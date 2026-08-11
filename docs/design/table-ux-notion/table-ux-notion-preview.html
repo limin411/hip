@@ -170,6 +170,37 @@ p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
 .tnode.folder svg.ik{color:var(--accent)}
 .tnode .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tnode .cnt{font-size:10px;color:var(--text-tertiary);background:var(--bg-muted);border-radius:8px;padding:0 6px}
+/* —— 侧边栏树（真实化：展开/折叠 + hover 操作） —— */
+.tnode .chev{width:13px;height:13px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);flex:none;transition:transform .12s}
+.tnode .chev.open{transform:rotate(90deg)}
+.tnode .chev.blank{visibility:hidden}
+.tnode .tops{display:none;align-items:center;gap:1px;margin-left:auto;flex:none}
+.tnode:hover .tops{display:flex}
+.tnode .tops button{width:17px;height:17px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px}
+.tnode .tops button:hover{background:var(--bg-muted);color:var(--text-primary)}
+.tnode.child{padding-left:22px;font-size:12px}
+.sb-new{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:13px;margin-left:auto;flex:none}
+.sb-new:hover{background:var(--state-hover);color:var(--text-primary)}
+/* —— 浏览页 —— */
+#view-browse{display:none;flex:1;flex-direction:column;min-height:0}
+.browse-head{display:flex;align-items:center;gap:10px;padding:6px 22px 10px}
+.browse-head .bh-title{font-size:21px;font-weight:650;letter-spacing:-.015em}
+.browse-sub{color:var(--text-tertiary);font-size:11.5px}
+.browse-list{flex:1;overflow:auto;padding:4px 18px 14px}
+.brow{display:flex;align-items:center;gap:10px;height:38px;padding:0 10px;border-radius:8px;cursor:pointer;font-size:12.5px;color:var(--text-primary)}
+.brow:hover{background:var(--tbl-row-hover)}
+.brow .bic{width:20px;height:20px;border-radius:5px;background:var(--bg-muted);display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:10px;flex:none}
+.brow .bic.table{color:var(--text-secondary)}
+.brow .bname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .bdate{font-size:10.5px;color:var(--text-tertiary);flex:none}
+.brow .bmore{display:none;width:20px;height:20px;border-radius:5px;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px;flex:none}
+.brow:hover .bmore{display:flex}
+.brow .bmore:hover{background:var(--bg-muted);color:var(--text-primary)}
+/* —— 滚动条（Notion 式细滚动条） —— */
+.grid-wrap::-webkit-scrollbar,.sb-scroll::-webkit-scrollbar,.browse-list::-webkit-scrollbar{width:9px;height:9px}
+.grid-wrap::-webkit-scrollbar-thumb,.sb-scroll::-webkit-scrollbar-thumb,.browse-list::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:5px;border:2px solid transparent;background-clip:content-box}
+.grid-wrap::-webkit-scrollbar-thumb:hover{background:var(--text-tertiary);background-clip:content-box}
+.grid-wrap::-webkit-scrollbar-corner,.sb-scroll::-webkit-scrollbar-corner,.browse-list::-webkit-scrollbar-corner{background:transparent}
 
 /* —— 文档/表格页 —— */
 .pg-bread{display:flex;align-items:center;gap:2px;padding:10px 22px 0;font-size:11.5px;color:var(--text-tertiary)}
@@ -213,6 +244,8 @@ p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
 th.corner.nf{top:auto}
 /* 遮罩（筛选/更多 popover 点击外部关闭） */
 #filter-scrim{position:fixed;inset:0;z-index:195;background:transparent}
+/* 右键菜单（portal） */
+.pop.ctx{min-width:190px;position:fixed}
 
 /* —— 表格网格 —— */
 .grid-wrap{flex:1;overflow:auto;outline:none;position:relative}
@@ -310,6 +343,9 @@ td.sel .cell-chip .ch-arrow{display:none}
 .pop .pmi.danger:hover{background:color-mix(in srgb,#c63b3b 10%,transparent)}
 .pop .pmi .pi-ic{width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px}
 .pop .pmi .chk-ic{width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:var(--tbl-focus);font-size:11px}
+.pop .pmi.hot{color:var(--text-primary);font-weight:600}
+/* 标题内联编辑 */
+.title-edit{flex:1;min-width:0;border:1px solid var(--tbl-focus);border-radius:6px;padding:1px 8px;font-size:20px;font-weight:650;letter-spacing:-.015em;outline:none;background:var(--bg-app);color:var(--text-primary)}
 .pop .pmi .grow{flex:1}
 .pop .pmi .kbd{margin-left:auto;font-size:10px;color:var(--text-tertiary);font-family:ui-monospace,Menlo,Consolas,monospace}
 .pop .psep{height:1px;background:var(--border);margin:4px 2px}
@@ -361,7 +397,7 @@ td.sel .cell-chip .ch-arrow{display:none}
   <!-- ══════════ 场景二：交互原型 ══════════ -->
   <section id="scene2" style="display:none">
     <h2 class="sec"><span class="tag">SCENE 2</span> 新版表格编辑器（全交互原型）</h2>
-    <p class="sec-sub">真实可操作：点选即键盘可用、Shift 扩展选区、⌘A 全选、⌘C/⌘V 跨应用复制粘贴、列头 hover ⋯、行号 hover 手柄、浮层永不裁剪。试试：点击单元格后直接打字 → 按 Enter 提交并下移；选中几个格子按 Delete；⌘V 粘入下方示例 TSV。</p>
+    <p class="sec-sub">完整应用环境：<b>侧边栏树可展开/折叠</b>（hover 出操作）、<b>面包屑可回浏览页</b>、<b>双击标题改名</b>（树/面包屑同步）、<b>右键菜单</b>、<b>日期列 date 控件</b>、<b>双击列宽自适应</b>、<b>统计逐列模式</b>。试试：点击单元格后直接打字 → Enter 提交并下移；Shift+点击扩展选区后 Delete；⌘V 粘入下方 TSV；右键单元格插入行/列。</p>
     <div class="hintbar" style="margin-bottom:12px">
       <b>交互清单：</b>
       <kbd>单击</kbd> 选中（焦点入网格）· <kbd>双击</kbd> / <kbd>Enter</kbd> / <kbd>F2</kbd> / 直接打字 编辑 · <kbd>Tab</kbd>/<kbd>Shift+Tab</kbd> 提交并换位（末列自动换行）· <kbd>Shift+Enter</kbd> 格内换行 · <kbd>Esc</kbd> 分级退出 · <kbd>Delete</kbd> 清空选区 · <kbd>Shift+方向键</kbd> 扩展选区 · <kbd>⌘A</kbd> 全选 · <kbd>⌘C/⌘V</kbd> 复制粘贴 · <kbd>⌘Z/⇧⌘Z</kbd> 撤销重做 · 单击行号=整行 · 单击列头=整列 · 列头右缘拖拽调宽 / 双击自适应 · 列头/行号拖拽重排（排序/筛选下禁用）
@@ -371,26 +407,29 @@ td.sel .cell-chip .ch-arrow{display:none}
 
     <div class="stage">
       <div id="sidebar">
-        <div class="sb-head">📚 知识库</div>
-        <div class="sb-scroll">
-          <div class="sb-sec">空间</div>
-          <div class="tnode"><span style="width:16px;height:16px;border-radius:5px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-size:10px">H</span><span class="tt">hip 工作台</span></div>
-          <div class="sb-sec">文档</div>
-          <div class="tnode folder"><svg class="ik" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="tt">产品规划</span></div>
-          <div class="tnode folder"><svg class="ik" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="tt">研发排期</span></div>
-          <div class="tnode active"><svg class="ik" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v6"/></svg><span class="tt">表格交互整改</span><span class="cnt">7</span></div>
-          <div class="tnode"><svg class="ik" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span class="tt">PR 评审记录</span></div>
-        </div>
+        <div class="sb-head">📚 知识库<button class="sb-new" id="sb-new" title="新建（文档 / 表格）">＋</button></div>
+        <div class="sb-scroll" id="sb-tree"></div>
       </div>
       <div id="main">
+        <!-- 浏览页视图 -->
+        <div id="view-browse">
+          <div class="pg-bread" id="br-crumbs"></div>
+          <div class="browse-head">
+            <span class="bh-title" id="br-title"></span>
+            <button class="btn primary" id="br-new" style="height:26px;padding:0 12px;font-size:11.5px">＋ 新建</button>
+          </div>
+          <div class="browse-list" id="br-list"></div>
+        </div>
+        <!-- 表格编辑器视图 -->
+        <div id="view-table" style="display:flex;flex:1;flex-direction:column;min-height:0">
         <div class="pg-bread">
-          <span class="cr">我的空间</span><span style="opacity:.5">/</span>
-          <span class="cr">研发排期</span><span style="opacity:.5">/</span>
-          <span class="cr cur">表格交互整改</span>
+          <span class="cr" data-nav="browse">我的空间</span><span style="opacity:.5">/</span>
+          <span class="cr" data-nav="browse">研发排期</span><span style="opacity:.5">/</span>
+          <span class="cr cur" id="tb-cr-title">表格交互整改 · 任务看板</span>
         </div>
         <div class="pg-title">
-          <span class="tm" id="table-title">表格交互整改 · 任务看板</span>
-          <button class="page-more" title="页面菜单">⋯</button>
+          <span class="tm" id="table-title" title="双击重命名">表格交互整改 · 任务看板</span>
+          <button class="page-more" id="page-more" title="页面菜单">⋯</button>
         </div>
         <div class="toolbar">
           <button class="tb-btn" id="tb-undo" title="撤销 ⌘Z">↶</button>
@@ -413,6 +452,7 @@ td.sel .cell-chip .ch-arrow{display:none}
           <span class="sb-hint" id="sb-hint"></span>
           <span class="sb-save" id="sb-save" style="display:none"><span class="dot"></span><span id="sb-save-text"></span></span>
         </div>
+        </div><!-- /view-table -->
       </div>
     </div>
   </section>
@@ -606,6 +646,28 @@ const DATA = {
 const TYPE_ICONS = { text:'T', number:'#', checkbox:'☑', date:'🗓', select:'▾' }
 const CHIP_COLS = ['c2','c3']
 
+/* —— 应用框架数据（侧边栏树 / 视图状态） —— */
+const TREE = [
+  { id:'f1', kind:'folder', name:'产品规划', open:false, children:[
+    { id:'d1', kind:'doc', name:'2026 年产品路线图' },
+    { id:'d2', kind:'doc', name:'用户访谈纪要' },
+  ]},
+  { id:'f2', kind:'folder', name:'研发排期', open:true, children:[
+    { id:'t1', kind:'table', name:'表格交互整改 · 任务看板' },
+    { id:'d3', kind:'doc', name:'PR 评审记录' },
+    { id:'d4', kind:'doc', name:'发布检查单' },
+  ]},
+  { id:'f3', kind:'folder', name:'知识沉淀', open:false, children:[
+    { id:'d5', kind:'doc', name:'Notion 交互调研' },
+  ]},
+]
+const APP = { view:'table', title:'表格交互整改 · 任务看板', folder:'研发排期', activeId:'t1' }
+const TREE_ICONS = {
+  folder: `<svg class="ik" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`,
+  doc: `<svg class="ik" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>`,
+  table: `<svg class="ik" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v6"/></svg>`,
+}
+
 let S = {
   sel:{ ar:0, ac:0, fr:0, fc:0 },
   mode:'cell',            // 'cell' | 'row' | 'col'
@@ -617,8 +679,12 @@ let S = {
   sort:null,              // {ci, dir}
   filter:null,            // {ci, op, value}
   stats:false,            // 统计行（默认关，对齐 TableEditor useState(false)）
+  colStats:{},            // 逐列统计模式：ci → 'sum'|'avg'|'count'|'off'
   filterOpen:false,       // 筛选 popover 开合
   moreOpen:false,         // ⋯ 菜单开合
+  pagePop:false,          // 页面 ⋯ 菜单
+  ctx:null,               // 右键菜单 {x, y, ri, ci}
+  titleEdit:false,        // 表格标题内联编辑
   freeze:true,            // 冻结表头（TB3：移入 ⋯ 菜单）
   undoStack:[], redoStack:[],
   colDrag:null, rowDrag:null, resize:null,
@@ -791,8 +857,17 @@ function startEdit(r,c,initial){
   closeMenus()
   S.editing={ r, c, value: initial !== undefined ? initial : DATA.rows[r][c] }
   renderAll()
-  const ta = grid.querySelector(`textarea[data-edit="${r}_${c}"]`)
-  if (ta){ ta.focus(); const len=ta.value.length; try{ ta.setSelectionRange(len,len) }catch{} }
+  const ta = grid.querySelector(`[data-edit="${r}_${c}"]`)
+  if (ta){
+    ta.focus()
+    if (ta.tagName === 'TEXTAREA'){ const len=ta.value.length; try{ ta.setSelectionRange(len,len) }catch{} }
+    // 编辑格若在容器视口外，自动滚动到可见（真实编辑器行为）
+    const wr = gridWrap.getBoundingClientRect(), er = ta.getBoundingClientRect()
+    if (er.top < wr.top) gridWrap.scrollTop -= (wr.top - er.top) + 6
+    if (er.bottom > wr.bottom) gridWrap.scrollTop += (er.bottom - wr.bottom) + 6
+    if (er.left < wr.left) gridWrap.scrollLeft -= (wr.left - er.left) + 6
+    if (er.right > wr.right) gridWrap.scrollLeft += (er.right - wr.right) + 6
+  }
 }
 function commitEdit(move){
   const ed = S.editing; if (!ed) return
@@ -938,9 +1013,15 @@ function renderGrid(){
       const numCls = col.type==='number' ? 'num' : ''
       html += `<td class="${selCls} ${numCls}" data-cell="${ri}_${ci}" style="position:relative">`
       if (S.editing && S.editing.r===ri && S.editing.c===ci){
-        const isNum = col.type==='number'
-        const taH = Math.min(120, Math.max(30, 18 + (S.editing.value.match(/\n/g)?.length||0)*16))
-        html += `<textarea class="cell-edit ${isNum?'num-edit':''}" data-edit="${ri}_${ci}" style="height:${taH}px" spellcheck="false">${esc(S.editing.value)}</textarea>`
+        if (col.type==='date'){
+          // 日期列：原生 date 控件（值非法时回退为空值 + placeholder）
+          const dv = /^\d{4}-\d{2}-\d{2}$/.test(S.editing.value) ? S.editing.value : ''
+          html += `<input type="date" class="cell-edit" data-edit="${ri}_${ci}" value="${dv}" placeholder="YYYY-MM-DD">`
+        } else {
+          const isNum = col.type==='number'
+          const taH = Math.min(120, Math.max(30, 18 + (S.editing.value.match(/\n/g)?.length||0)*16))
+          html += `<textarea class="cell-edit ${isNum?'num-edit':''}" data-edit="${ri}_${ci}" style="height:${taH}px" spellcheck="false">${esc(S.editing.value)}</textarea>`
+        }
       } else if (col.type==='checkbox'){
         const on = v==='1'
         html += `<span class="chk ${on?'on':''}" data-check="${ri}_${ci}">${on?'✓':''}</span>`
@@ -960,17 +1041,23 @@ function renderGrid(){
     html += '</tr>'
   })
   // 统计行
+  // 统计行（逐列模式：数字列 sum/avg/count，其余 count；off 隐藏）
   if (S.stats){
     html += `<tr class="stats-row"><td class="rn">Σ</td>`
     DATA.cols.forEach((col, ci) => {
       const vis = order.map(ri => DATA.rows[ri][ci])
+      const mode = S.colStats[ci] ?? (col.type==='number' ? 'sum' : 'count')
       let v = ''
-      if (col.type==='number'){
-        const nums = vis.map(parseFloat).filter(n=>!Number.isNaN(n))
-        if (nums.length) v = 'Σ ' + nums.reduce((a,b)=>a+b,0)
-      } else if (col.type==='checkbox'){ v = '✓ ' + vis.filter(x=>x==='1').length }
-      else { v = vis.filter(x=>x.trim()!=='').length + ' 项' }
-      html += `<td>${v}</td>`
+      if (mode !== 'off'){
+        if (col.type==='number'){
+          const nums = vis.map(parseFloat).filter(n=>!Number.isNaN(n))
+          if (mode==='sum') v = 'Σ ' + (nums.length ? nums.reduce((a,b)=>a+b,0) : '')
+          else if (mode==='avg') v = 'x̄ ' + (nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1) : '')
+          else v = nums.length + ' 项'
+        } else if (col.type==='checkbox'){ v = '✓ ' + vis.filter(x=>x==='1').length }
+        else { v = vis.filter(x=>x.trim()!=='').length + ' 项' }
+      }
+      html += `<td data-stats-cell="${ci}">${v}</td>`
     })
     html += '</tr>'
   }
@@ -1077,7 +1164,9 @@ function renderMorePop(){
 function renderStatus(){
   const order = viewOrder()
   const filtered = S.filter ? ` · 可见 ${order.length}/${DATA.rows.length} 行` : ''
-  $('sb-count').textContent = `${DATA.rows.length} 行 · ${DATA.cols.length} 列${filtered}`
+  const cells = selCells().length
+  const selInfo = cells > 1 ? ` · 已选 ${cells} 格` : ''
+  $('sb-count').textContent = `${DATA.rows.length} 行 · ${DATA.cols.length} 列${filtered}${selInfo}`
   const hint = $('sb-hint')
   if (S.sort && S.filter) hint.textContent = '排序+筛选视图：行拖拽已禁用，新增行可能被隐藏'
   else if (S.sort) hint.textContent = '排序视图：行拖拽已禁用'
@@ -1105,7 +1194,7 @@ function openPop(node, anchorEl){
   node.style.left = Math.max(8, Math.min(x, innerWidth - pw - 8)) + 'px'
   node.style.top = Math.max(8, Math.min(y, innerHeight - ph - 8)) + 'px'
 }
-function closeMenus(){ S.colMenu=null; S.rowMenu=null; S.popup=null; S.renameCi=null; S.filterOpen=false; S.moreOpen=false; portalEl=null; $('portal').innerHTML=''; const sc=document.getElementById('filter-scrim'); if (sc) sc.remove() }
+function closeMenus(){ S.colMenu=null; S.rowMenu=null; S.popup=null; S.renameCi=null; S.filterOpen=false; S.moreOpen=false; S.pagePop=false; S.ctx=null; portalEl=null; $('portal').innerHTML=''; const sc=document.getElementById('filter-scrim'); if (sc) sc.remove() }
 
 function renderMenus(){
   // 网格菜单（列/行/选项）互斥渲染；筛选/更多 popover 独立管理，不在此清空
@@ -1126,6 +1215,15 @@ function renderMenus(){
       <div class="pmi" data-csort="asc"><span class="pi-ic">↑</span>升序排列</div>
       <div class="pmi" data-csort="desc"><span class="pi-ic">↓</span>降序排列</div>
       ${S.sort?.ci===S.colMenu?`<div class="pmi dim" data-csort="clear">清除排序</div>`:''}
+      ${S.stats?`
+      <div class="psep"></div>
+      <div class="psub">统计（Σ）</div>
+      ${(() => {
+        const m = S.colStats[S.colMenu] ?? (col.type==='number' ? 'sum' : 'count')
+        const row = (mode, label) => `<div class="pmi ${m===mode?'hot':''}" data-cstats="${mode}"><span class="chk-ic">${m===mode?'✓':''}</span>${label}</div>`
+        if (col.type==='number') return row('sum','求和') + row('avg','均值') + row('count','计数') + row('off','关闭')
+        return row('count','计数') + row('off','关闭')
+      })()}`:''}
       <div class="psep"></div>
       <div class="pmi" data-cins="0"><span class="pi-ic">＋</span>在左侧插入列</div>
       <div class="pmi" data-cins="1"><span class="pi-ic">＋</span>在右侧插入列</div>
@@ -1139,6 +1237,8 @@ function renderMenus(){
       const ins = e.target.closest('[data-cins]')
       if (ins){ addColAt(S.colMenu, Number(ins.dataset.cins)); closeMenus(); return }
       if (e.target.closest('[data-cdel]')){ delCol(S.colMenu); closeMenus(); return }
+      const cs = e.target.closest('[data-cstats]')
+      if (cs){ S.colStats[S.colMenu] = cs.dataset.cstats; closeMenus(); renderAll(); return }
     })
     return
   }
@@ -1346,16 +1446,109 @@ gridWrap.addEventListener('dblclick', e => {
     if (inp){ inp.focus(); inp.select() }
     return
   }
+  const rs = e.target.closest('[data-col-resize]')
+  if (rs){ autofitCol(Number(rs.dataset.colResize)); return }
   const cellEl = e.target.closest('td[data-cell]')
   if (!cellEl) return
   const [r, c] = cellEl.dataset.cell.split('_').map(Number)
   if (DATA.cols[c].type === 'checkbox') return
   startEdit(r, c)
 })
+/** 双击列宽手柄 = 自适应内容宽度（Notion/Sheets 语义） */
+function autofitCol(ci){
+  const col = DATA.cols[ci]
+  let max = col.name.length
+  DATA.rows.forEach(r => {
+    const v = String(r[ci] ?? '')
+    let w = 0
+    for (const ch of v) w += /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 2 : 1
+    max = Math.max(max, w)
+  })
+  if (col.width === Math.max(64, Math.min(420, max*8+30))) return
+  pushHistory()
+  setColWidth(ci, Math.max(64, Math.min(420, max*8+30)))
+  renderGrid()
+}
+
+/* —— 右键菜单（单元格/行号/列头上下文） —— */
+gridWrap.addEventListener('contextmenu', e => {
+  e.preventDefault()
+  const th = e.target.closest('th[data-ci]')
+  const rn = e.target.closest('td.rn')
+  const cellEl = e.target.closest('td[data-cell]')
+  if (th && !rn && !e.target.closest('[data-col-rename]')){
+    closeMenus(); S.colMenu = Number(th.dataset.ci); renderMenus()
+    return
+  }
+  if (rn && !rn.closest('tr.add-row') && !rn.closest('tr.stats-row')){
+    closeMenus()
+    S.ctx = { x: e.clientX, y: e.clientY, ri: Number(rn.closest('tr').dataset.ri), ci: null }
+    renderCtxPop()
+    return
+  }
+  if (cellEl){
+    const [ri, ci] = cellEl.dataset.cell.split('_').map(Number)
+    selectCell(ri, ci, false)   // 右键即选中该格
+    closeMenus()
+    S.ctx = { x: e.clientX, y: e.clientY, ri, ci }
+    renderCtxPop()
+    return
+  }
+  closeMenus()
+  S.ctx = { x: e.clientX, y: e.clientY, ri: null, ci: null }
+  renderCtxPop()
+})
+function renderCtxPop(){
+  $('portal').innerHTML=''
+  if (!S.ctx) return
+  showScrim()
+  const node = document.createElement('div')
+  node.className = 'pop ctx'
+  const { ri, ci } = S.ctx
+  node.innerHTML = `
+    <div class="pmi" data-ctx="copy"><span class="pi-ic">⧉</span>复制<span class="kbd">⌘C</span></div>
+    <div class="pmi" data-ctx="paste"><span class="pi-ic">📋</span>粘贴<span class="kbd">⌘V</span></div>
+    <div class="pmi" data-ctx="clear"><span class="pi-ic">⌫</span>清空选区</div>
+    <div class="psep"></div>
+    <div class="pmi" data-ctx="row-above"><span class="pi-ic">⇧</span>在上方插入行</div>
+    <div class="pmi" data-ctx="row-below"><span class="pi-ic">⇩</span>在下方插入行</div>
+    <div class="pmi ${ri==null?'dim':''}" data-ctx="row-del"><span class="pi-ic">✕</span>删除行</div>
+    <div class="psep"></div>
+    <div class="pmi" data-ctx="col-left"><span class="pi-ic">⇦</span>在左侧插入列</div>
+    <div class="pmi" data-ctx="col-right"><span class="pi-ic">⇨</span>在右侧插入列</div>
+    <div class="pmi ${ci==null?'dim':''}" data-ctx="col-del"><span class="pi-ic">✕</span>删除列</div>`
+  node.style.left = Math.max(8, Math.min(S.ctx.x, innerWidth - 210)) + 'px'
+  node.style.top = Math.max(8, Math.min(S.ctx.y, innerHeight - 320)) + 'px'
+  $('portal').appendChild(node)
+  node.addEventListener('click', e => {
+    const it = e.target.closest('[data-ctx]')
+    if (!it) return
+    const k = it.dataset.ctx
+    closeMenus()
+    switch (k){
+      case 'copy': copySel(); break
+      case 'paste': readClipboard(); break
+      case 'clear':
+        if (selCells().length){ pushHistory(); selDataCells().forEach(([r,c])=>{ DATA.rows[r][c]='' }); afterDataChange() }
+        break
+      case 'row-above': if (ri!=null) insertRow(ri, false); break
+      case 'row-below': if (ri!=null) insertRow(ri+1, false); break
+      case 'row-del': if (ri!=null) delRow(ri); break
+      case 'col-left': if (ci!=null) addColAt(ci, 0); break
+      case 'col-right': if (ci!=null) addColAt(ci, 1); break
+      case 'col-del': if (ci!=null) delCol(ci); break
+    }
+  })
+}
+
+/* 滚动网格容器 → 关闭全部浮层（spec T6 简单方案） */
+gridWrap.addEventListener('scroll', () => {
+  if (S.colMenu!=null || S.rowMenu!=null || S.popup || S.filterOpen || S.moreOpen || S.pagePop || S.ctx) closeMenus()
+})
 
 gridWrap.addEventListener('keydown', e => {
   const meta = e.metaKey || e.ctrlKey
-  const editEl = e.target.closest('textarea.cell-edit')
+  const editEl = e.target.closest('textarea.cell-edit, input.cell-edit')
   if (editEl) return  // 编辑态由 input 自身处理（下方绑定）
   if (meta){
     const k = e.key.toLowerCase()
@@ -1438,12 +1631,14 @@ gridWrap.addEventListener('keydown', e => {
 })
 
 grid.addEventListener('input', e => {
-  const ta = e.target.closest('textarea.cell-edit')
+  const ta = e.target.closest('textarea.cell-edit, input.cell-edit')
   if (ta){
     const [r, c] = ta.dataset.edit.split('_').map(Number)
     S.editing = { r, c, value: ta.value }
-    const h = Math.min(120, Math.max(30, 18 + (ta.value.match(/\n/g)?.length||0)*16))
-    ta.style.height = h + 'px'
+    if (ta.tagName === 'TEXTAREA'){
+      const h = Math.min(120, Math.max(30, 18 + (ta.value.match(/\n/g)?.length||0)*16))
+      ta.style.height = h + 'px'
+    }
     ta.classList.remove('err')
   }
   const ren = e.target.closest('[data-col-rename]')
@@ -1460,7 +1655,7 @@ grid.addEventListener('keydown', e => {
     }
     return
   }
-  const ta = e.target.closest('textarea.cell-edit')
+  const ta = e.target.closest('textarea.cell-edit, input.cell-edit')
   if (!ta) return
   const [r, c] = ta.dataset.edit.split('_').map(Number)
   const meta = e.metaKey || e.ctrlKey
@@ -1495,7 +1690,7 @@ grid.addEventListener('keydown', e => {
   if (e.key === 'Escape'){ e.preventDefault(); cancelEdit() }
 })
 grid.addEventListener('blur', e => {
-  const ta = e.target.closest('textarea.cell-edit')
+  const ta = e.target.closest('textarea.cell-edit, input.cell-edit')
   if (ta && S.editing){ commitEdit() }
 }, true)
 grid.addEventListener('focusout', e => {
@@ -1508,6 +1703,149 @@ function commitRename(ren){
   if (v && v !== DATA.cols[ci].name){ pushHistory(); DATA.cols[ci].name = v }
   S.renameCi = null
   renderAll(); focusGrid()
+}
+
+/* —— 应用框架：侧边栏树 / 浏览页 / 标题重命名 / 页面 ⋯ 菜单 —— */
+function renderSidebar(){
+  const el = $('sb-tree')
+  let h = `<div class="sb-sec">空间</div>`
+  h += `<div class="tnode space"><span style="width:16px;height:16px;border-radius:5px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-size:10px">H</span><span class="tt">hip 工作台</span><span class="tops"><button data-sb="new" title="新建">＋</button><button data-sb="more" title="空间菜单">⋯</button></span></div>`
+  h += `<div class="sb-sec">文档</div>`
+  for (const f of TREE){
+    h += `<div class="tnode folder" data-folder="${f.id}">`
+    h += `<span class="chev ${f.open?'open':''}">▶</span>${TREE_ICONS.folder}<span class="tt">${esc(f.name)}</span><span class="cnt">${f.children.length}</span>`
+    h += `<span class="tops"><button data-sb="new" title="新建">＋</button><button data-sb="more" title="菜单">⋯</button></span></div>`
+    if (f.open) for (const c of f.children){
+      h += `<div class="tnode child ${APP.activeId===c.id?'active':''}" data-node="${c.id}" data-kind="${c.kind}">`
+      h += `<span class="chev blank">▶</span>${TREE_ICONS[c.kind]}<span class="tt">${esc(c.name)}</span>`
+      h += `<span class="tops"><button data-sb="more" title="菜单">⋯</button></span></div>`
+    }
+  }
+  el.innerHTML = h
+}
+$('sb-tree').addEventListener('click', e => {
+  const sb = e.target.closest('[data-sb]')
+  if (sb){
+    if (sb.dataset.sb === 'new') toast('新建文档 / 新建表格（原型演示）')
+    else toast('节点菜单：重命名 / 删除（原型演示）')
+    return
+  }
+  const folder = e.target.closest('[data-folder]')
+  if (folder){
+    const f = TREE.find(x => x.id === folder.dataset.folder)
+    if (f){ f.open = !f.open; renderSidebar() }
+    return
+  }
+  const node = e.target.closest('[data-node]')
+  if (node){
+    if (node.dataset.kind === 'table') openTable()
+    else toast(`文档「${node.querySelector('.tt').textContent}」将在此打开（原型聚焦表格编辑器）`)
+  }
+})
+$('sb-new').addEventListener('click', () => toast('新建文档 / 新建表格（原型演示）'))
+
+function renderBrowse(){
+  $('br-crumbs').innerHTML = `<span class="cr cur">我的空间</span><span style="opacity:.5">/</span><span class="cr cur">${esc(APP.folder)}</span>`
+  $('br-title').textContent = APP.folder
+  const f = TREE.find(x => x.name === APP.folder) || TREE[1]
+  $('br-list').innerHTML = f.children.map(c => `
+    <div class="brow" data-brow="${c.id}" data-kind="${c.kind}">
+      <span class="bic ${c.kind==='table'?'table':''}">${c.kind==='table'?'▦':'📄'}</span>
+      <span class="bname">${esc(c.name)}</span>
+      <span class="bdate">${c.kind==='table'?'今天 09:41':'8 月 10 日'}</span>
+      <button class="bmore" data-bmore="${c.id}">⋯</button>
+    </div>`).join('')
+}
+$('br-list').addEventListener('click', e => {
+  const row = e.target.closest('[data-brow]')
+  if (row){
+    if (row.dataset.kind === 'table') openTable()
+    else toast(`文档「${row.querySelector('.bname').textContent}」将在此打开（原型聚焦表格编辑器）`)
+  } else if (e.target.closest('[data-bmore]')) toast('行菜单：重命名 / 移动 / 删除（原型演示）')
+})
+$('br-new').addEventListener('click', () => toast('新建文档 / 新建表格（原型演示）'))
+
+function openBrowse(){ closeMenus(); APP.view = 'browse'; renderViews() }
+function openTable(){ closeMenus(); APP.view = 'table'; APP.activeId = 't1'; renderViews(); focusGrid() }
+function renderViews(){
+  $('view-browse').style.display = APP.view === 'browse' ? 'flex' : 'none'
+  $('view-table').style.display = APP.view === 'table' ? 'flex' : 'none'
+  if (APP.view === 'browse') renderBrowse()
+  $('tb-cr-title').textContent = APP.title
+  renderTableTitle()
+  renderSidebar()
+}
+document.querySelectorAll('.pg-bread').forEach(b => b.addEventListener('click', e => {
+  const nav = e.target.closest('[data-nav]')
+  if (nav && nav.dataset.nav === 'browse') openBrowse()
+}))
+
+/* 表格标题：双击内联重命名（Enter/Esc/外点提交，树与面包屑同步） */
+function renderTableTitle(){
+  const el = $('table-title')
+  if (S.titleEdit){
+    el.innerHTML = `<input class="title-edit" id="title-input" value="${esc(APP.title)}" spellcheck="false">`
+    const inp = $('title-input')
+    if (inp){ inp.focus(); inp.select() }
+  } else {
+    el.textContent = APP.title
+  }
+  $('tb-cr-title').textContent = APP.title
+}
+function commitTitle(){
+  const inp = $('title-input')
+  const v = inp ? inp.value.trim() : ''
+  if (v && v !== APP.title){
+    APP.title = v
+    const f = TREE.find(x => x.name === APP.folder)
+    const n = f && f.children.find(c => c.id === 't1')
+    if (n) n.name = v
+    toast('已重命名')
+  }
+  S.titleEdit = false
+  renderViews()
+  if (APP.view === 'table') focusGrid()
+}
+$('table-title').addEventListener('dblclick', () => { S.titleEdit = true; renderTableTitle() })
+document.addEventListener('click', e => {
+  // 忽略浮层内点击（页面 ⋯ 菜单等会先 closeMenus 再触发新状态，不能在此误提交）
+  if (S.titleEdit && !e.target.closest('#title-input') && !e.target.closest('.pop')) commitTitle()
+})
+document.addEventListener('keydown', e => {
+  if (!S.titleEdit) return
+  if (e.key === 'Enter'){ e.preventDefault(); commitTitle() }
+  else if (e.key === 'Escape'){ e.preventDefault(); S.titleEdit = false; renderViews() }
+})
+
+/* 页面 ⋯ 菜单（重命名 / 导出 / 版本 / 回收站） */
+$('page-more').addEventListener('click', () => {
+  if (S.pagePop){ closeMenus(); return }
+  closeMenus(); S.pagePop = true; renderPagePop()
+})
+function renderPagePop(){
+  $('portal').innerHTML=''
+  if (!S.pagePop) return
+  showScrim()
+  const node = document.createElement('div')
+  node.className = 'pop'
+  node.style.minWidth = '190px'
+  node.innerHTML = `
+    <div class="pmi" data-pp="rename"><span class="pi-ic">✎</span>重命名</div>
+    <div class="pmi" data-pp="export"><span class="pi-ic">⇩</span>导出 CSV</div>
+    <div class="pmi" data-pp="versions"><span class="pi-ic">🕘</span>版本历史</div>
+    <div class="psep"></div>
+    <div class="pmi danger" data-pp="trash"><span class="pi-ic">🗑</span>移至回收站</div>`
+  openPop(node, $('page-more'))
+  node.addEventListener('click', e => {
+    const it = e.target.closest('[data-pp]')
+    if (!it) return
+    const k = it.dataset.pp
+    closeMenus()
+    if (k === 'rename'){ S.titleEdit = true; renderTableTitle() }
+    else if (k === 'export') $('tb-export').click()
+    else if (k === 'versions') toast('版本历史：按天快照（原型演示）')
+    else if (k === 'trash') toast('已移至回收站（原型演示）','warn')
+  })
 }
 
 /* —— 工具栏 —— */
@@ -1604,6 +1942,7 @@ renderCards()
 function init(){
   S.sel = { ar:0, ac:0, fr:0, fc:0 }
   pushHistory()  // 基线
+  renderViews()
   renderAll()
   bindDrags()
   focusGrid()

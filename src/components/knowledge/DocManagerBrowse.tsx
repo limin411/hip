@@ -55,6 +55,7 @@ export function DocManagerBrowse() {
   const [view, setView] = useState<'grid' | 'list'>('list')
   const [newKind, setNewKind] = useState<'folder' | 'doc' | 'table' | null>(null)
   const [newTitle, setNewTitle] = useState('')
+  const cancelNewRef = useRef(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [jumpOpen, setJumpOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -877,8 +878,17 @@ export function DocManagerBrowse() {
                     confirmNew()
                   } else if (e.key === 'Escape') {
                     e.stopPropagation()
+                    cancelNewRef.current = true
                     setNewKind(null)
                   }
+                }}
+                onBlur={() => {
+                  // 鼠标点击他处即提交（与列重命名/Excel 一致）；Esc 取消后忽略随后的 blur。
+                  if (cancelNewRef.current) {
+                    cancelNewRef.current = false
+                    return
+                  }
+                  confirmNew()
                 }}
                 onClick={(e) => e.stopPropagation()}
                 className="min-w-0 flex-1 rounded-sm border border-accent/50 bg-surface px-1.5 py-0.5 text-body text-ink outline-none"

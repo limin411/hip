@@ -7,12 +7,20 @@ import { useKnowledgeStore } from '@/store/knowledgeStore'
 
 const knowledgeReadTable = vi.fn()
 const knowledgeWriteTable = vi.fn()
+const knowledgeExportText = vi.fn()
+const pickSavePath = vi.fn()
 const commitTableSpy = vi.fn()
 
 vi.mock('@/ipc/knowledge', () => ({
   knowledgeReadTable: (...a: unknown[]) => knowledgeReadTable(...a),
   knowledgeWriteTable: (...a: unknown[]) => knowledgeWriteTable(...a),
+  knowledgeExportText: (...a: unknown[]) => knowledgeExportText(...a),
   knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
+}))
+
+vi.mock('@/ipc/dialog', () => ({
+  pickSavePath: (...a: unknown[]) => pickSavePath(...a),
+  pickAttachmentFiles: vi.fn(),
 }))
 
 vi.mock('sonner', () => ({
@@ -38,7 +46,7 @@ vi.mock('react-i18next', async (importOriginal) => {
   }
 })
 
-const CSV = 'a,b,c\n1,2,3\nx,y,z\n'
+const CSV = 'a,100,c\n1,200,3\nx,300,z\n'
 const META = JSON.stringify({
   cols: [
     { id: 'col_1', name: '任务', type: 'text', width: 150 },
@@ -148,7 +156,7 @@ describe('TableEditor (knowledge-table PR-3)', () => {
     render(<TableEditor tableId="tbl_1" />)
     const grid = screen.getByTestId('table-grid')
     fireEvent.keyDown(grid, { key: 'Delete' })
-    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe(',b,c\n1,2,3\nx,y,z')
+    expect(useKnowledgeStore.getState().tableDraft?.csv).toBe(',100,c\n1,200,3\nx,300,z')
     expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toBe('')
   })
 
@@ -279,7 +287,7 @@ describe('TableEditor PR-4 (undo/resize/drag/freeze)', () => {
     expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('BB')
     // ⌘Z → 回到 AA
     fireEvent.keyDown(grid, { key: 'z', metaKey: true })
-    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('b')
+    expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('100')
     expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('AA')
     // ⇧⌘Z → 重做 BB
     fireEvent.keyDown(grid, { key: 'z', metaKey: true, shiftKey: true })
@@ -336,8 +344,8 @@ describe('TableEditor PR-4 (undo/resize/drag/freeze)', () => {
     // 列头顺序变了：第 1 列现在是原来的 col_1（预算）
     const th0 = screen.getByTestId('table-grid').querySelector('th[data-col="0"]')!
     expect((th0 as HTMLElement).dataset.colId).toBe('col_2')
-    // 数据随动：原 col_1 的值 'b' 移到 col_0，原 'a' 移到 col_1
-    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('b')
+    // 数据随动：原 col_1 的值 '100' 移到 col_0，原 'a' 移到 col_1
+    expect(document.querySelector('td[data-cell="0,0"]')!.textContent).toContain('100')
     expect(document.querySelector('td[data-cell="0,1"]')!.textContent).toContain('a')
   })
 
@@ -384,5 +392,98 @@ describe('TableEditor PR-4 (undo/resize/drag/freeze)', () => {
     expect(screen.getByTestId('table-grid').dataset.cols).toBe('2')
     fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'z', metaKey: true })
     expect(screen.getByTestId('table-grid').dataset.cols).toBe('3')
+  })
+})
+
+describe('TableEditor PR-5 (sort/filter/stats/export)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+    vi.mocked(knowledgeExportText).mockReset()
+    vi.mocked(pickSavePath).mockReset()
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('sorts via column menu desc and shows indicator + chip', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="1"]')!)
+    fireEvent.click(screen.getByTestId('table-col-sort-desc'))
+    // 数字列 100,200,300 → 降序后首个可见行 col1 = '300'
+    const firstCol1 = () =>
+      document.querySelector('tbody tr[data-row] td[data-cell$=",1"]')!.textContent
+    expect(firstCol1()).toContain('300')
+    expect(screen.getByTestId('table-col-sort-ind').textContent).toBe('↓')
+    expect(screen.getByTestId('table-sort-chip')).toBeTruthy()
+    // 撤销排序恢复原序
+    fireEvent.keyDown(screen.getByTestId('table-grid'), { key: 'z', metaKey: true })
+    expect(firstCol1()).toContain('100')
+    expect(screen.queryByTestId('table-sort-chip')).toBeNull()
+  })
+
+  it('filter panel: contains filter + badge + visible rows + clear', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-filter'))
+    expect(screen.getByTestId('table-filter-panel')).toBeTruthy()
+    // 添加条件：列0 包含 'x'（默认 contains）
+    fireEvent.click(screen.getByTestId('table-filter-add'))
+    const val = screen.getByTestId('table-filter-value-0') as HTMLInputElement
+    fireEvent.change(val, { target: { value: 'x' } })
+    // 只有第 2 行（原始 ri=2）匹配（'x'）
+    expect(screen.getByTestId('table-grid').querySelectorAll('tbody tr[data-row]')).toHaveLength(1)
+    expect(document.querySelector('tbody tr[data-row] td[data-cell$=",0"]')!.textContent).toContain('x')
+    expect(screen.getByTestId('table-filter-badge').textContent).toBe('1')
+    // 清除
+    fireEvent.click(screen.getByTestId('table-filter-clear'))
+    expect(screen.getByTestId('table-grid').querySelectorAll('tbody tr[data-row]')).toHaveLength(3)
+    expect(screen.queryByTestId('table-filter-badge')).toBeNull()
+  })
+
+  it('stats row sums number columns and counts others over visible rows', () => {
+    render(<TableEditor tableId="tbl_1" />)
+    fireEvent.click(screen.getByTestId('table-stats'))
+    expect(screen.getByTestId('table-stats-row')).toBeTruthy()
+    // col1 数字求和：100+200+300=600；col0 计数：3
+    const stats1 = () =>
+      screen.getByTestId('table-stats-row').querySelector('[data-stats-cell="1"]')!.textContent
+    expect(stats1()).toBe('600')
+    expect(screen.getByTestId('table-stats-row').querySelector('[data-stats-cell="0"]')!.textContent).toBe('3')
+    // 列菜单统计：均值 → 200
+    fireEvent.click(screen.getByTestId('table-grid').querySelector('th[data-col="1"]')!)
+    fireEvent.click(screen.getByTestId('table-col-stats-avg'))
+    expect(stats1()).toBe('200')
+    // 筛选后统计可见行：只留 'x' 行 → 均值 300
+    fireEvent.click(screen.getByTestId('table-filter'))
+    fireEvent.click(screen.getByTestId('table-filter-add'))
+    const val = screen.getByTestId('table-filter-value-0') as HTMLInputElement
+    fireEvent.change(val, { target: { value: 'x' } })
+    expect(stats1()).toBe('300')
+  })
+
+  it('exports full CSV with BOM via pickSavePath', async () => {
+    vi.mocked(pickSavePath).mockResolvedValueOnce('/tmp/预算.csv')
+    vi.mocked(knowledgeExportText).mockResolvedValueOnce(undefined)
+    render(<TableEditor tableId="tbl_1" />)
+    // 筛选不随导出
+    fireEvent.click(screen.getByTestId('table-filter'))
+    fireEvent.click(screen.getByTestId('table-filter-add'))
+    const val = screen.getByTestId('table-filter-value-0') as HTMLInputElement
+    fireEvent.change(val, { target: { value: 'x' } })
+    fireEvent.click(screen.getByTestId('table-export'))
+    await vi.waitFor(() => {
+      expect(knowledgeExportText).toHaveBeenCalledTimes(1)
+    })
+    const [dest, body] = vi.mocked(knowledgeExportText).mock.calls[0]
+    expect(dest).toBe('/tmp/预算.csv')
+    expect(body.charCodeAt(0)).toBe(0xfeff)
+    expect(body).toContain('a,100,c') // 全量数据（含被筛选隐藏的行）
+    expect(body).toContain('1,200,3')
   })
 })

@@ -184,9 +184,11 @@ describe('sort comparators (type-aware)', () => {
     expect(asc.rows[1][0]).toBe('5')
   })
 
-  it('sortRows ignores unknown column', () => {
+  it('sortRows ignores unknown column (data unchanged)', () => {
     const t = createEmptyTable(2, 1)
-    expect(sortRows(t, 'col_99', 'asc')).toBe(t)
+    const out = sortRows(t, 'col_99', 'asc')
+    expect(out.rows).toEqual(t.rows)
+    expect(out.cols).toEqual(t.cols)
   })
 })
 

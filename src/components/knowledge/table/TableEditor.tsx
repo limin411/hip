@@ -17,27 +17,41 @@ import {
   CalendarDays,
   CheckSquare,
   ChevronDown,
+  FileDown,
+  Filter,
   Hash,
   MoreHorizontal,
   Plus,
   Redo2,
+  Sigma,
   Snowflake,
   Table2,
   Type,
   Undo2,
+  X,
 } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { knowledgeExportText } from '@/ipc/knowledge'
+import { pickSavePath } from '@/ipc/dialog'
 import { cn } from '@/lib/utils'
 import {
   clampWidth,
   createColumn,
   createTableHistory,
   csvToTable,
+  matchesAllFilters,
   metaFromTable,
+  sortRowIndices,
   tableToCsv,
+  avgRows,
+  countNonEmpty,
+  sumRows,
   type TableColType,
   type TableData,
+  type TableFilter,
+  type TableFilterOp,
   type TableSnapshot,
+  type TableSortState,
 } from '@/domain/knowledge/tableModel'
 
 const TYPE_ICONS: Record<TableColType, typeof Type> = {
@@ -74,12 +88,22 @@ export function TableEditor({ tableId }: { tableId: string }) {
   const [selectPopup, setSelectPopup] = useState<CellPos | null>(null)
   const [newOptionText, setNewOptionText] = useState('')
   const [freezeHeader, setFreezeHeader] = useState(true)
+  /** 排序（列 id 引用 meta col id；数据行不变，视图重排；可撤销）。 */
+  const [sortState, setSortState] = useState<TableSortState | null>(null)
+  /** 筛选（仅视图，不写文件）。 */
+  const [filters, setFilters] = useState<TableFilter[]>([])
+  const [filterOpen, setFilterOpen] = useState(false)
+  /** 统计行开关 + 逐列模式（缺省：数字→求和，其余→计数）。 */
+  const [statsOn, setStatsOn] = useState(false)
+  const [colStats, setColStats] = useState<Record<number, 'sum' | 'avg' | 'count' | 'off'>>({})
   /** 撤销栈版本戳：任何 push/undo/redo 后 +1 以刷新按钮启用态。 */
   const [histTick, setHistTick] = useState(0)
 
   const historyRef = useRef(createTableHistory())
   const tableRef = useRef(table)
   tableRef.current = table
+  const sortRef = useRef<TableSortState | null>(sortState)
+  sortRef.current = sortState
 
   const saveTimer = useRef<number | null>(null)
   const commitRef = useRef(commitTable)
@@ -103,14 +127,18 @@ export function TableEditor({ tableId }: { tableId: string }) {
       void commitRef.current(idRef.current)
     }, 800)
     if (opts?.history !== false) {
-      historyRef.current.push({ table: next, sort: null })
+      historyRef.current.push({ table: next, sort: sortRef.current })
       setHistTick((t) => t + 1)
     }
   }
 
-  /** 拖拽等 live 变更结束后补推一步历史（当前状态入栈）。 */
-  const pushHistoryStep = () => {
-    historyRef.current.push({ table: tableRef.current, sort: null })
+  /** 拖拽等 live 变更结束后补推一步历史（当前状态入栈）。
+   *  `sortOverride`：排序类变更的推入发生在 setState 之前，需显式携带目标排序态。 */
+  const pushHistoryStep = (sortOverride?: TableSortState | null) => {
+    historyRef.current.push({
+      table: tableRef.current,
+      sort: sortOverride === undefined ? sortRef.current : sortOverride,
+    })
     setHistTick((t) => t + 1)
   }
 
@@ -120,6 +148,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
     setRowMenuRi(null)
     setSelectPopup(null)
     setEditing(null)
+    setSortState(snap.sort)
     onChange(snap.table, { history: false })
   }
 
@@ -139,7 +168,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
 
   // 打开时初始化历史基线。
   useEffect(() => {
-    historyRef.current.reset({ table: tableRef.current, sort: null })
+    historyRef.current.reset({ table: tableRef.current, sort: sortRef.current })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
@@ -365,6 +394,90 @@ export function TableEditor({ tableId }: { tableId: string }) {
 
   const canUndo = useMemo(() => historyRef.current.canUndo(), [histTick, table])
   const canRedo = useMemo(() => historyRef.current.canRedo(), [histTick, table])
+
+  // ── 排序 / 筛选 / 统计 / 导出（PR-5 数据能力） ───────────────────────────
+  const sortBy = (colId: string, dir: 'asc' | 'desc') => {
+    if (sortRef.current?.col === colId && sortRef.current.dir === dir) return
+    // 推入变更后状态（含目标排序），避免与上一快照（排序前）去重冲突。
+    pushHistoryStep({ col: colId, dir })
+    setSortState({ col: colId, dir })
+    setColMenuCi(null)
+  }
+
+  const clearSort = () => {
+    if (!sortRef.current) return
+    pushHistoryStep(null)
+    setSortState(null)
+    setColMenuCi(null)
+  }
+
+  const opsForType = (type: TableColType): TableFilterOp[] => {    switch (type) {
+      case 'number':
+      case 'date':
+        return ['equals', 'gt', 'lt', 'isNotEmpty']
+      case 'checkbox':
+        return ['equals', 'isNotEmpty']
+      case 'select':
+        return ['equals', 'isNotEmpty']
+      default:
+        return ['contains', 'equals', 'isNotEmpty']
+    }
+  }
+
+  const OP_LABEL_KEYS = {
+    contains: 'knowledge.table.filter.opContains',
+    equals: 'knowledge.table.filter.opEquals',
+    isNotEmpty: 'knowledge.table.filter.opNotEmpty',
+    gt: 'knowledge.table.filter.opGt',
+    lt: 'knowledge.table.filter.opLt',
+  } as const satisfies Record<TableFilterOp, string>
+
+  /** 可见行 = 排序后的原始行索引，再叠加筛选（AND）。 */
+  const visibleIndices = useMemo(() => {
+    let order: number[] = table.rows.map((_, i) => i)
+    if (sortState) {
+      order = sortRowIndices({ cols: table.cols, rows: table.rows }, sortState.col, sortState.dir)
+    }
+    if (filters.length > 0) {
+      order = order.filter((ri) => matchesAllFilters(table.rows[ri] ?? [], filters, table.cols))
+    }
+    return order
+  }, [table, sortState, filters])
+
+  const visibleData = useMemo(
+    () => visibleIndices.map((ri) => table.rows[ri] ?? []),
+    [visibleIndices, table],
+  )
+
+  const statsModeFor = (ci: number): 'sum' | 'avg' | 'count' | 'off' =>
+    colStats[ci] ?? (table.cols[ci]?.type === 'number' ? 'sum' : 'count')
+
+  const statsCell = (ci: number): string => {
+    const mode = statsModeFor(ci)
+    if (mode === 'off') return ''
+    if (mode === 'count') return String(countNonEmpty(visibleData, ci))
+    const v = mode === 'sum' ? sumRows(visibleData, ci) : avgRows(visibleData, ci)
+    return Number.isInteger(v) ? String(v) : v.toFixed(1)
+  }
+
+  const exportCsv = async () => {
+    const title =
+      useKnowledgeStore.getState().nodes.find((n) => n.id === tableId)?.title ??
+      t('knowledge.table.untitled')
+    const dest = await pickSavePath({
+      defaultPath: `${title}.csv`,
+      title: t('knowledge.table.toolbar.exportCsv'),
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    })
+    if (!dest) return
+    try {
+      // BOM 供 Excel 识别 UTF-8。导出全量数据（不随筛选）。
+      await knowledgeExportText(dest, `\uFEFF${tableToCsv(tableRef.current)}`)
+      toast.success(t('knowledge.export.docDone'))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   const backToBrowse = () => {
     void useKnowledgeStore.getState().backToBrowse()
@@ -607,11 +720,166 @@ export function TableEditor({ tableId }: { tableId: string }) {
           >
             <Snowflake size={13} aria-hidden />
           </button>
+          {/* 排序状态芯片：点击清除排序 */}
+          {sortState ? (
+            <button
+              type="button"
+              data-testid="table-sort-chip"
+              onClick={clearSort}
+              title={t('knowledge.table.columnMenu.sortClear')}
+              className="flex h-6 items-center gap-1 rounded-md bg-state-hover px-1.5 text-meta font-medium text-ink transition-colors hover:bg-state-hover"
+            >
+              <ArrowUpDown size={12} aria-hidden />
+              {colName(table.cols.findIndex((c) => c.id === sortState.col))} {sortState.dir === 'asc' ? '↑' : '↓'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            data-testid="table-filter"
+            aria-pressed={filterOpen}
+            onClick={() => setFilterOpen((v) => !v)}
+            title={t('knowledge.table.toolbar.filter')}
+            className={cn(
+              'relative flex h-6 items-center gap-1 rounded-md px-1.5 text-meta transition-colors',
+              filterOpen || filters.length > 0
+                ? 'bg-state-hover font-medium text-ink'
+                : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
+            )}
+          >
+            <Filter size={13} aria-hidden />
+            {filters.length > 0 ? (
+              <span
+                className="flex h-4 min-w-4 items-center justify-center rounded-full bg-btn-primary px-1 text-[10px] font-semibold text-on-btn-primary"
+                data-testid="table-filter-badge"
+              >
+                {filters.length}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            data-testid="table-stats"
+            aria-pressed={statsOn}
+            onClick={() => setStatsOn((v) => !v)}
+            title={t('knowledge.table.toolbar.stats')}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded-md transition-colors',
+              statsOn
+                ? 'bg-state-hover font-medium text-ink'
+                : 'text-ink-tertiary hover:bg-state-hover hover:text-ink',
+            )}
+          >
+            <Sigma size={14} aria-hidden />
+          </button>
+          <button
+            type="button"
+            data-testid="table-export"
+            onClick={() => void exportCsv()}
+            title={t('knowledge.table.toolbar.exportCsv')}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+          >
+            <FileDown size={14} aria-hidden />
+          </button>
           <span className="rounded-md bg-surface-muted px-2 py-0.5 text-meta text-ink-tertiary">
             {statsLine}
           </span>
         </div>
       </div>
+
+      {/* 筛选面板 */}
+      {filterOpen ? (
+        <div
+          className="relative z-30 shrink-0 border-b border-border bg-surface px-4 py-2.5 shadow-overlay"
+          data-testid="table-filter-panel"
+        >
+          <div className="flex flex-col gap-1.5">
+            {filters.length === 0 ? (
+              <p className="text-meta text-ink-tertiary">{t('knowledge.table.filter.title')}</p>
+            ) : null}
+            {filters.map((f, fi) => {
+              const colType = table.cols[f.colIndex]?.type ?? 'text'
+              return (
+                <div key={fi} className="flex items-center gap-1.5" data-testid="table-filter-row">
+                  <select
+                    data-testid={`table-filter-col-${fi}`}
+                    value={f.colIndex}
+                    onChange={(e) => {
+                      const colIndex = Number(e.target.value)
+                      const next = [...filters]
+                      next[fi] = { colIndex, op: 'contains', value: '' }
+                      setFilters(next)
+                    }}
+                    className="h-7 rounded-md border border-border bg-surface px-1.5 text-caption text-ink outline-none focus:border-accent/50"
+                  >
+                    {table.cols.map((c, ci) => (
+                      <option key={c.id} value={ci}>
+                        {colName(ci)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    data-testid={`table-filter-op-${fi}`}
+                    value={f.op}
+                    onChange={(e) => {
+                      const next = [...filters]
+                      next[fi] = { ...f, op: e.target.value as TableFilterOp }
+                      setFilters(next)
+                    }}
+                    className="h-7 rounded-md border border-border bg-surface px-1.5 text-caption text-ink outline-none focus:border-accent/50"
+                  >
+                    {opsForType(colType).map((op) => (
+                      <option key={op} value={op}>
+                        {t(OP_LABEL_KEYS[op])}
+                      </option>
+                    ))}
+                  </select>
+                  {f.op !== 'isNotEmpty' ? (
+                    <input
+                      data-testid={`table-filter-value-${fi}`}
+                      value={f.value}
+                      placeholder={t('knowledge.table.filter.value')}
+                      onChange={(e) => {
+                        const next = [...filters]
+                        next[fi] = { ...f, value: e.target.value }
+                        setFilters(next)
+                      }}
+                      className="h-7 w-36 rounded-md border border-border bg-surface px-2 text-caption text-ink outline-none placeholder:text-ink-tertiary focus:border-accent/50"
+                    />
+                  ) : null}
+                  <button
+                    type="button"
+                    data-testid={`table-filter-remove-${fi}`}
+                    onClick={() => setFilters(filters.filter((_, i) => i !== fi))}
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+                  >
+                    <X size={12} aria-hidden />
+                  </button>
+                </div>
+              )
+            })}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="table-filter-add"
+                onClick={() => setFilters([...filters, { colIndex: 0, op: 'contains', value: '' }])}
+                className="rounded-md px-2 py-1 text-caption font-medium text-accent-strong transition-colors hover:bg-state-hover"
+              >
+                + {t('knowledge.table.filter.addCondition')}
+              </button>
+              {filters.length > 0 ? (
+                <button
+                  type="button"
+                  data-testid="table-filter-clear"
+                  onClick={() => setFilters([])}
+                  className="rounded-md px-2 py-1 text-caption text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+                >
+                  {t('knowledge.table.filter.clear')}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* 网格 */}
       <div
@@ -652,6 +920,7 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   className={cn(
                     'sticky top-0 z-10 h-9 cursor-pointer border-b border-r border-border bg-surface-muted px-2 text-left text-caption font-medium text-ink',
                     !freezeHeader && 'relative',
+                    sortRef.current?.col === col.id && 'bg-state-hover',
                     colDrag?.ci === ci && 'opacity-40',
                     colDrag && colDrag.ci !== ci && colDrag.overCi === ci && 'bg-state-hover',
                   )}
@@ -700,7 +969,11 @@ export function TableEditor({ tableId }: { tableId: string }) {
                     ) : (
                       <span className="min-w-0 flex-1 truncate">{colName(ci)}</span>
                     )}
-                    <ArrowUpDown size={11} className="shrink-0 text-ink-tertiary/70" aria-hidden />
+                    {sortRef.current?.col === col.id ? (
+                      <span className="shrink-0 text-ink-secondary" data-testid="table-col-sort-ind">
+                        {sortRef.current.dir === 'asc' ? '↑' : '↓'}
+                      </span>
+                    ) : null}
                   </div>
                   {/* 列宽拖拽手柄（右缘）+ 双击自适应 */}
                   <span
@@ -774,6 +1047,89 @@ export function TableEditor({ tableId }: { tableId: string }) {
                       <div className="my-1 border-t border-border" />
                       <button
                         type="button"
+                        data-testid="table-col-sort-asc"
+                        onClick={() => sortBy(col.id, 'asc')}
+                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                      >
+                        ↑ {t('knowledge.table.columnMenu.sortAsc')}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="table-col-sort-desc"
+                        onClick={() => sortBy(col.id, 'desc')}
+                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                      >
+                        ↓ {t('knowledge.table.columnMenu.sortDesc')}
+                      </button>
+                      {sortRef.current?.col === col.id ? (
+                        <button
+                          type="button"
+                          data-testid="table-col-sort-clear"
+                          onClick={clearSort}
+                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-ink-secondary transition-colors hover:bg-state-hover"
+                        >
+                          {t('knowledge.table.columnMenu.sortClear')}
+                        </button>
+                      ) : null}
+                      {statsOn ? (
+                        <>
+                          <div className="my-1 border-t border-border" />
+                          <div className="px-2.5 pb-1 pt-0.5 text-meta text-ink-tertiary">
+                            {t('knowledge.table.columnMenu.statsShow')}
+                          </div>
+                          {col.type === 'number' ? (
+                            <>
+                              <button
+                                type="button"
+                                data-testid="table-col-stats-sum"
+                                onClick={() => {
+                                  setColStats((s) => ({ ...s, [ci]: 'sum' }))
+                                  setColMenuCi(null)
+                                }}
+                                className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                              >
+                                {t('knowledge.table.columnMenu.statsSum')}
+                              </button>
+                              <button
+                                type="button"
+                                data-testid="table-col-stats-avg"
+                                onClick={() => {
+                                  setColStats((s) => ({ ...s, [ci]: 'avg' }))
+                                  setColMenuCi(null)
+                                }}
+                                className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                              >
+                                {t('knowledge.table.columnMenu.statsAvg')}
+                              </button>
+                            </>
+                          ) : null}
+                          <button
+                            type="button"
+                            data-testid="table-col-stats-count"
+                            onClick={() => {
+                              setColStats((s) => ({ ...s, [ci]: 'count' }))
+                              setColMenuCi(null)
+                            }}
+                            className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-body text-ink transition-colors hover:bg-state-hover"
+                          >
+                            {t('knowledge.table.columnMenu.statsCount')}
+                          </button>
+                          <button
+                            type="button"
+                            data-testid="table-col-stats-off"
+                            onClick={() => {
+                              setColStats((s) => ({ ...s, [ci]: 'off' }))
+                              setColMenuCi(null)
+                            }}
+                            className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-body text-ink-secondary transition-colors hover:bg-state-hover"
+                          >
+                            {t('knowledge.table.columnMenu.statsOff')}
+                          </button>
+                        </>
+                      ) : null}
+                      <div className="my-1 border-t border-border" />
+                      <button
+                        type="button"
                         data-testid="table-col-delete"
                         onClick={() => deleteColumn(ci)}
                         className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-body text-danger transition-colors hover:bg-danger/10"
@@ -787,7 +1143,9 @@ export function TableEditor({ tableId }: { tableId: string }) {
             </tr>
           </thead>
           <tbody>
-            {table.rows.map((row, ri) => (
+            {visibleIndices.map((ri) => {
+              const row = table.rows[ri] ?? []
+              return (
               <tr key={ri} data-row={ri}>
                 <td
                   className={cn(
@@ -1007,7 +1365,25 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   )
                 })}
               </tr>
-            ))}
+              )
+            })}
+            {/* 统计行（Σ；仅统计可见行；不参与数据） */}
+            {statsOn ? (
+              <tr data-testid="table-stats-row">
+                <td className="sticky left-0 z-10 border-b border-r border-border bg-surface-muted text-center text-meta font-semibold text-ink-secondary">
+                  <Sigma size={12} className="mx-auto" aria-hidden />
+                </td>
+                {table.cols.map((col, ci) => (
+                  <td
+                    key={col.id}
+                    data-stats-cell={ci}
+                    className="border-b border-r border-border bg-surface-muted px-2 py-1.5 text-caption font-medium tabular-nums text-ink-secondary"
+                  >
+                    {statsCell(ci) || ''}
+                  </td>
+                ))}
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

@@ -289,8 +289,13 @@ export function compareCells(a: string, b: string, type: TableColType): number {
 }
 
 export function sortRows(t: TableData, colId: string, dir: 'asc' | 'desc'): TableData {
+  return { cols: t.cols, rows: sortRowIndices(t, colId, dir).map((ri) => [...t.rows[ri]]) }
+}
+
+/** 返回排序后的原始行索引（稳定序；未知列返回原序）。 */
+export function sortRowIndices(t: TableData, colId: string, dir: 'asc' | 'desc'): number[] {
   const ci = t.cols.findIndex((c) => c.id === colId)
-  if (ci < 0) return t
+  if (ci < 0) return t.rows.map((_, i) => i)
   const type = t.cols[ci].type
   const idx = t.rows.map((_, ri) => ri)
   idx.sort((x, y) => {
@@ -298,7 +303,7 @@ export function sortRows(t: TableData, colId: string, dir: 'asc' | 'desc'): Tabl
     if (c !== 0) return dir === 'asc' ? c : -c
     return x - y // 稳定序
   })
-  return { cols: t.cols, rows: idx.map((ri) => [...t.rows[ri]]) }
+  return idx
 }
 
 // ── 筛选（条件求值；仅影响当前查看） ──────────────────────────────────────
@@ -336,8 +341,17 @@ export function applyFilters(t: TableData, filters: TableFilter[]): TableData {
   if (filters.length === 0) return t
   return {
     cols: t.cols,
-    rows: t.rows.filter((row) => filters.every((f) => matchesFilter(row, f, t.cols[f.colIndex]?.type ?? 'text'))),
+    rows: t.rows.filter((row) => matchesAllFilters(row, filters, t.cols)),
   }
+}
+
+/** 多条件 AND 求值（可见行判断用，避免构造中间表）。 */
+export function matchesAllFilters(
+  row: string[],
+  filters: TableFilter[],
+  cols: TableColumn[],
+): boolean {
+  return filters.every((f) => matchesFilter(row, f, cols[f.colIndex]?.type ?? 'text'))
 }
 
 // ── 统计（仅可见行） ──────────────────────────────────────────────────────

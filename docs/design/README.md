@@ -12,7 +12,7 @@
 | `doc-ux-polish-2/` | 操作交互与视觉体验第二弹 | `doc-ux-polish-2-{spec,plan,preview}` |
 | `doc-browse-interaction/` | 文档管理浏览视图交互整改（选择/打开/组织分离、手柄多选、列头排序、新建置顶，对齐 Notion All pages） | `doc-browse-interaction-{spec,preview}`（plan 待评审后排期） |
 | `knowledge-table/` | 文档管理新增「新建表格」（轻表格：类型化列 + 键盘导航 + 排序/筛选/统计） | `knowledge-table-{spec,plan,preview}`（preview 为全交互原型） |
-| `table-ux-notion/` | 表格编辑器交互 Notion 化整改（焦点闭环/选区模型/复制粘贴/浮层 portal/行号视图一致性/视觉对齐） | `table-ux-notion-{spec,preview}`（preview 为问题对照 + 新版全交互原型） |
+| `table-ux-notion/` | 表格编辑器交互 Notion 化整改（焦点闭环/选区模型/复制粘贴/浮层 portal/行号视图一致性/视觉对齐） | `table-ux-notion-{spec,plan,preview}`（preview 为问题对照 + 新版全交互原型） |
 | `doc-terminal-capability-gap/` | 终端能力补齐（对照 alacritty 差距分析） | `terminal-capability-gap-spec.md` + `-plan.md`（P0 已完成 2026-08-10，P1–P3 待排期）+ `terminal-capability-gap-preview.html`（高保真原型） |
 
 ## 其它系列

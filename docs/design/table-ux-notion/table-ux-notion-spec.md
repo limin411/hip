@@ -1,7 +1,7 @@
 # 文档管理 · 表格（Table）交互 Notion 化整改 Spec
 
 - 系列：`docs/design/table-ux-notion/`
-- 配套：`docs/design/table-ux-notion/table-ux-notion-preview.html`（整改前后对比 + 新版全交互原型，浏览器直接打开）
+- 配套：`docs/design/table-ux-notion/table-ux-notion-preview.html`（整改前后对比 + 新版全交互原型，浏览器直接打开）；`docs/design/table-ux-notion/table-ux-notion-plan.md`（执行计划：PR-1..10 拆解、文件级任务、测试与验收、节奏与风险）
 - 状态：待评审
 - 日期：2026-08-11
 - 前置基线：`docs/design/knowledge-table/knowledge-table-spec.md`（表格功能模型，本版不改功能范围，只改**交互与呈现**）；`docs/design/doc-notion-polish/doc-notion-polish-spec.md`（文档域 S4/S5 子语言裁决，本版继承）

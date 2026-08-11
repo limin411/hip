@@ -66,8 +66,8 @@ describe('knowledge table flow @knowledge @table', () => {
     await input.waitForDisplayed()
     await input.setValue('e2e-marker-alpha')
     await browser.keys('Enter')
-    // Tab 到第二格输入
-    await browser.keys('Tab')
+    // 直接双击第二格编辑（Enter 提交后焦点回网格，Tab 为选区移动）
+    await browser.$('td[data-cell="0,1"]').doubleClick()
     const input2 = await browser.$('[data-testid="table-cell-input"]')
     await input2.waitForDisplayed()
     await input2.setValue('e2e-marker-beta')

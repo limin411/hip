@@ -354,6 +354,22 @@ export function matchesAllFilters(
   return filters.every((f) => matchesFilter(row, f, cols[f.colIndex]?.type ?? 'text'))
 }
 
+/** 视图行序 = 排序后的原始行索引，再叠加筛选（AND）。筛选为纯视图态。 */
+export function viewIndexes(
+  t: TableData,
+  sort: TableSortState | null,
+  filters: TableFilter[],
+): number[] {
+  let order: number[] = t.rows.map((_, i) => i)
+  if (sort) {
+    order = sortRowIndices(t, sort.col, sort.dir)
+  }
+  if (filters.length > 0) {
+    order = order.filter((ri) => matchesAllFilters(t.rows[ri] ?? [], filters, t.cols))
+  }
+  return order
+}
+
 // ── 统计（仅可见行） ──────────────────────────────────────────────────────
 
 export function countNonEmpty(rows: string[][], ci: number): number {
@@ -382,6 +398,209 @@ export function avgRows(rows: string[][], ci: number): number {
     }
   }
   return n === 0 ? 0 : sum / n
+}
+
+// ── 统计模式（逐列；缺省：数字→求和，其余→计数） ──────────────────────────
+
+export type ColStatsMode = 'sum' | 'avg' | 'count' | 'off'
+
+export function defaultStatsMode(type: TableColType): ColStatsMode {
+  return type === 'number' ? 'sum' : 'count'
+}
+
+/** 统计行单元格文本（仅可见行数据；off → ''）。 */
+export function statsValue(rows: string[][], ci: number, mode: ColStatsMode): string {
+  if (mode === 'off') return ''
+  if (mode === 'count') return String(countNonEmpty(rows, ci))
+  const v = mode === 'sum' ? sumRows(rows, ci) : avgRows(rows, ci)
+  return Number.isInteger(v) ? String(v) : v.toFixed(1)
+}
+
+// ── 选区（视图坐标；anchor/focus 矩形） ───────────────────────────────────
+
+export interface CellPos {
+  ri: number
+  ci: number
+}
+
+export type SelectionMode = 'cell' | 'row' | 'column'
+
+/**
+ * 选区 = anchor/focus 矩形（视图坐标）。
+ * mode 决定整行/整列语义：cell=普通矩形，row=全部列，column=全部行。
+ */
+export interface TableSelection {
+  anchor: CellPos
+  focus: CellPos
+  mode: SelectionMode
+}
+
+export function clampSelection(sel: TableSelection, rows: number, cols: number): TableSelection {
+  const clamp = (p: CellPos): CellPos => ({
+    ri: Math.max(0, Math.min(rows - 1, p.ri)),
+    ci: Math.max(0, Math.min(cols - 1, p.ci)),
+  })
+  return { anchor: clamp(sel.anchor), focus: clamp(sel.focus), mode: sel.mode }
+}
+
+/** 选区覆盖的视图行列范围（min/max，含端点）。 */
+export function selectionSpan(
+  sel: TableSelection,
+): { r0: number; r1: number; c0: number; c1: number } {
+  const a = sel.anchor
+  const f = sel.focus
+  return {
+    r0: Math.min(a.ri, f.ri),
+    r1: Math.max(a.ri, f.ri),
+    c0: Math.min(a.ci, f.ci),
+    c1: Math.max(a.ci, f.ci),
+  }
+}
+
+/** 选区视图坐标展开（整行→全部列；整列→全部行）。 */
+export function selectionCells(sel: TableSelection, rows: number, cols: number): CellPos[] {
+  if (rows <= 0 || cols <= 0) return []
+  const s = clampSelection(sel, rows, cols)
+  let { r0, r1, c0, c1 } = selectionSpan(s)
+  if (s.mode === 'row') {
+    c0 = 0
+    c1 = cols - 1
+  }
+  if (s.mode === 'column') {
+    r0 = 0
+    r1 = rows - 1
+  }
+  const out: CellPos[] = []
+  for (let ri = r0; ri <= r1; ri++) {
+    for (let ci = c0; ci <= c1; ci++) {
+      out.push({ ri, ci })
+    }
+  }
+  return out
+}
+
+/** 选区对应的数据坐标（视图坐标经 viewOrder 映射；排序/筛选后仍写对行）。 */
+export function selectionDataCells(
+  sel: TableSelection,
+  viewOrder: number[],
+  rows: number,
+  cols: number,
+): CellPos[] {
+  return selectionCells(sel, rows, cols).map((p) => ({ ri: viewOrder[p.ri] ?? p.ri, ci: p.ci }))
+}
+
+/** Shift+方向键扩展（或锚定后移动）；越界钳制；mode 随当前选区不变。 */
+export function expandSelection(
+  sel: TableSelection,
+  dr: number,
+  dc: number,
+  rows: number,
+  cols: number,
+): TableSelection {
+  const next = {
+    anchor: { ...sel.anchor },
+    focus: { ri: sel.focus.ri + dr, ci: sel.focus.ci + dc },
+    mode: sel.mode,
+  }
+  return clampSelection(next, rows, cols)
+}
+
+// ── 剪贴板（TSV；仅含 \t 视为表格） ───────────────────────────────────────
+
+export const PASTE_LIMIT = { rows: 200, cols: 50 }
+
+function escapeTsvCell(v: string): string {
+  if (v.includes('\t') || v.includes('\n') || v.includes('"')) {
+    return `"${v.replace(/"/g, '""')}"`
+  }
+  return v
+}
+
+/**
+ * 解析剪贴板文本。含 `\t` → TSV 表格（引号包裹/`""` 转义）；否则返回 null
+ * （视为单格多行文本，由调用方原样写入一个单元格）。
+ */
+export function parseClipboardText(text: string): string[][] | null {
+  const t = text.replace(/^\uFEFF/, '')
+  if (!t.includes('\t')) return null
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let inQuotes = false
+  let i = 0
+  const n = t.length
+  const endField = () => {
+    row.push(field)
+    field = ''
+  }
+  const endRow = () => {
+    endField()
+    rows.push(row)
+    row = []
+  }
+  while (i < n) {
+    const c = t[i]
+    if (inQuotes) {
+      if (c === '"') {
+        if (t[i + 1] === '"') {
+          field += '"'
+          i += 2
+          continue
+        }
+        inQuotes = false
+        i++
+        continue
+      }
+      field += c
+      i++
+      continue
+    }
+    if (c === '"') {
+      inQuotes = true
+      i++
+      continue
+    }
+    if (c === '\t') {
+      endField()
+      i++
+      continue
+    }
+    if (c === '\n') {
+      endRow()
+      i++
+      continue
+    }
+    if (c === '\r') {
+      if (t[i + 1] === '\n') i++
+      endRow()
+      i++
+      continue
+    }
+    field += c
+    i++
+  }
+  if (field !== '' || row.length > 0) endRow()
+  while (rows.length > 0 && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') {
+    rows.pop()
+  }
+  return rows
+}
+
+/** 选区序列化为 TSV（按视图顺序取数据行）。 */
+export function serializeClipboard(
+  t: TableData,
+  sel: TableSelection,
+  viewOrder: number[],
+): string {
+  const { r0, r1, c0, c1 } = selectionSpan(sel)
+  const lines: string[] = []
+  for (let vi = r0; vi <= r1; vi++) {
+    const row = t.rows[viewOrder[vi] ?? vi] ?? []
+    lines.push(
+      (sel.mode === 'row' ? row : row.slice(c0, c1 + 1)).map(escapeTsvCell).join('\t'),
+    )
+  }
+  return lines.join('\n')
 }
 
 // ── 撤销栈（结构化快照，含排序状态，上限 50） ─────────────────────────────

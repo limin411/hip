@@ -9,19 +9,29 @@ import {
   createEmptyTable,
   createTableHistory,
   csvToTable,
+  defaultStatsMode,
+  expandSelection,
   fallbackColsForRows,
   isEqualTable,
   metaFromTable,
   normalizeColType,
   normalizeMeta,
+  parseClipboardText,
   parseCsv,
+  PASTE_LIMIT,
+  selectionCells,
+  selectionDataCells,
+  serializeClipboard,
   serializeCsv,
   sortRows,
+  statsValue,
   sumRows,
   tableToCsv,
+  viewIndexes,
   DEFAULT_COL_WIDTH,
   MIN_COL_WIDTH,
   MAX_COL_WIDTH,
+  type TableSelection,
 } from './tableModel'
 
 describe('createEmptyTable', () => {
@@ -369,5 +379,127 @@ describe('misc helpers', () => {
     expect(isEqualTable(a, b)).toBe(true)
     b.rows[0][0] = 'x'
     expect(isEqualTable(a, b)).toBe(false)
+  })
+})
+
+describe('selection (view coords)', () => {
+  const selOf = (ar: number, ac: number, fr: number, fc: number, mode: TableSelection['mode'] = 'cell'): TableSelection => ({
+    anchor: { ri: ar, ci: ac },
+    focus: { ri: fr, ci: fc },
+    mode,
+  })
+
+  it('selectionCells expands anchor/focus rectangle', () => {
+    expect(selectionCells(selOf(1, 1, 2, 2), 5, 5)).toEqual([
+      { ri: 1, ci: 1 }, { ri: 1, ci: 2 },
+      { ri: 2, ci: 1 }, { ri: 2, ci: 2 },
+    ])
+  })
+
+  it('row mode covers all columns; column mode covers all rows', () => {
+    const rowSel = selectionCells(selOf(2, 1, 2, 1, 'row'), 4, 3)
+    expect(rowSel).toHaveLength(3)
+    expect(rowSel.every((p) => p.ri === 2)).toBe(true)
+    const colSel = selectionCells(selOf(1, 0, 1, 0, 'column'), 4, 3)
+    expect(colSel).toHaveLength(4)
+    expect(colSel.every((p) => p.ci === 0)).toBe(true)
+  })
+
+  it('clampSelection bounds out-of-range and empty-table selection yields []', () => {
+    const clamped = selectionCells(selOf(-1, 3, 10, 12), 3, 3)
+    expect(clamped).toEqual([
+      { ri: 0, ci: 2 }, { ri: 1, ci: 2 }, { ri: 2, ci: 2 },
+    ])
+    expect(selectionCells(selOf(0, 0, 0, 0), 0, 3)).toEqual([])
+  })
+
+  it('selectionDataCells maps view coords through viewOrder', () => {
+    // 视图序 [2,0,1]（例如排序后）：视图第 0 行 = 数据第 2 行
+    const data = selectionDataCells(selOf(0, 0, 1, 1), [2, 0, 1], 3, 3)
+    expect(data).toEqual([
+      { ri: 2, ci: 0 }, { ri: 2, ci: 1 },
+      { ri: 0, ci: 0 }, { ri: 0, ci: 1 },
+    ])
+  })
+
+  it('expandSelection moves focus and clamps', () => {
+    let s = selOf(1, 1, 1, 1)
+    s = expandSelection(s, 1, 1, 4, 4)
+    expect(s.focus).toEqual({ ri: 2, ci: 2 })
+    s = expandSelection(s, 5, 0, 4, 4)
+    expect(s.focus.ri).toBe(3)
+    expect(s.anchor).toEqual({ ri: 1, ci: 1 })
+  })
+})
+
+describe('clipboard (TSV)', () => {
+  const t = csvToTable('a,100,c\n1,200,3\nx,300,z\n', JSON.stringify({
+    cols: [
+      { id: 'col_1', name: '', type: 'text', width: 150 },
+      { id: 'col_2', name: '', type: 'number', width: 150 },
+      { id: 'col_3', name: '', type: 'text', width: 150 },
+    ],
+  }))
+  const selOf = (ar: number, ac: number, fr: number, fc: number, mode: TableSelection['mode'] = 'cell'): TableSelection => ({
+    anchor: { ri: ar, ci: ac },
+    focus: { ri: fr, ci: fc },
+    mode,
+  })
+
+  it('serializeClipboard emits TSV in view order (rect + row mode)', () => {
+    // 矩形 0..1 行 × 0..1 列
+    expect(serializeClipboard(t, selOf(0, 0, 1, 1), [0, 1, 2])).toBe('a\t100\n1\t200')
+    // 整行模式：所有列
+    expect(serializeClipboard(t, selOf(2, 1, 2, 1, 'row'), [0, 1, 2])).toBe('x\t300\tz')
+    // 视图序 [2,0,1]：视图第 0 行 = 数据第 2 行
+    expect(serializeClipboard(t, selOf(0, 0, 0, 2), [2, 0, 1])).toBe('x\t300\tz')
+  })
+
+  it('escapes tabs/newlines/quotes inside cells', () => {
+    const t2 = csvToTable('a\tb\n', JSON.stringify({ cols: [{ id: 'c1', name: '', type: 'text', width: 150 }] }))
+    const s = serializeClipboard(t2, selOf(0, 0, 0, 0), [0])
+    expect(s).toBe('"a\tb"')
+    expect(parseClipboardText(s)).toEqual([['a\tb']])
+  })
+
+  it('parseClipboardText: only tab counts as table; plain text is null', () => {
+    expect(parseClipboardText('hello\nworld')).toBeNull()
+    expect(parseClipboardText('a\tb\n1\t2')).toEqual([['a', 'b'], ['1', '2']])
+    // 引号转义 + 换行单元格 + CRLF + BOM
+    expect(parseClipboardText('\uFEFF"x\ny"\t2\r\n3\t4')).toEqual([['x\ny', '2'], ['3', '4']])
+    // 尾空行丢弃
+    expect(parseClipboardText('a\tb\n\n')).toEqual([['a', 'b']])
+  })
+
+  it('paste limits exposed as constants', () => {
+    expect(PASTE_LIMIT).toEqual({ rows: 200, cols: 50 })
+  })
+})
+
+describe('viewIndexes + statsValue (PR-1 extraction)', () => {
+  const t = csvToTable('a,100\n1,200\nx,300\n', JSON.stringify({
+    cols: [
+      { id: 'col_1', name: '', type: 'text', width: 150 },
+      { id: 'col_2', name: '', type: 'number', width: 150 },
+    ],
+  }))
+
+  it('viewIndexes = sort then filter', () => {
+    expect(viewIndexes(t, null, [])).toEqual([0, 1, 2])
+    expect(viewIndexes(t, { col: 'col_2', dir: 'desc' }, [])).toEqual([2, 1, 0])
+    expect(viewIndexes(t, null, [{ colIndex: 0, op: 'contains', value: 'x' }])).toEqual([2])
+    // 排序 + 筛选叠加：筛选后视图序保持排序
+    expect(viewIndexes(t, { col: 'col_2', dir: 'asc' }, [{ colIndex: 0, op: 'isNotEmpty', value: '' }])).toEqual([0, 1, 2])
+  })
+
+  it('statsValue per mode; defaultStatsMode by type', () => {
+    expect(statsValue(t.rows, 1, 'sum')).toBe('600')
+    expect(statsValue(t.rows, 1, 'avg')).toBe('200')
+    expect(statsValue(t.rows, 1, 'count')).toBe('3')
+    expect(statsValue(t.rows, 1, 'off')).toBe('')
+    expect(statsValue([['', 'x']], 1, 'count')).toBe('1')
+    expect(statsValue([['', '']], 1, 'count')).toBe('0')
+    expect(defaultStatsMode('number')).toBe('sum')
+    expect(defaultStatsMode('text')).toBe('count')
   })
 })

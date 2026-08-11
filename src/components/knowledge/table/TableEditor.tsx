@@ -39,13 +39,12 @@ import {
   createColumn,
   createTableHistory,
   csvToTable,
-  matchesAllFilters,
+  defaultStatsMode,
   metaFromTable,
-  sortRowIndices,
+  statsValue,
   tableToCsv,
-  avgRows,
-  countNonEmpty,
-  sumRows,
+  viewIndexes,
+  type ColStatsMode,
   type TableColType,
   type TableData,
   type TableFilter,
@@ -447,32 +446,20 @@ export function TableEditor({ tableId }: { tableId: string }) {
   } as const satisfies Record<TableFilterOp, string>
 
   /** 可见行 = 排序后的原始行索引，再叠加筛选（AND）。 */
-  const visibleIndices = useMemo(() => {
-    let order: number[] = table.rows.map((_, i) => i)
-    if (sortState) {
-      order = sortRowIndices({ cols: table.cols, rows: table.rows }, sortState.col, sortState.dir)
-    }
-    if (filters.length > 0) {
-      order = order.filter((ri) => matchesAllFilters(table.rows[ri] ?? [], filters, table.cols))
-    }
-    return order
-  }, [table, sortState, filters])
+  const visibleIndices = useMemo(
+    () => viewIndexes(table, sortState, filters),
+    [table, sortState, filters],
+  )
 
   const visibleData = useMemo(
     () => visibleIndices.map((ri) => table.rows[ri] ?? []),
     [visibleIndices, table],
   )
 
-  const statsModeFor = (ci: number): 'sum' | 'avg' | 'count' | 'off' =>
-    colStats[ci] ?? (table.cols[ci]?.type === 'number' ? 'sum' : 'count')
+  const statsModeFor = (ci: number): ColStatsMode =>
+    colStats[ci] ?? defaultStatsMode(table.cols[ci]?.type ?? 'text')
 
-  const statsCell = (ci: number): string => {
-    const mode = statsModeFor(ci)
-    if (mode === 'off') return ''
-    if (mode === 'count') return String(countNonEmpty(visibleData, ci))
-    const v = mode === 'sum' ? sumRows(visibleData, ci) : avgRows(visibleData, ci)
-    return Number.isInteger(v) ? String(v) : v.toFixed(1)
-  }
+  const statsCell = (ci: number): string => statsValue(visibleData, ci, statsModeFor(ci))
 
   const exportCsv = async () => {
     const title =

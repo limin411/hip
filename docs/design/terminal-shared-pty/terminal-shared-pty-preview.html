@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>终端管理 × 运维助手 — 共享终端协同整改预览</title>
+<style>
+/* ═══════════════ 设计令牌（对齐 src/styles/tokens.css flat 体系）═══════════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F6F5F3; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e6e4e1; --border-strong:#c9c6c2;
+  --text-primary:#2f2c28; --text-secondary:#6b6762; --text-tertiary:#9b9893;
+  --accent:#c2410c; --accent-strong:#7c2d12; --accent-subtle:#f3eee8; --on-accent:#fff;
+  --btn-primary:#37352f; --btn-primary-hover:#2b2923; --on-btn-primary:#fafafa;
+  --state-hover:rgba(55,53,47,.07); --shadow-overlay:0 8px 30px rgba(15,15,15,.12);
+  --ok:#2f7d40; --ok-bg:rgba(47,125,64,.1); --warn:#b45309; --warn-bg:rgba(180,83,9,.1);
+  --danger:#c0392b; --danger-bg:rgba(192,57,43,.1); --info:#1a8cd8; --info-bg:rgba(26,140,216,.1);
+}
+[data-theme="dark"]{
+  --bg-app:#1a1a1a; --bg-subtle:#1f1f1f; --bg-muted:#262626; --bg-content:#1a1a1a;
+  --border:#333333; --border-strong:#4a4a4a;
+  --text-primary:#e8e6e1; --text-secondary:#a6a39e; --text-tertiary:#7d7a75;
+  --accent:#fb923c; --accent-strong:#fdba74; --accent-subtle:#2b251f; --on-accent:#1a1a1a;
+  --btn-primary:#dcd8d2; --btn-primary-hover:#eeeae4; --on-btn-primary:#1a1a1a;
+  --state-hover:rgba(255,255,255,.07); --shadow-overlay:0 8px 30px rgba(0,0,0,.5);
+  --ok:#5cb86a; --ok-bg:rgba(92,184,106,.14); --warn:#eab308; --warn-bg:rgba(234,179,8,.12);
+  --danger:#f87171; --danger-bg:rgba(248,113,113,.14); --info:#5bb8f0; --info-bg:rgba(91,184,240,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-app);color:var(--text-primary)}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;line-height:1.5;padding-bottom:64px}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select,textarea{font-family:inherit;color:inherit}
+svg{display:block;flex:none}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+
+/* ═══════════════ 顶部说明条 ═══════════════ */
+.topbar{position:sticky;top:0;z-index:80;background:var(--bg-app);border-bottom:1px solid var(--border);padding:10px 0}
+.topbar .row{display:flex;align-items:center;gap:12px}
+.topbar h1{font-size:15.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+.topbar .sub{color:var(--text-tertiary);font-size:11.5px;white-space:nowrap}
+.spacer{flex:1}
+.btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:7px;padding:5px 11px;font-size:12px;color:var(--text-secondary);transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--state-hover);color:var(--text-primary)}
+.btn.primary{background:var(--btn-primary);color:var(--on-btn-primary);border-color:var(--btn-primary)}
+.btn.primary:hover{background:var(--btn-primary-hover)}
+.btn.primary:disabled{opacity:.45;cursor:default}
+.btn.accent{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn.accent:hover{filter:brightness(1.08)}
+.btn.sm{padding:3px 9px;font-size:11px;border-radius:6px}
+.tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.tabs button{padding:5px 13px;font-size:12px;color:var(--text-secondary);background:var(--bg-subtle)}
+.tabs button+.tabs button{border-left:1px solid var(--border)}
+.tabs button.on{background:var(--state-hover);color:var(--text-primary);font-weight:600}
+.hintbar{font-size:11.5px;color:var(--text-tertiary);margin:10px 0 0;line-height:1.6}
+.hintbar kbd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;background:var(--bg-muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--text-primary)}
+.hintbar b{color:var(--text-primary);font-weight:600}
+.actions{margin:12px 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.actions .btn{display:inline-flex;align-items:center;gap:6px}
+
+/* ═══════════════ 场景说明 ═══════════════ */
+h2.sec{font-size:15px;font-weight:650;letter-spacing:-.01em;margin:26px 0 4px;display:flex;align-items:center;gap:8px}
+h2.sec .tag{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);padding:2px 7px;border-radius:4px;letter-spacing:.04em}
+p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
+.scene{display:none}
+.scene.on{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+/* ═══════════════ 场景 0：问题对照卡 ═══════════════ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px}
+.cmp{background:var(--bg-subtle);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.cmp-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)}
+.cmp-no{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:2px 6px;letter-spacing:.03em}
+.cmp-title{font-size:12.5px;font-weight:600;flex:1}
+.cmp-pair{display:grid;grid-template-columns:1fr 1fr;flex:1}
+.cmp-side{padding:12px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.cmp-side.before{background:var(--bg-app);border-right:1px dashed var(--border)}
+.cmp-label{font-size:10.5px;font-weight:600;letter-spacing:.05em;color:var(--text-tertiary)}
+.cmp-label .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.cmp-label .dot.b{background:#9b9893}.cmp-label .dot.a{background:var(--ok)}
+.cmp-foot{padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-secondary);line-height:1.55;background:var(--bg-subtle)}
+.cmp-foot b{color:var(--text-primary);font-weight:600}
+.cmp-foot code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10px;background:var(--accent-subtle);border-radius:3px;padding:0 4px;color:var(--text-primary)}
+.mini-term{background:#0d1117;border-radius:6px;padding:8px 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;line-height:1.6;color:#c9d1d9;white-space:pre-wrap;word-break:break-all}
+.mini-term .bad{color:#f85149}.mini-term .good{color:#3fb950}.mini-term .dim{color:#8b949e}.mini-term .ps{color:#fb923c}
+.mini-note{font-size:10.5px;color:var(--text-secondary);line-height:1.6}
+.mini-note .chip{display:inline-block;font-size:9.5px;padding:0 5px;border-radius:4px;font-weight:600}
+.mini-note .chip.bad{background:var(--danger-bg);color:var(--danger)}
+.mini-note .chip.good{background:var(--ok-bg);color:var(--ok)}
+.mini-note .chip.warn{background:var(--warn-bg);color:var(--warn)}
+
+/* ═══════════════ 场景 1-3：应用框架 ═══════════════ */
+.stage{display:flex;height:600px;border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--bg-app);box-shadow:var(--shadow-overlay);margin-top:12px}
+#sidebar{width:200px;flex:none;display:flex;flex-direction:column;background:var(--bg-subtle);border-right:1px solid var(--border)}
+#main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg-content)}
+#rail{width:252px;flex:none;display:flex;flex-direction:column;background:var(--bg-app);border-left:1px solid var(--border)}
+.sb-head{height:38px;flex:none;display:flex;align-items:center;gap:7px;padding:0 12px;border-bottom:1px solid var(--border);font-size:12px;font-weight:650}
+.sb-scroll{flex:1;overflow:auto;padding:8px}
+.sb-sec{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--text-tertiary);padding:8px 8px 4px}
+.tnode{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;cursor:default;font-size:12px;color:var(--text-secondary)}
+.tnode.active{background:var(--state-hover);color:var(--text-primary);font-weight:600}
+.tnode .ik{width:14px;height:14px;display:flex;align-items:center;justify-content:center;flex:none;font-size:10px;color:var(--text-tertiary)}
+.tnode .st{width:6px;height:6px;border-radius:50%;flex:none}
+.tnode .st.ok{background:#22a06b}.tnode .st.err{background:#c0392b}
+.tnode .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tnode .kind{font-size:9px;color:var(--text-tertiary);border:1px solid var(--border);border-radius:3px;padding:0 3px;letter-spacing:.02em}
+.tnode.child{padding-left:24px;font-size:11.5px}
+.tnode .chev{font-size:8px;color:var(--text-tertiary);transition:transform .12s}
+.tnode .chev.open{transform:rotate(90deg)}
+
+/* —— 终端（xterm 模拟） —— */
+.term{flex:1;display:flex;flex-direction:column;min-height:0;background:#0d1117}
+.term-bar{height:30px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;background:#161b22;border-bottom:1px solid #21262d;font-size:10.5px;color:#8b949e}
+.term-bar .tdot{width:6px;height:6px;border-radius:50%;background:#22a06b}
+.term-bar .tt{font-weight:600;color:#c9d1d9}
+.term-bar .tag{font-size:9px;border:1px solid #30363d;border-radius:3px;padding:0 4px;color:#8b949e}
+.term-bar .sp{flex:1}
+.term-bar .osc-hint{font-size:9px;color:#58a6ff;border:1px solid rgba(88,166,255,.35);background:rgba(88,166,255,.08);border-radius:3px;padding:0 5px;white-space:nowrap}
+.term-scroll{flex:1;overflow:auto;padding:10px 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;color:#c9d1d9;white-space:pre-wrap;word-break:break-all}
+.term-scroll .ps{color:#fb923c;font-weight:600}
+.term-scroll .dim{color:#8b949e}
+.term-scroll .good{color:#3fb950}
+.term-scroll .err{color:#f85149}
+.term-scroll .user{color:#58a6ff}
+.term-scroll .caret{display:inline-block;width:6px;height:13px;background:#c9d1d9;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.term-input-row{flex:none;display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid #21262d;background:#161b22}
+.term-input-row .lbl{font-size:10px;color:#8b949e;white-space:nowrap}
+.term-input-row input{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:5px;color:#c9d1d9;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;padding:5px 9px;outline:none}
+.term-input-row input:focus{border-color:#58a6ff}
+.term-input-row input:disabled{opacity:.4}
+
+/* —— 右侧运维助手 —— */
+.rail-head{display:flex;align-items:center;gap:6px;height:38px;flex:none;padding:0 10px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600}
+.rail-head .rh-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:4px}
+.rail-head .rh-title .host{color:var(--text-tertiary);font-weight:400;font-size:11px}
+.rail-head .rh-btn{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px;flex:none}
+.rail-head .rh-btn:hover{background:var(--state-hover);color:var(--text-primary)}
+.rail-body{flex:1;min-height:0;overflow-y:auto;padding:10px 10px 0;display:flex;flex-direction:column;gap:10px}
+.msg{display:flex;flex-direction:column;gap:3px}
+.msg .m-meta{font-size:10px;color:var(--text-tertiary);display:flex;align-items:center;gap:6px}
+.msg .m-meta b{color:var(--text-secondary);font-weight:600}
+.msg .m-body{background:var(--bg-subtle);border:1px solid var(--border);border-radius:9px;padding:7px 10px;font-size:11.5px;line-height:1.65;color:var(--text-secondary)}
+.msg.assistant .m-body{color:var(--text-primary)}
+.msg .queued-chip{font-size:9px;font-weight:600;color:var(--warn);background:var(--warn-bg);border-radius:4px;padding:1px 6px;align-self:flex-start;display:inline-flex;align-items:center;gap:4px}
+.msg .queued-chip.sent{color:var(--ok);background:var(--ok-bg)}
+.tool-card{border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--bg-subtle)/70;background:color-mix(in srgb,var(--bg-subtle) 70%,transparent)}
+.tc-head{display:flex;align-items:center;gap:7px;padding:6px 9px;cursor:pointer;font-size:11px;color:var(--text-primary)}
+.tc-head .ic{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex:none;background:var(--bg-muted);color:var(--text-tertiary)}
+.tc-head .cmd{font-family:ui-monospace,Menlo,Consolas,monospace;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;color:var(--text-primary)}
+.tc-status{font-size:9.5px;font-weight:600;border-radius:4px;padding:1.5px 6px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.tc-status.run{background:var(--info-bg);color:var(--info)}
+.tc-status.ok{background:var(--ok-bg);color:var(--ok)}
+.tc-status.warn{background:var(--warn-bg);color:var(--warn)}
+.tc-status.err{background:var(--danger-bg);color:var(--danger)}
+.tc-status.off{background:var(--bg-muted);color:var(--text-tertiary)}
+.tc-status .spin{width:8px;height:8px;border:1.5px solid currentColor;border-top-color:transparent;border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.tc-body{border-top:1px solid var(--border);padding:7px 9px;display:flex;flex-direction:column;gap:5px;font-size:10.5px;color:var(--text-secondary)}
+.tc-body .k{color:var(--text-tertiary);font-size:9.5px;letter-spacing:.03em}
+.tc-exit{display:inline-flex;align-items:center;gap:5px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px}
+.tc-exit .ec{font-weight:700;border-radius:4px;padding:1px 6px}
+.tc-exit .ec.zero{background:var(--ok-bg);color:var(--ok)}
+.tc-exit .ec.nonzero{background:var(--danger-bg);color:var(--danger)}
+.tc-exit .why{color:var(--text-tertiary);font-size:9.5px;font-family:inherit}
+.banner{display:flex;align-items:center;gap:8px;border:1px solid var(--warn);background:var(--warn-bg);border-radius:9px;padding:7px 10px;font-size:11px;color:var(--warn)}
+.banner b{font-weight:700}
+.banner .sp{flex:1}
+.banner.agent{color:var(--text-primary);border-color:var(--info);background:var(--info-bg)}
+.banner .btn{margin-left:auto}
+.composer{border-top:1px solid var(--border);padding:8px 10px 10px;display:flex;flex-direction:column;gap:7px;flex:none;background:var(--bg-app)}
+.comp-sel{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-tertiary)}
+.comp-sel .psel{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:10px;color:var(--text-secondary);cursor:pointer}
+.comp-sel .psel:hover{background:var(--state-hover)}
+.comp-sel .sp{flex:1}
+.comp-input-row{display:flex;align-items:flex-end;gap:7px}
+.comp-input-row textarea{flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:11.5px;resize:none;height:44px;outline:none;background:var(--bg-subtle);color:var(--text-primary)}
+.comp-input-row textarea:focus{border-color:var(--border-strong)}
+.comp-input-row .send{width:30px;height:30px;border-radius:8px;background:var(--btn-primary);color:var(--on-btn-primary);display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.comp-input-row .send:hover{background:var(--btn-primary-hover)}
+.comp-input-row .send:disabled{opacity:.4;cursor:default}
+.composer .queue-hint{font-size:10px;color:var(--warn);display:none;align-items:center;gap:5px}
+.composer .queue-hint.on{display:flex}
+
+/* ═══════════════ 场景 4：审批规则 ═══════════════ */
+.rule-layout{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start}
+.confirm-card{border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;background:var(--bg-app);box-shadow:var(--shadow-overlay)}
+.cc-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-subtle)}
+.cc-head .risk{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px}
+.cc-head .risk.high{background:var(--danger-bg);color:var(--danger)}
+.cc-head .risk.med{background:var(--warn-bg);color:var(--warn)}
+.cc-head .risk.low{background:var(--ok-bg);color:var(--ok)}
+.cc-title{font-size:12.5px;font-weight:650}
+.cc-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.cc-cmd{background:#0d1117;border-radius:7px;padding:9px 12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:#c9d1d9;line-height:1.6}
+.cc-cmd .flag{color:#f85149;font-weight:700}
+.cc-reason{font-size:11px;color:var(--text-secondary);line-height:1.6}
+.cc-reason b{color:var(--text-primary)}
+.cc-rule{font-size:11px;color:var(--text-tertiary);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cc-rule .rmatch{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;background:var(--bg-muted);border:1px solid var(--border);border-radius:4px;padding:1px 6px;color:var(--text-primary)}
+.cc-btns{display:flex;gap:8px;padding:0 14px 12px;flex-wrap:wrap}
+.cc-btns .btn{flex:1;justify-content:center;display:inline-flex;align-items:center;gap:5px;padding:6px 8px}
+.cc-btns .btn.allow{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.cc-btns .btn.deny{background:var(--danger-bg);color:var(--danger);border-color:transparent}
+.rule-panel{border:1px solid var(--border);border-radius:10px;background:var(--bg-subtle);overflow:hidden}
+.rp-head{padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px;font-weight:650;display:flex;align-items:center;gap:7px}
+.rp-head .tag{font-size:9px;background:var(--bg-muted);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text-tertiary)}
+.rp-list{display:flex;flex-direction:column}
+.rp-row{display:flex;align-items:center;gap:7px;padding:6px 12px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border)}
+.rp-row:last-child{border-bottom:0}
+.rp-row .act{font-size:9px;font-weight:700;border-radius:4px;padding:1px 6px;width:34px;text-align:center;flex:none}
+.rp-row .act.allow{background:var(--ok-bg);color:var(--ok)}
+.rp-row .act.ask{background:var(--warn-bg);color:var(--warn)}
+.rp-row .act.deny{background:var(--danger-bg);color:var(--danger)}
+.rp-row .pat{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-row .src{font-size:9px;color:var(--text-tertiary);flex:none}
+.rp-row.added{animation:fade .3s ease}
+.rp-foot{padding:8px 12px;font-size:10px;color:var(--text-tertiary);border-top:1px solid var(--border);line-height:1.6}
+.mode-map{margin-top:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.mm-head{padding:9px 12px;background:var(--bg-subtle);border-bottom:1px solid var(--border);font-size:12px;font-weight:650}
+.mm-table{width:100%;border-collapse:collapse;font-size:11px}
+.mm-table th{text-align:left;padding:7px 12px;color:var(--text-tertiary);font-weight:600;border-bottom:1px solid var(--border);background:var(--bg-subtle)}
+.mm-table td{padding:7px 12px;border-bottom:1px solid var(--border);color:var(--text-secondary);vertical-align:top}
+.mm-table tr:last-child td{border-bottom:0}
+.mm-table td:first-child{font-weight:600;color:var(--text-primary);white-space:nowrap}
+
+/* ═══════════════ 场景 5：完成判定对照 ═══════════════ */
+.fence-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.fence-card{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-app)}
+.fc-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg-subtle);font-size:12px;font-weight:650}
+.fc-head .st{font-size:9.5px;font-weight:700;border-radius:4px;padding:1.5px 6px}
+.fc-head .st.good{background:var(--ok-bg);color:var(--ok)}
+.fc-head .st.bad{background:var(--danger-bg);color:var(--danger)}
+.fc-body{padding:11px 12px;display:flex;flex-direction:column;gap:9px}
+.fc-case{font-size:11px;color:var(--text-secondary);line-height:1.6}
+.fc-case b{color:var(--text-primary)}
+.fc-case .tag{font-size:9px;font-weight:700;border-radius:4px;padding:1px 6px;margin-right:5px}
+.fc-case .tag.fail{background:var(--danger-bg);color:var(--danger)}
+.fc-case .tag.pass{background:var(--ok-bg);color:var(--ok)}
+.fc-verdict{display:flex;align-items:center;gap:7px;font-size:10.5px;border-radius:7px;padding:6px 9px}
+.fc-verdict.good{background:var(--ok-bg);color:var(--ok)}
+.fc-verdict.bad{background:var(--danger-bg);color:var(--danger)}
+.fc-verdict .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.verdict-row{display:flex;gap:12px;margin-top:14px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--bg-subtle);font-size:12px;color:var(--text-secondary);line-height:1.7}
+.verdict-row .big{font-size:15px;flex:none}
+.verdict-row b{color:var(--text-primary)}
+
+.term-bar .tbar-usr{font-size:9px}
+.comp-status{font-size:9.5px;color:var(--text-tertiary)}
+/* ═══════════════ Toast ═══════════════ */
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{background:var(--btn-primary);color:var(--on-btn-primary);border-radius:8px;padding:8px 14px;font-size:11.5px;box-shadow:var(--shadow-overlay);display:flex;align-items:center;gap:7px;animation:fade .2s ease;max-width:520px;line-height:1.5}
+.toast .mono{opacity:.85}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap row">
+    <h1>终端管理 × 运维助手 — 共享终端协同整改预览</h1>
+    <span class="sub">terminal-shared-pty · 围栏信号 / 接管交还 / 排队 / 规则审批</span>
+    <div class="spacer"></div>
+    <div class="tabs" id="themeTabs">
+      <button data-theme-btn="light" class="on">浅色</button>
+      <button data-theme-btn="dark">深色</button>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:8px">
+    <div class="tabs" id="sceneTabs">
+      <button data-scene="s0" class="on">① 现状问题对照</button>
+      <button data-scene="s1">② 围栏执行（核心）</button>
+      <button data-scene="s2">③ 接管 / 交还</button>
+      <button data-scene="s3">④ 长命令排队</button>
+      <button data-scene="s4">⑤ 规则化审批</button>
+      <button data-scene="s5">⑥ 完成判定对照</button>
+    </div>
+    <div class="hintbar" id="hint"></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ══════════ 场景 0：现状问题对照 ══════════ -->
+<div class="scene on" id="s0">
+  <h2 class="sec">现状 → 新版：六个结构性缺口<span class="tag">SPEC §1</span></h2>
+  <p class="sec-sub">对照「terminal-shared-pty-spec.md」根因 A–E 组。右侧为整改后行为。</p>
+  <div class="grid">
+
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">A1</span><span class="cmp-title">完成判定：猜 prompt → 围栏信号</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><div class="cmp-label"><span class="dot b"></span>现状</div>
+          <div class="mini-term"><span class="dim">agent 跑 df -h … 输出后</span>\n最后一行是 <span class="bad">$</span>？\n→ 正则 <span class="mono">[$#%&gt;]\s*$</span> 猜完成\nPS1 带图标 → <span class="bad">timed_out</span></div>
+          <div class="mini-note"><span class="chip bad">启发式</span> 自定义 PS1 / 输出以 $ 结尾 → 误判</div>
+        </div>
+        <div class="cmp-side after"><div class="cmp-label"><span class="dot a"></span>新版</div>
+          <div class="mini-term"><span class="dim">写入时包 <span class="dim">OSC 633</span> 围栏</span>\n<span class="dim">(marker 渲染层吞除，用户无感)</span>\n<span class="good">exit=0</span> ← 围栏携带退出码\n→ <span class="good">completed + exitCode</span></div>
+          <div class="mini-note"><span class="chip good">命令边界信号</span> VS Code / Warp 同款机制</div>
+        </div>
+      </div>
+      <div class="cmp-foot">输出按<b>命令块</b>切分，不再混入用户自己的输入；退出码进命令卡 <b>exit 0</b> chip。</div>
+    </div>
+
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">B1</span><span class="cmp-title">sudo / 交互：干等超时 → 接管交还</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><div class="cmp-label"><span class="dot b"></span>现状</div>
+          <div class="mini-term">sudo apt install -y htop\n<span class="bad">[sudo] password for root:</span>\n… 等待 15s → <span class="bad">timed_out</span>\n<span class="dim">mayStillRun: true 用户干完活</span>\n<span class="dim">agent 不知道何时恢复</span></div>
+          <div class="mini-note"><span class="chip bad">无协作路径</span> 只能超时 + 手动轮询</div>
+        </div>
+        <div class="cmp-side after"><div class="cmp-label"><span class="dot a"></span>新版</div>
+          <div class="mini-term">sudo apt install -y htop\n<span class="dim">[sudo] password for root:</span>\n<span class="good">◈ 命令可能需要你介入 — 接管</span>\n<span class="user">(你输入密码…)</span> → 点「交还」\n→ agent 恢复 → <span class="good">completed</span></div>
+          <div class="mini-note"><span class="chip good">handed_off ⇄ resumed</span> deadline 暂停，交还后重读 ring</div>
+        </div>
+      </div>
+      <div class="cmp-foot">Claudette 三态驾驶机 + Warp <b>Takeover</b>；TUI（vim/htop）从<b>拒绝</b>改为<b>启动即交还</b>。</div>
+    </div>
+
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">B2</span><span class="cmp-title">交互式 TUI：黑名单拒绝 → 启动即交还</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><div class="cmp-label"><span class="dot b"></span>现状</div>
+          <div class="mini-term">agent: terminal_exec("htop")\n→ <span class="bad">rejected</span>\n「interactive command blocked\n — run it manually in the terminal」</div>
+          <div class="mini-note"><span class="chip bad">TUI 黑名单</span> vim / nvim / top / htop / passwd / ssh</div>
+        </div>
+        <div class="cmp-side after"><div class="cmp-label"><span class="dot a"></span>新版</div>
+          <div class="mini-term">agent: terminal_exec("htop")\n→ 启动成功 → <span class="good">控制权自动交给用户</span>\n<span class="good">handed_off</span>（agent 暂停等待）\n用户退出 htop → 点「交还」继续</div>
+          <div class="mini-note"><span class="chip good">Full Terminal Use 前哨</span> agent 可进入，操作内部留待 P1</div>
+        </div>
+      </div>
+      <div class="cmp-foot">对齐 Warp Full Terminal Use：agent 可启动交互程序，键盘立即交还用户，<b>不再一刀切拒绝</b>。</div>
+    </div>
+
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">C1</span><span class="cmp-title">并发：报错拒绝 → 排队投递</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><div class="cmp-label"><span class="dot b"></span>现状</div>
+          <div class="mini-term">agent A 正在跑 build…\nagent B: terminal_exec(...)\n→ <span class="bad">error: another command\nis already running</span>\n<span class="dim">用户消息也直接并行 → 状态过期</span></div>
+          <div class="mini-note"><span class="chip bad">单飞行锁无队列</span></div>
+        </div>
+        <div class="cmp-side after"><div class="cmp-label"><span class="dot a"></span>新版</div>
+          <div class="mini-term">agent B: terminal_exec(...)\n→ <span class="good">queued #1</span>（30s 超时）\n用户消息 → <span class="good">「命令运行中 —\n结束后自动发送」</span>\nbuild 完成 → 队列自动执行 / 消息投递</div>
+          <div class="mini-note"><span class="chip good">FIFO 队列</span> Warp queued prompts 同款</div>
+        </div>
+      </div>
+      <div class="cmp-foot">exec 进入 per-terminal FIFO（30s 排队超时）；用户消息本地暂存，飞行结束自动投递。</div>
+    </div>
+
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">D1/D2</span><span class="cmp-title">审批：正则黑名单 + 原生弹窗 → 规则化</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><div class="cmp-label"><span class="dot b"></span>现状</div>
+          <div class="mini-term"><span class="bad">window.confirm</span> 原生弹窗\n「Run dangerous command?」\n<span class="dim">黑名单漏：git push --force</span>\n<span class="dim">kill -9 / chmod -R / fork bomb</span>\n<span class="dim">无「记住选择」</span></div>
+          <div class="mini-note"><span class="chip bad">正则黑名单 + 一次性弹窗</span></div>
+        </div>
+        <div class="cmp-side after"><div class="cmp-label"><span class="dot a"></span>新版</div>
+          <div class="mini-term">风险分级 + 规则集<br><span class="good">allow / deny / ask</span> 三元组\n确认卡：<b>本次允许 / 总是允许 / 总是拒绝</b>\n规则持久化 hip.toml\n<span class="good">git push --force → ask</span></div>
+          <div class="mini-note"><span class="chip good">Claude Code 式规则</span> 按权限模式预置</div>
+        </div>
+      </div>
+      <div class="cmp-foot"><code>Bash(git push:*)</code> 式模式规则；「总是允许/拒绝」写入 <code>hip.toml [terminal]</code> 重启生效。</div>
+    </div>
+
+    <div class="cmp">
+      <div class="cmp-head"><span class="cmp-no">E1</span><span class="cmp-title">重连：cursor 失效 → ring_reset 可自愈</span></div>
+      <div class="cmp-pair">
+        <div class="cmp-side before"><div class="cmp-label"><span class="dot b"></span>现状</div>
+          <div class="mini-term">SSH 断线 → 重连成功\nring 重建、cursor 失效\n→ <span class="bad">aborted</span>（笼统错误）\n<span class="dim">「waiting aborted by user」</span>\n<span class="dim">agent 不知是否该重试</span></div>
+          <div class="mini-note"><span class="chip bad">无 generation 校验</span></div>
+        </div>
+        <div class="cmp-side after"><div class="cmp-label"><span class="dot a"></span>新版</div>
+          <div class="mini-term">重连 → generation+1\n飞行 cursor 校验失败\n→ <span class="good">ring_reset</span>（明确错误码）\nagent: terminal_read 重读 → 继续\n<span class="good">错误码细化：ring_reset /\nterminal_closed / handed_off</span></div>
+          <div class="mini-note"><span class="chip good">可自愈语义</span> 替代笼统 aborted</div>
+        </div>
+      </div>
+      <div class="cmp-foot">ring cursor 绑定 <b>generation</b>（pty 侧字段扩展）；agent 工具文档声明收到 <code>ring_reset</code> 后的重读流程。</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════ 场景 1-3：共享舞台 ══════════ -->
+<div class="scene" id="s1">
+  <h2 class="sec">共享终端协同 — 围栏执行主路径<span class="tag">T1 · P0</span></h2>
+  <p class="sec-sub">agent 提议 → 审批 → 围栏写入共享 PTY → 围栏退出码命中 → 命令卡 exit chip。OSC 633 marker 被 xterm 渲染层吞除，用户无感。</p>
+  <div class="actions" id="act-s1"><button class="btn primary" id="s1-run">▶ 模拟：agent 执行 df -h</button><button class="btn" id="s1-reset">重置</button></div>
+  <div class="stage" id="stage"></div>
+  <div class="hintbar" style="margin-top:10px"><b>看点：</b>① 终端里只出现命令与输出，<kbd>OSC 633</kbd> marker 不可见；② 命令卡显示 <kbd>exit 0</kbd> chip——退出码来自围栏而非猜 prompt；③ 输出按命令块切分，用户自己的输入不进 agent 上下文。</div>
+</div>
+
+<div class="scene" id="s2">
+  <h2 class="sec">接管 / 交还（take the wheel）<span class="tag">T2 · P0</span></h2>
+  <p class="sec-sub">agent 卡在 sudo 密码 → 用户直接在共享终端输入 → 飞行置 handed_off（deadline 暂停）→ 交还后 agent 重读 ring 恢复。</p>
+  <div class="actions" id="act-s2"><button class="btn primary" id="s2-run">▶ 开始演示：sudo 场景</button><button class="btn" id="s2-type" disabled>✍ 模拟用户输入密码</button><button class="btn accent" id="s2-handback" disabled>交还 — 让助手继续</button><button class="btn" id="s2-reset">重置</button></div>
+  <div class="stage" id="stage2"></div>
+  <div class="hintbar" style="margin-top:10px"><b>看点：</b>① 无输出超阈值 → 信息性横幅「命令可能需要你介入」；② 用户键入 → <kbd>driver=user</kbd>，横幅变「你正在输入」；③ 点「交还」→ agent 恢复，结果标记 <kbd>user_interleaved</kbd>。</div>
+</div>
+
+<div class="scene" id="s3">
+  <h2 class="sec">长命令 + 用户消息排队<span class="tag">T3 · P0</span></h2>
+  <p class="sec-sub">agent 跑 npm run build（wait 120s）期间用户提交消息 → 暂存并标记 queued → 命令结束自动投递（Warp queued prompts 同款）。</p>
+  <div class="actions" id="act-s3"><button class="btn primary" id="s3-run">▶ 开始演示：长命令</button><button class="btn" id="s3-finish" disabled>⏩ 命令完成</button><button class="btn" id="s3-reset">重置</button></div>
+  <div class="stage" id="stage3"></div>
+  <div class="hintbar" style="margin-top:10px"><b>看点：</b>① 输入框下方出现「命令运行中 — 消息将在结束后发送」；② 消息卡带 <kbd>queued</kbd> 标记；③ 命令结束（exit 0）→ 消息自动投递，agent 继续处理。</div>
+</div>
+
+<!-- ══════════ 场景 4：规则化审批 ══════════ -->
+<div class="scene" id="s4">
+  <h2 class="sec">规则化审批 — 确认卡 + 规则集<span class="tag">T4 · P0</span></h2>
+  <p class="sec-sub">window.confirm → 应用内确认卡；黑名单 → allow/deny/ask 规则集（Claude Code 式），「总是允许/拒绝」持久化 hip.toml。</p>
+  <div class="rule-layout">
+    <div>
+      <div class="confirm-card">
+        <div class="cc-head"><span class="risk high">高危</span><span class="cc-title">执行命令需要你的确认</span><span class="spacer" style="flex:1"></span><span style="font-size:10px;color:var(--text-tertiary)">permissionMode: full</span></div>
+        <div class="cc-body">
+          <div class="cc-cmd">git <span class="flag">push --force</span> origin main<span style="opacity:.6">  # 风险：覆盖远端历史</span></div>
+          <div class="cc-reason"><b>agent 说明：</b>把已 rebase 的本地分支强制推送到远端，使 CI 重跑。命中预置高危规则 <span class="mono" style="font-family:ui-monospace;font-size:10px;background:var(--bg-muted);border:1px solid var(--border);border-radius:4px;padding:0 5px">deny/ask: git push --force*</span></div>
+          <div class="cc-rule">匹配规则：<span class="rmatch">ask: git push*</span><span class="rmatch">allow: git status*</span><span class="rmatch">deny: rm -rf /</span></div>
+        </div>
+        <div class="cc-btns">
+          <button class="btn" id="s4-once">本次允许</button>
+          <button class="btn allow" id="s4-always">总是允许</button>
+          <button class="btn deny" id="s4-never">总是拒绝</button>
+        </div>
+      </div>
+      <div class="mode-map">
+        <div class="mm-head">权限模式 → 预置规则集（映射先行对齐，回归三模式）</div>
+        <table class="mm-table">
+          <tr><th>模式</th><th>写操作</th><th>高危命令</th><th>终端执行</th></tr>
+          <tr><td>chat</td><td>全部 ask</td><td>ask + 说明</td><td>ask（含只读）</td></tr>
+          <tr><td>edit</td><td>ask + 规则集</td><td>ask + 确认卡</td><td>ask</td></tr>
+          <tr><td>full</td><td>allow 规则命中直跑</td><td>ask + 确认卡（本卡）</td><td>allow 规则命中直跑</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="rule-panel">
+      <div class="rp-head">规则集 <span class="tag">hip.toml [terminal]</span><span style="flex:1"></span><span style="font-size:10px;color:var(--text-tertiary)">allow / ask / deny</span></div>
+      <div class="rp-list" id="rp-list">
+        <div class="rp-row"><span class="act allow">allow</span><span class="pat">Bash(git status:*)</span><span class="src">预置</span></div>
+        <div class="rp-row"><span class="act allow">allow</span><span class="pat">Bash(df:*)</span><span class="src">预置</span></div>
+        <div class="rp-row"><span class="act ask">ask</span><span class="pat">Bash(git push:*)</span><span class="src">预置 · 高危</span></div>
+        <div class="rp-row"><span class="act ask">ask</span><span class="pat">Bash(kill:*)</span><span class="src">预置 · 高危</span></div>
+        <div class="rp-row"><span class="act deny">deny</span><span class="pat">Bash(rm -rf /*)</span><span class="src">预置</span></div>
+        <div class="rp-row"><span class="act deny">deny</span><span class="pat">Bash(> /dev/sd*)</span><span class="src">预置</span></div>
+      </div>
+      <div class="rp-foot">「总是允许 / 总是拒绝」会把 <b>ask → allow/deny</b> 的行追加到这里，重启后仍生效；<code>full</code> 模式下仅高危保留 ask。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 场景 5：完成判定对照 ══════════ -->
+<div class="scene" id="s5">
+  <h2 class="sec">完成判定对照 — 围栏信号 vs 猜 prompt<span class="tag">T1/T6 · P0</span></h2>
+  <p class="sec-sub">同样一个 df -h，正则启发式在三个真实场景下翻车；围栏（OSC 633 语义）全部命中，且自带退出码。</p>
+  <div class="fence-layout">
+    <div class="fence-card">
+      <div class="fc-head"><span class="st good">围栏信号 · OSC 633</span>命令边界 + 退出码（VS Code / Warp 同款）</div>
+      <div class="fc-body">
+        <div class="fc-case"><b>机制：</b>写入时包裹不可见 OSC 序列；xterm 渲染层吞 marker；ring 保留原文供解析。无 marker（被 strip）时自动降级 prompt 兜底。</div>
+        <div class="mini-term">printf '\x1b]633;A\x1b\\'\n<span class="ps">$</span> df -h\nFilesystem  Size  Used Avail Use% Mounted\n/dev/sda1   196G   42G  145G  23% /\n<span class="good">\x1b]633;D;0\x1b\\</span>\n<span class="ps">$</span> <span class="caret"></span></div>
+        <div class="fc-verdict good"><span>✓</span><span class="mono">extractFenceExitCode → exit 0 → completed</span></div>
+        <div class="fc-case"><span class="tag pass">PASS</span>p10k 自定义 PS1（图标结尾）、输出被 ring 裁剪、命令无输出——全部靠 marker 命中，<b>不依赖 prompt 长相</b>。</div>
+      </div>
+    </div>
+    <div class="fence-card">
+      <div class="fc-head"><span class="st bad">正则启发式 · hasPromptTail</span>现状，三个翻车现场</div>
+      <div class="fc-body">
+        <div class="fc-case"><span class="tag fail">漏判</span><b>p10k / starship 自定义 PS1：</b>最后一行是图标 + 转义序列，<span class="mono">[$#%&gt;]\s*$</span> 不匹配 → 干等 deadline → <span class="mono">timed_out + mayStillRun</span></div>
+        <div class="fc-case"><span class="tag fail">误判</span><b>输出以 $ 结尾：</b><span class="mono">echo $? </span>的输出恰以 <span class="mono">$</span> 收尾 → 命令还在跑就被判 <span class="mono">completed</span></div>
+        <div class="fc-case"><span class="tag fail">误判</span><b>ring 裁剪：</b>长输出超过 2MiB 被 trim，prompt 已不在最后一行 → 同样漏判</div>
+        <div class="fc-verdict bad"><span>✗</span><span>三条路径都拿不到 <span class="mono">exitCode</span>，agent 不知道成败</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="verdict-row"><span class="big">✅</span><span><b>结论：</b>围栏把「猜」变成「读」——命令边界与退出码成为协议信号；<span class="mono">hasPromptTail</span> 降级为无 marker 时的兜底（降级路径由真实 bash 夹具 T6 覆盖）。</span></div>
+</div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════ 基础 ═══════════════ */
+const $ = (s, el=document) => el.querySelector(s)
+const $$ = (s, el=document) => [...el.querySelectorAll(s)]
+function toast(text, ms=2600){ const t=document.createElement('div'); t.className='toast'; t.innerHTML=text; $('#toast').appendChild(t); setTimeout(()=>t.remove(), ms) }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)) }
+
+const HINTS = {
+  s0:'六张对照卡对应 spec §1 根因 A–E；右侧为整改后行为。',
+  s1:'agent 执行 df -h：观察终端（marker 无感）、命令卡（exit 0 chip）、输出块（不含用户输入）。',
+  s2:'sudo 密码场景：先点「开始演示」，再按顺序点「模拟用户输入密码」→「交还」。',
+  s3:'npm run build 期间提交一条消息：观察 queued 标记与结束后自动投递。',
+  s4:'点击确认卡三按钮体验规则记忆；右侧规则集实时追加新规则。',
+  s5:'对照围栏信号与正则启发式在三种真实场景下的表现差异。',
+}
+function switchScene(id){
+  $$('#sceneTabs button').forEach(b=>b.classList.toggle('on', b.dataset.scene===id))
+  $$('.scene').forEach(s=>s.classList.toggle('on', s.id===id))
+  $('#hint').textContent = HINTS[id]
+}
+$('#sceneTabs').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) switchScene(b.dataset.scene) })
+$$('#themeTabs button').forEach(b=>b.addEventListener('click', ()=>{
+  document.documentElement.dataset.theme = b.dataset.themeBtn
+  $$('#themeTabs button').forEach(x=>x.classList.toggle('on', x===b))
+}))
+
+/* ═══════════════ 舞台构建（场景 1/2/3 共用；全部作用域 class，无全局 id 冲突）═══════════════ */
+function buildStage(mount){
+  mount.innerHTML = `
+  <div class="sb">
+    <div class="sb-head">终端</div>
+    <div class="sb-scroll">
+      <div class="sb-sec">SSH</div>
+      <div class="tnode active"><span class="ik">▾</span><span class="st ok"></span><span class="tt">prod-box</span><span class="kind">SSH</span></div>
+      <div class="tnode child active"><span class="ik">💬</span><span class="tt">查磁盘 · 刚才</span></div>
+      <div class="tnode child"><span class="ik">💬</span><span class="tt">部署回滚（昨晚）</span></div>
+      <div class="tnode"><span class="chev">▸</span><span class="st ok"></span><span class="tt">staging</span><span class="kind">SSH</span></div>
+      <div class="sb-sec">本地</div>
+      <div class="tnode"><span class="ik">▸</span><span class="tt">local-dev</span><span class="kind">本地</span></div>
+    </div>
+  </div>
+  <div class="mn">
+    <div class="term">
+      <div class="term-bar"><span class="tdot"></span><span class="tt">prod-box — root@10.0.4.21: ~</span><span class="tag">共享 PTY</span><span class="osc-hint">OSC 633 · marker 已吞除</span><span class="sp"></span><span class="tbar-usr">user@host · connected</span></div>
+      <div class="term-scroll"></div>
+      <div class="term-input-row"><span class="lbl">用户键入：</span><input class="user-input" placeholder="直接在这里打字（接管场景演示）" disabled><span class="lbl driver-lbl">driver: agent</span></div>
+    </div>
+  </div>
+  <div class="rl">
+    <div class="rail-head"><span class="rh-title">运维助手 <span class="host">· prod-box</span></span><span class="rh-btn">⋯</span><span class="rh-btn">×</span></div>
+    <div class="rail-body"></div>
+    <div class="composer">
+      <div class="comp-sel"><span class="psel">◆ 模型 · sonnet-4</span><span class="psel">⚙ full</span><span class="sp"></span><span class="comp-status"></span></div>
+      <div class="comp-input-row"><textarea class="composer-input" placeholder="向运维助手提问…"></textarea><button class="send composer-send" disabled>↑</button></div>
+      <div class="queue-hint">⏳ 命令运行中 — 消息将在结束后发送</div>
+    </div>
+  </div>`
+  const t = {
+    root: mount,
+    termScroll: mount.querySelector('.term-scroll'),
+    userInput: mount.querySelector('.user-input'),
+    driverLbl: mount.querySelector('.driver-lbl'),
+    oscHint: mount.querySelector('.osc-hint'),
+    railBody: mount.querySelector('.rail-body'),
+    composerInput: mount.querySelector('.composer-input'),
+    composerSend: mount.querySelector('.composer-send'),
+    queueHint: mount.querySelector('.queue-hint'),
+    compStatus: mount.querySelector('.comp-status'),
+  }
+  return t
+}
+function termLine(t, html, cls=''){ const d=document.createElement('div'); d.innerHTML=html; d.className=cls; t.termScroll.appendChild(d); t.termScroll.scrollTop=1e9; return d }
+function termPs(t){ termLine(t, '<span class="ps">$ </span><span class="caret"></span>') }
+function termType(t, text, speed=14){
+  return new Promise(res=>{
+    let i=0; const caret=termLine(t, '')
+    const esc = c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c] ?? c)
+    const tick=()=>{ if(i>=text.length){ caret.remove(); termPs(t); res(); return } caret.innerHTML = [...text].slice(0,++i).map(esc).join('')+'<span class="caret"></span>'; setTimeout(tick, speed) }
+    tick()
+  })
+}
+function termOut(t, html){ termLine(t, html) }
+function setDriver(t, d){ t.driverLbl.textContent = 'driver: '+d; t.driverLbl.style.color = d==='user' ? '#58a6ff' : '#8b949e' }
+function setOscHint(t, show){ t.oscHint.style.display = show ? '' : 'none' }
+
+/* —— 运维助手面板消息/命令卡（全部作用域） —— */
+function addMsg(t, role, name, time, bodyHTML, extra=''){
+  const d=document.createElement('div')
+  d.innerHTML = `<div class="msg ${role}">${extra}<div class="m-meta"><b>${name}</b> · ${time}</div><div class="m-body">${bodyHTML}</div></div>`
+  t.railBody.appendChild(d); t.railBody.scrollTop=1e9; return d
+}
+function addToolCard(t, cmd, status, statusCls, bodyHTML){
+  const d=document.createElement('div')
+  d.innerHTML = `<div class="tool-card"><div class="tc-head"><span class="ic">▢</span><span class="cmd">${cmd}</span><span class="tc-status ${statusCls}">${status}</span></div>${bodyHTML?`<div class="tc-body">${bodyHTML}</div>`:''}</div>`
+  t.railBody.appendChild(d); t.railBody.scrollTop=1e9; return d
+}
+function setCard(card, status, statusCls, bodyHTML){
+  card.querySelector('.tc-status').textContent=status
+  card.querySelector('.tc-status').className='tc-status '+statusCls
+  if(bodyHTML!==undefined){ const old=card.querySelector('.tc-body'); if(old) old.remove(); if(bodyHTML) card.insertAdjacentHTML('beforeend',`<div class="tc-body">${bodyHTML}</div>`) }
+}
+function addBanner(t, text, extraClass=''){
+  const d=document.createElement('div'); d.innerHTML=`<div class="banner ${extraClass}">${text}</div>`
+  t.railBody.appendChild(d); t.railBody.scrollTop=1e9; return d
+}
+function exitChip(code){
+  return `<span class="tc-exit"><span class="k">exit</span><span class="ec ${code===0?'zero':'nonzero'}">${code}</span>${code===0?'<span class="why">围栏信号命中 · 非猜 prompt</span>':'<span class="why">围栏携带退出码</span>'}</span>`
+}
+
+/* ═══════════════ 场景 1：围栏执行 ═══════════════ */
+let T1=null
+function resetS1(){
+  $('#stage').innerHTML=''; T1=buildStage($('#stage')); $('#s1-run').disabled=false
+}
+async function runS1(){
+  resetS1(); $('#s1-run').disabled=true; const t=T1
+  setOscHint(t, true)
+  await sleep(300)
+  addMsg(t,'assistant','助手','14:02:11','我来看看这台机的磁盘占用。')
+  const card=addToolCard(t,'terminal_exec · df -h','运行中','run','<span class="k">reason</span> 检查磁盘使用率<span style="display:block;margin-top:3px" class="k">wait_ms</span> 15000')
+  await sleep(600)
+  await termType(t,'df -h',22)
+  await sleep(900)
+  termOut(t,'<span class="dim">Filesystem      Size  Used Avail Use% Mounted on</span><br><span class="dim">/dev/sda1       196G   42G  145G  23% /</span><br><span class="dim">tmpfs           7.8G     0  7.8G   0% /dev/shm</span>')
+  await sleep(700)
+  setCard(card,'completed','ok','<span class="k">reason</span> 检查磁盘使用率<br><span style="margin-top:4px;display:inline-block">'+exitChip(0)+'</span><br><span class="k" style="margin-top:5px;display:block">output · df -h 命令块（不含用户输入）</span><span class="mono" style="font-size:9.5px;color:var(--text-tertiary)">/dev/sda1 196G 42G 145G 23% / …</span>')
+  addMsg(t,'assistant','助手','14:02:13','根分区已用 <b>23%</b>（145G 可用），暂无需清理。')
+  toast('<span class="mono">fence exit=0</span> — 围栏完成信号命中，<b>无需猜 prompt</b>')
+}
+
+/* ═══════════════ 场景 2：接管 / 交还 ═══════════════ */
+let T2=null, S2={}
+function resetS2(){
+  $('#stage2').innerHTML=''; T2=buildStage($('#stage2')); S2={phase:0, banner:null, card:null}
+  $('#s2-run').disabled=false; $('#s2-type').disabled=true; $('#s2-handback').disabled=true
+}
+async function runS2(){
+  resetS2(); $('#s2-run').disabled=true; const t=T2
+  setOscHint(t,false)
+  await sleep(300)
+  addMsg(t,'assistant','助手','14:05:41','需要安装 htop 来监控负载，我直接装。')
+  S2.card=addToolCard(t,'terminal_exec · sudo apt-get install -y htop','运行中','run','<span class="k">reason</span> 安装 htop（已加 -y 避免交互）')
+  await sleep(500)
+  await termType(t,'sudo apt-get install -y htop',24)
+  await sleep(1000)
+  termOut(t,'<span class="dim">[sudo] password for root:</span>')
+  await sleep(1200)
+  S2.banner=addBanner(t,'<b>◈ 命令可能需要你介入</b> — 等待密码输入，或点「接管」直接操作','agent')
+  toast('无输出超阈值 — 提示用户可介入（信息性，不阻塞）')
+  S2.phase=1
+  $('#s2-type').disabled=false
+}
+async function s2UserType(){
+  if(S2.phase!==1) return
+  const t=T2; $('#s2-type').disabled=true
+  termOut(t,'<span class="user">••••••</span><span style="opacity:.5">（你在共享终端输入了密码）</span>')
+  await sleep(500)
+  S2.banner.remove()
+  S2.banner=addBanner(t,'<b>你正在输入 — 完成后点「交还」让助手继续</b> <span class="tc-status warn" style="background:var(--warn-bg);color:var(--warn)">handed_off · deadline 暂停</span>')
+  setDriver(t,'user'); t.userInput.disabled=false
+  await sleep(400)
+  setCard(S2.card,'handed_off','warn','<span class="k">reason</span> 安装 htop（已加 -y 避免交互）<br><span class="k" style="margin-top:3px">driver = user · 用户正在输入</span>')
+  $('#s2-handback').disabled=false
+  S2.phase=2
+  toast('飞行置 <span class="mono">handed_off</span> — deadline 计时暂停，不再 timed_out')
+}
+async function s2Handback(){
+  if(S2.phase!==2) return
+  const t=T2; $('#s2-handback').disabled=true
+  await sleep(400)
+  termOut(t,'<span class="dim">Reading package lists… Done</span><br><span class="dim">Setting up htop (3.2.2) …</span>')
+  await sleep(900)
+  setCard(S2.card,'completed','ok','<span class="k">reason</span> 安装 htop<br><span style="margin-top:4px;display:inline-block">'+exitChip(0)+'</span><br><span class="k" style="margin-top:5px;display:block">user_interleaved</span><span class="mono" style="font-size:9.5px;color:var(--text-tertiary)">用户输入与命令输出并存 — 结果已谨慎标注</span>')
+  S2.banner.remove()
+  addMsg(t,'assistant','助手','14:06:02','htop 装好了（3.2.2）。你输密码期间我暂停了等待，现在继续。')
+  setDriver(t,'agent'); t.userInput.disabled=true
+  toast('交还成功 — agent 重读 ring 后恢复，结果标记 <span class="mono">user_interleaved</span>')
+  S2.phase=3
+}
+
+/* ═══════════════ 场景 3：长命令排队 ═══════════════ */
+let T3=null, S3={}
+function resetS3(){
+  $('#stage3').innerHTML=''; T3=buildStage($('#stage3')); S3={phase:0, card:null, queued:null}
+  $('#s3-run').disabled=false; $('#s3-finish').disabled=true
+}
+async function runS3(){
+  resetS3(); $('#s3-run').disabled=true; $('#s3-finish').disabled=false; const t=T3
+  setOscHint(t,true)
+  await sleep(300)
+  addMsg(t,'assistant','助手','14:11:05','开始构建，跑完我汇报。')
+  S3.card=addToolCard(t,'terminal_exec · npm run build','运行中','run','<span class="k">wait_ms</span> 120000')
+  await sleep(500)
+  await termType(t,'npm run build',24)
+  await sleep(900)
+  termOut(t,'<span class="dim">> hip@1.0.1 build</span><br><span class="dim">vite v6.0.2 building for production…</span>')
+  await sleep(600)
+  t.composerInput.disabled=false; t.composerSend.disabled=false
+  t.compStatus.textContent='build 运行中 · 消息将排队'
+  t.queueHint.classList.add('on')
+  toast('exec flight 激活 — 新消息进入<span class="mono">排队</span>语义（Warp queued prompts 同款）')
+  S3.phase=1
+}
+async function s3Send(){
+  if(S3.phase!==1) return
+  const t=T3
+  const v=t.composerInput.value.trim(); if(!v) return
+  t.composerInput.value=''; t.composerSend.disabled=true; t.composerInput.disabled=true
+  S3.queued=addMsg(t,'user','我','14:11:20',v,'<span class="queued-chip">⏳ queued · 命令运行中 — 结束后自动发送</span>')
+  await sleep(400)
+  toast('消息已暂存 — 命令结束后自动投递')
+}
+async function s3Finish(){
+  if(S3.phase!==1) return
+  S3.phase=2; $('#s3-finish').disabled=true; const t=T3
+  await sleep(400)
+  termOut(t,'<span class="dim">✓ built in 42.3s</span>')
+  setCard(S3.card,'completed','ok','<span class="k">wait_ms</span> 120000 → 42.3s 完成<br><span style="margin-top:4px;display:inline-block">'+exitChip(0)+'</span>')
+  t.queueHint.classList.remove('on'); t.compStatus.textContent=''
+  await sleep(500)
+  if(S3.queued){
+    S3.queued.querySelector('.queued-chip').textContent='已投递 · 助手开始处理'
+    S3.queued.querySelector('.queued-chip').classList.add('sent')
+  }
+  t.composerSend.disabled=false; t.composerInput.disabled=false
+  await sleep(900)
+  addMsg(t,'assistant','助手','14:11:58','构建通过。你让我更新的 CHANGELOG：我看下最近的提交…… 好，这就补上「新增共享终端围栏执行」。')
+  toast('排队消息已自动投递 — agent 继续处理')
+}
+/* composer 发送（全局委托：仅场景 3 生效） */
+document.addEventListener('click', e=>{
+  if(e.target.closest('.composer-send') && document.querySelector('#sceneTabs button[data-scene="s3"]').classList.contains('on')) s3Send()
+})
+
+/* ═══════════════ 场景 4：规则审批 ═══════════════ */
+const RULES=[
+  ['allow','Bash(git status:*)','预置'],
+  ['allow','Bash(df:*)','预置'],
+  ['ask','Bash(git push:*)','预置 · 高危'],
+  ['ask','Bash(kill:*)','预置 · 高危'],
+  ['deny','Bash(rm -rf /*)','预置'],
+  ['deny','Bash(> /dev/sd*)','预置'],
+]
+function renderRules(){ $('#rp-list').innerHTML = RULES.map(r=>`<div class="rp-row"><span class="act ${r[0]}">${r[0]}</span><span class="pat">${r[1]}</span><span class="src">${r[2]}</span></div>`).join('') }
+$('#s4-once').addEventListener('click', ()=>{ toast('本次允许 — 仅此一次，不写规则') })
+$('#s4-always').addEventListener('click', ()=>{ RULES.splice(2,0,['allow','Bash(git push:*)','你 · 刚刚']); renderRules(); toast('已写入 <span class="mono">hip.toml [terminal]</span>：git push* → <b>allow</b>（重启生效）') })
+$('#s4-never').addEventListener('click', ()=>{ RULES.splice(2,0,['deny','Bash(git push:*)','你 · 刚刚']); renderRules(); toast('已写入 <span class="mono">hip.toml [terminal]</span>：git push* → <b>deny</b>（重启生效）') })
+renderRules()
+
+/* ═══════════════ 事件绑定与初始化 ═══════════════ */
+$('#s1-run').addEventListener('click', runS1)
+$('#s1-reset').addEventListener('click', resetS1)
+$('#s2-run').addEventListener('click', runS2)
+$('#s2-type').addEventListener('click', s2UserType)
+$('#s2-handback').addEventListener('click', s2Handback)
+$('#s2-reset').addEventListener('click', resetS2)
+$('#s3-run').addEventListener('click', runS3)
+$('#s3-finish').addEventListener('click', s3Finish)
+$('#s3-reset').addEventListener('click', resetS3)
+
+switchScene('s0')
+resetS1(); resetS2(); resetS3()
+
+</script>
+</body>
+</html>

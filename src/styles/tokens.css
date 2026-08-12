@@ -63,7 +63,7 @@
    * lights (tauri.conf trafficLightPosition y=26). Win/Linux stay 40px.
    */
   --titlebar-height: 40px;
-  /* 扁平化：无半透明材质 —— 标题栏恒为实色（原生 vibrancy 已拆除，见 windowVibrancy.ts） */
+  /* 标题栏恒为实色（侧栏毛玻璃仅作用于 aside 本身，见 .sidebar-glass） */
   --titlebar-bg: var(--bg-app);
   --titlebar-backdrop: none;
   /* 右侧浮动 panel 阴影（与 menu/overlay 并列的第三档）—— 扁平化：面板改实底 + 1px 边框 */
@@ -273,8 +273,21 @@ html.dark[data-platform="linux"] {
   --titlebar-backdrop: none;
 }
 
-/* 扁平化：无半透明材质。data-vibrancy 恒为 solid（见 windowVibrancy.ts），
-   历史分支（mac-sidebar / win-mica / win-acrylic / native）已全部拆除。 */
+/* ── 侧栏毛玻璃（sidebar-glass）──────────────────────────────────────────
+   仅 mac/win：tauri.conf 窗口透明 + windowEffects（macOS sidebar / Win
+   acrylic·mica），侧栏半透明底 + backdrop blur，透出桌面与原生材质。
+   linux：Tauri 不支持透明窗口，无物可透，兜底不透明实色（与扁平化一致）。 */
+.sidebar-glass {
+  background: rgb(var(--bg-subtle-rgb) / 0.68);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+
+html[data-platform="linux"] .sidebar-glass {
+  background: var(--bg-subtle);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 
 html {
   color-scheme: light;
@@ -307,9 +320,15 @@ html[data-platform="windows"] body {
   text-rendering: auto;
 }
 
-/* 扁平化：无原生材质，body 恒为不透明页面底色。 */
+/* 毛玻璃侧栏（见 .sidebar-glass）：mac/win 窗口透明，body 不落底色，原生材质
+   从透明区透出；linux 无透明窗口支持，保持不透明页面底色兜底。 */
 body {
   background: var(--bg-app);
+}
+
+html[data-platform="mac"] body,
+html[data-platform="windows"] body {
+  background: transparent;
 }
 
 * {

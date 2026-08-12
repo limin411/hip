@@ -5,7 +5,7 @@
 
 ## 1. 设计原则
 
-1. **固体优先 Solid over Glass** —— 所有表面 100% 不透明；层级由明度阶差 + 1px 边框表达，禁止 `backdrop-filter`。原生 vibrancy（macOS sidebar / Win Mica / Acrylic）已全部拆除。
+1. **固体优先 Solid over Glass（侧栏除外）** —— 除侧栏外所有表面 100% 不透明；层级由明度阶差 + 1px 边框表达，其余表面禁止 `backdrop-filter`。**侧栏毛玻璃**（`.sidebar-glass`）：macOS/Windows 窗口透明 + 原生材质（macOS sidebar vibrancy / Windows acrylic→mica）+ 半透明底 + `backdrop-filter: blur(24px) saturate(160%)`；Linux 无透明窗口（Tauri 不支持），侧栏兜底不透明实色。
 2. **边界优先 Border over Shadow** —— 浮层（下拉 / Modal / 面板）用实色 + 1px 边框 + scrim 分层；阴影只保留 Modal 一档极轻投影（`shadow-overlay`），其余全部 `none`。
 3. **色块优先 Color over Gradient** —— 状态用纯色实底 chip / 色条 / 圆点，禁止渐变、glow、shimmer。effort-max 为纯色。
 4. **直角优先 Sharp over Round** —— 按钮/输入框 2px、卡片 4px、浮层 6px；胶囊（`rounded-full`）仅保留给 avatar / 状态点 / 开关拇指。
@@ -183,9 +183,10 @@
 
 | 平台 | 差异 |
 |---|---|
-| macOS | 标题栏 48px、红绿灯让位 90px；无 vibrancy，恒为实色 |
-| Windows / Linux | 标题栏 40px、无红绿灯让位；Windows 文字渲染用 ClearType |
-| 全平台 | 无半透明材质（`data-vibrancy` 恒为 `solid`）；标题栏实色 |
+| macOS | 标题栏 48px、红绿灯让位 90px；侧栏毛玻璃 = 原生 `sidebar` vibrancy 材质（窗口透明 + `windowEffects`，CSS `.sidebar-glass` 半透明底 + blur） |
+| Windows / Linux | 标题栏 40px、无红绿灯让位；Windows 侧栏毛玻璃 = 原生 acrylic（降级 mica）；Windows 文字渲染用 ClearType |
+| Linux | 无透明窗口（Tauri v2 不支持）→ 侧栏恒为不透明实色（`.sidebar-glass` 兜底）；标题栏实色 |
+| 全平台 | 除侧栏外无半透明材质；标题栏实色 |
 
 ## 9. 无障碍约定
 

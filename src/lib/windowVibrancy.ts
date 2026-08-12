@@ -1,10 +1,12 @@
 /**
  * Native window vibrancy (desktop wallpaper / DWM material under transparent regions).
  *
- * Flat design (see docs/flat-design-spec.md §4.5): translucent materials are removed.
- * `data-vibrancy` is always `solid`; `setTheme` still syncs window chrome to the
- * app theme. Legacy modes (`mac-sidebar` / `win-mica` / `win-acrylic`) are still
- * readable by getVibrancyMode but never written by this module.
+ * Sidebar glass (see DESIGN.md §8): on macOS / Windows the window is transparent
+ * and tauri.conf `windowEffects` applies the native material at creation
+ * (macOS `sidebar` vibrancy / Windows `acrylic`, falling back to `mica`).
+ * This module only syncs the window theme and marks the CSS hook (`data-vibrancy`)
+ * so styles can tell real-material platforms apart; on Linux (no transparent
+ * windows in Tauri) and outside Tauri it stays `solid`.
  */
 
 import { detectHipPlatform, type HipPlatform } from './platform'
@@ -52,32 +54,33 @@ export function getVibrancyMode(): VibrancyMode | null {
 }
 
 /**
- * Apply platform window effects. Safe outside Tauri (marks solid / clears, returns false).
- * Flat design: no translucency — always solid; only the window theme is synced.
- * Idempotent enough to re-run when app theme changes.
+ * Mark the CSS hook for the active material.
+ * macOS → `mac-sidebar`; Windows → `win-acrylic` (tauri.conf prefers acrylic,
+ * falls back to mica automatically); Linux / outside Tauri → `solid`.
+ * Safe outside Tauri (marks solid, returns false).
  */
 export async function enableNativeVibrancy(): Promise<boolean> {
   const platform = detectHipPlatform()
+  let mode: VibrancyMode = 'solid'
 
-  if (platform !== 'mac' && platform !== 'windows') {
-    markVibrancyMode('solid')
-    return false
+  if (platform === 'mac' || platform === 'windows') {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      const win = getCurrentWindow()
+      const dark = isDarkDocument()
+
+      await win.setTheme(dark ? 'dark' : 'light').catch(() => {
+        /* setTheme not available / denied — chrome color sync is optional */
+      })
+      mode = platform === 'mac' ? 'mac-sidebar' : 'win-acrylic'
+    } catch {
+      /* not in Tauri — solid anyway */
+      mode = 'solid'
+    }
   }
 
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const win = getCurrentWindow()
-    const dark = isDarkDocument()
-
-    await win.setTheme(dark ? 'dark' : 'light').catch(() => {
-      /* setTheme not available / denied — chrome color sync is optional */
-    })
-  } catch {
-    /* not in Tauri — solid anyway */
-  }
-
-  markVibrancyMode('solid')
-  return false
+  markVibrancyMode(mode)
+  return mode !== 'solid'
 }
 
 /** Re-apply after theme toggle (window theme + acrylic tint). */

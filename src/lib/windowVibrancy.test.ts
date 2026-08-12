@@ -68,4 +68,30 @@ describe('windowVibrancy', () => {
     expect(ok).toBe(false)
     expect(getVibrancyMode()).toBe('solid')
   })
+
+  it('enableNativeVibrancy marks mac-sidebar inside Tauri on mac', async () => {
+    vi.stubGlobal('navigator', {
+      platform: 'MacIntel',
+      userAgent: 'Mozilla/5.0 (Macintosh)',
+    })
+    vi.doMock('@tauri-apps/api/window', () => ({
+      getCurrentWindow: () => ({ setTheme: vi.fn().mockResolvedValue(undefined) }),
+    }))
+    const ok = await enableNativeVibrancy()
+    expect(ok).toBe(true)
+    expect(getVibrancyMode()).toBe('mac-sidebar')
+  })
+
+  it('enableNativeVibrancy marks win-acrylic inside Tauri on windows', async () => {
+    vi.stubGlobal('navigator', {
+      platform: 'Win32',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    })
+    vi.doMock('@tauri-apps/api/window', () => ({
+      getCurrentWindow: () => ({ setTheme: vi.fn().mockResolvedValue(undefined) }),
+    }))
+    const ok = await enableNativeVibrancy()
+    expect(ok).toBe(true)
+    expect(getVibrancyMode()).toBe('win-acrylic')
+  })
 })

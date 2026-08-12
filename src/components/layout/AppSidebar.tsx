@@ -281,7 +281,7 @@ export function AppSidebar() {
 
   return (
     <aside
-      className="relative flex h-full shrink-0 flex-col border-r border-border bg-surface-subtle"
+      className="sidebar-glass relative flex h-full shrink-0 flex-col border-r border-border"
       style={{ width: sidebarWidth }}
       data-testid="app-sidebar"
       aria-label={settingsOpen ? t('settings.title') : t('sidebar.aria')}

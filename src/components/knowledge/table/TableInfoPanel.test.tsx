@@ -76,7 +76,6 @@ describe('TableInfoPanel (table-right-panel PR-2, spec T2)', () => {
   })
 
   it('draft updates flow into stats after debounce', async () => {
-    vi.useFakeTimers()
     render(<TableInfoPanel />)
     useKnowledgeStore.setState({
       tableDraft: { id: 'tbl_1', csv: 'a\nb\nc\nd\n', meta: META },
@@ -84,7 +83,8 @@ describe('TableInfoPanel (table-right-panel PR-2, spec T2)', () => {
     await act(async () => {})
     // 防抖窗口内不更新（'33 行' = 数字 span 3 + '3 行 · 3 列'）
     expect(screen.getByTestId('table-info-stats').textContent).toContain('3 行 · 3 列')
-    vi.advanceTimersByTime(220)
+    // 真实等待防抖窗口（并行负载下 fake timers 时序不稳）
+    await new Promise((r) => setTimeout(r, 260))
     await act(async () => {})
     expect(screen.getByTestId('table-info-stats').textContent).toContain('4 行 · 3 列')
   })

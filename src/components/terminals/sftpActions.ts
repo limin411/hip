@@ -16,6 +16,59 @@ const RETRY_MS = 200
 /** ~3s — enough for open race; TerminalFileTree also gates on status=running. */
 const MAX_RETRIES = 15
 
+// ── Transfer queue ──────────────────────────────────────────────────────────
+// Rust enforces hard caps (1 per session, 2 process-wide) by *rejecting* new
+// transfers instead of queuing them, so concurrent downloads used to fail
+// immediately. We serialize here instead — per-terminal FIFO (matches
+// MAX_PER_SESSION_TRANSFERS=1) plus a process-wide slot cap (matches
+// MAX_GLOBAL_TRANSFERS=2) — so simultaneous transfers queue (phase 'queued')
+// and run in order. Rust caps stay as a safety net for non-UI callers.
+const MAX_GLOBAL_TRANSFERS = 2
+
+/** Tail promise per terminal — jobs for the same terminal run one at a time. */
+const perTerminalTail = new Map<string, Promise<void>>()
+let globalSlots = MAX_GLOBAL_TRANSFERS
+const globalWaiters: Array<() => void> = []
+
+function acquireGlobalSlot(): Promise<void> {
+  if (globalSlots > 0) {
+    globalSlots -= 1
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    globalWaiters.push(resolve)
+  })
+}
+
+function releaseGlobalSlot(): void {
+  const next = globalWaiters.shift()
+  if (next) next()
+  else globalSlots += 1
+}
+
+/** Run `job` after earlier transfers for `terminalId` finish, when a global slot is free. */
+function enqueueTransfer(terminalId: string, job: () => Promise<void>): Promise<void> {
+  const prev = perTerminalTail.get(terminalId) ?? Promise.resolve()
+  const run = prev.then(async () => {
+    await acquireGlobalSlot()
+    try {
+      await job()
+    } finally {
+      releaseGlobalSlot()
+    }
+  })
+  // Jobs never reject (they record errors into the store), but keep the chain
+  // alive regardless so a stray throw cannot strand later queued transfers.
+  perTerminalTail.set(
+    terminalId,
+    run.then(
+      () => {},
+      () => {},
+    ),
+  )
+  return run
+}
+
 function localBasename(localPath: string): string {
   const normalized = localPath.replace(/\\/g, '/')
   const parts = normalized.split('/')
@@ -101,6 +154,9 @@ export async function runSftpUploadIntoDir(
     title: t('terminals.sftp.pickFiles'),
   })
   if (!files?.length) return
+  // Create all rows up front (phase 'queued') so later files show as waiting
+  // while earlier ones transfer; jobs then run strictly in order below.
+  const jobs: Array<{ local: string; base: string; remoteTarget: string; opId: string }> = []
   for (const local of files) {
     const base = localBasename(local)
     if (!(await warnIfConfigPath(local, t('terminals.sftp.warnConfigPath')))) continue
@@ -111,21 +167,44 @@ export async function runSftpUploadIntoDir(
       terminalId,
       kind: 'upload',
       label: base,
-      phase: 'started',
+      phase: 'queued',
       bytes: 0,
     })
-    try {
-      await sftpUpload(terminalId, local, remoteTarget, { force: false, opId })
-    } catch (e) {
-      if (isAlreadyExistsError(e)) {
-        const ok = window.confirm(t('terminals.sftp.overwriteConfirm', { name: base }))
-        if (!ok) {
-          useTerminalFsStore.getState().removeTransfer(opId)
-          continue
-        }
-        try {
-          await sftpUpload(terminalId, local, remoteTarget, { force: true, opId })
-        } catch (e2) {
+    jobs.push({ local, base, remoteTarget, opId })
+  }
+  for (const { local, base, remoteTarget, opId } of jobs) {
+    await enqueueTransfer(terminalId, async () => {
+      useTerminalFsStore.getState().upsertTransfer({
+        opId,
+        terminalId,
+        kind: 'upload',
+        label: base,
+        phase: 'started',
+        bytes: 0,
+      })
+      try {
+        await sftpUpload(terminalId, local, remoteTarget, { force: false, opId })
+      } catch (e) {
+        if (isAlreadyExistsError(e)) {
+          const ok = window.confirm(t('terminals.sftp.overwriteConfirm', { name: base }))
+          if (!ok) {
+            useTerminalFsStore.getState().removeTransfer(opId)
+            return
+          }
+          try {
+            await sftpUpload(terminalId, local, remoteTarget, { force: true, opId })
+          } catch (e2) {
+            useTerminalFsStore.getState().upsertTransfer({
+              opId,
+              terminalId,
+              kind: 'upload',
+              label: base,
+              phase: 'error',
+              bytes: 0,
+              message: e2 instanceof Error ? e2.message : String(e2),
+            })
+          }
+        } else {
           useTerminalFsStore.getState().upsertTransfer({
             opId,
             terminalId,
@@ -133,21 +212,11 @@ export async function runSftpUploadIntoDir(
             label: base,
             phase: 'error',
             bytes: 0,
-            message: e2 instanceof Error ? e2.message : String(e2),
+            message: e instanceof Error ? e.message : String(e),
           })
         }
-      } else {
-        useTerminalFsStore.getState().upsertTransfer({
-          opId,
-          terminalId,
-          kind: 'upload',
-          label: base,
-          phase: 'error',
-          bytes: 0,
-          message: e instanceof Error ? e.message : String(e),
-        })
       }
-    }
+    })
   }
   await refreshSftpDir(terminalId, dirPath)
 }
@@ -169,21 +238,41 @@ export async function runSftpDownload(
     terminalId,
     kind: 'download',
     label: name,
-    phase: 'started',
+    phase: 'queued',
     bytes: 0,
   })
-  try {
-    await sftpDownload(terminalId, remotePath, dest, { force: false, opId })
-  } catch (e) {
-    if (isAlreadyExistsError(e)) {
-      const ok = window.confirm(t('terminals.sftp.overwriteConfirm', { name }))
-      if (!ok) {
-        useTerminalFsStore.getState().removeTransfer(opId)
-        return
-      }
-      try {
-        await sftpDownload(terminalId, remotePath, dest, { force: true, opId })
-      } catch (e2) {
+  await enqueueTransfer(terminalId, async () => {
+    useTerminalFsStore.getState().upsertTransfer({
+      opId,
+      terminalId,
+      kind: 'download',
+      label: name,
+      phase: 'started',
+      bytes: 0,
+    })
+    try {
+      await sftpDownload(terminalId, remotePath, dest, { force: false, opId })
+    } catch (e) {
+      if (isAlreadyExistsError(e)) {
+        const ok = window.confirm(t('terminals.sftp.overwriteConfirm', { name }))
+        if (!ok) {
+          useTerminalFsStore.getState().removeTransfer(opId)
+          return
+        }
+        try {
+          await sftpDownload(terminalId, remotePath, dest, { force: true, opId })
+        } catch (e2) {
+          useTerminalFsStore.getState().upsertTransfer({
+            opId,
+            terminalId,
+            kind: 'download',
+            label: name,
+            phase: 'error',
+            bytes: 0,
+            message: e2 instanceof Error ? e2.message : String(e2),
+          })
+        }
+      } else {
         useTerminalFsStore.getState().upsertTransfer({
           opId,
           terminalId,
@@ -191,19 +280,9 @@ export async function runSftpDownload(
           label: name,
           phase: 'error',
           bytes: 0,
-          message: e2 instanceof Error ? e2.message : String(e2),
+          message: e instanceof Error ? e.message : String(e),
         })
       }
-    } else {
-      useTerminalFsStore.getState().upsertTransfer({
-        opId,
-        terminalId,
-        kind: 'download',
-        label: name,
-        phase: 'error',
-        bytes: 0,
-        message: e instanceof Error ? e.message : String(e),
-      })
     }
-  }
+  })
 }

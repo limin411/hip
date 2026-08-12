@@ -1906,6 +1906,7 @@ export const ko = {
       "done": "완료",
       "cancelled": "취소됨",
       "failed": "실패",
+      "queued": "대기 중",
       "uploadHere": "이 폴더에 업로드",
       "emptyDir": "빈 폴더"
     },

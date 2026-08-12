@@ -1974,6 +1974,7 @@ export const en = {
         done: 'Done',
         cancelled: 'Cancelled',
         failed: 'Failed',
+        queued: 'Queued',
         uploadHere: 'Upload into this folder',
         emptyDir: 'Empty folder',
       },

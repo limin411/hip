@@ -1909,6 +1909,7 @@ export const zhTW = {
       "done": "完成",
       "cancelled": "已取消",
       "failed": "失敗",
+      "queued": "等待中",
       "uploadHere": "上傳到此資料夾",
       "emptyDir": "空資料夾"
     },

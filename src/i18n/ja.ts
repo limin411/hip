@@ -1906,6 +1906,7 @@ export const ja = {
       "done": "完了",
       "cancelled": "キャンセル済み",
       "failed": "失敗",
+      "queued": "待機中",
       "uploadHere": "このフォルダにアップロード",
       "emptyDir": "空のフォルダ"
     },

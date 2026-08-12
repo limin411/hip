@@ -123,6 +123,7 @@ export function TerminalFilesPanel({
                 ? Math.min(100, Math.round((tr.bytes / tr.total) * 100))
                 : null
             const active = tr.phase === 'started' || tr.phase === 'progress'
+            const queued = tr.phase === 'queued'
             return (
               <div
                 key={tr.opId}
@@ -162,9 +163,11 @@ export function TerminalFilesPanel({
                           ? 'bg-ink-tertiary/40'
                           : tr.phase === 'completed'
                             ? 'bg-success/80'
-                            : 'bg-accent',
+                            : queued
+                              ? 'bg-ink-tertiary/30'
+                              : 'bg-accent',
                     )}
-                    style={{ width: pct != null ? `${pct}%` : active ? '30%' : '100%' }}
+                    style={{ width: pct != null ? `${pct}%` : active || queued ? '30%' : '100%' }}
                   />
                 </div>
                 <p className="mt-0.5 text-[10px] text-ink-tertiary">
@@ -176,7 +179,9 @@ export function TerminalFilesPanel({
                       ? ` · ${t('terminals.sftp.cancelled')}`
                       : tr.phase === 'error'
                         ? ` · ${t('terminals.sftp.failed')}`
-                        : ''}
+                        : queued
+                          ? ` · ${t('terminals.sftp.queued')}`
+                          : ''}
                 </p>
               </div>
             )

@@ -44,6 +44,20 @@ describe('TurnStatusLine', () => {
     expect(screen.getByTestId('turn-status-text')).toHaveTextContent('3s')
   })
 
+  it('wraps the elapsed duration in mono tabular numerals (P0-4)', () => {
+    render(<TurnStatusLine streaming startedAt={Date.now() - 3000} />)
+    const mono = screen.getByTestId('turn-status-text').querySelector('.font-mono.tabular-nums')
+    expect(mono).not.toBeNull()
+    expect(mono).toHaveTextContent('3s')
+  })
+
+  it('fades the status icon in on settle via keyed wrapper (P0-4)', () => {
+    const { rerender } = render(<TurnStatusLine streaming startedAt={Date.now() - 3000} />)
+    expect(screen.getByTestId('turn-status-spinner')).toBeInTheDocument()
+    rerender(<TurnStatusLine startedAt={Date.now() - 3000} />)
+    expect(screen.getByTestId('turn-status-success')).toBeInTheDocument()
+  })
+
   it('shows writing phase when streaming with assistant text', () => {
     render(
       <TurnStatusLine

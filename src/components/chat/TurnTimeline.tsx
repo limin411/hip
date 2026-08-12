@@ -67,11 +67,13 @@ export function ThinkingDisclosure({
         <Brain size={14} className="block shrink-0" aria-hidden />
         <span className="min-w-0 truncate">{label}</span>
       </button>
-      {open && (
-        <pre className="mt-1 whitespace-pre-wrap break-words border-l border-border pl-3 font-sans text-meta leading-relaxed text-ink-secondary">
-          {clean}
-        </pre>
-      )}
+      <div className={cn('clip-expand', open && 'is-open')}>
+        <div className="clip-expand-inner">
+          <pre className="mt-1 whitespace-pre-wrap break-words border-l border-border pl-3 font-sans text-meta leading-relaxed text-ink-secondary">
+            {clean}
+          </pre>
+        </div>
+      </div>
     </div>
   )
 }

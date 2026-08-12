@@ -158,8 +158,9 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
             <span className="shrink-0 text-ink-tertiary">{t('chat.tool.truncated')}</span>
           )}
         </button>
-        {open && (
-          <div className="mt-0.5 space-y-1.5 border-l border-border/70 py-1 pl-3" data-testid="tool-result-view">
+        <div className={cn('clip-expand', open && 'is-open')}>
+          <div className="clip-expand-inner">
+            <div className="mt-0.5 space-y-1.5 border-l border-border/70 py-1 pl-3" data-testid="tool-result-view">
             {tool.status === 'error' ? (
               <Field label={t('artifact.failed')} value={humanError || tool.error || ''} danger mono={false} />
             ) : model.kind === 'diff' && model.diff ? (
@@ -199,8 +200,9 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
                 )}
               </div>
             )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </DeclarativeContextMenu>
   )

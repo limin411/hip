@@ -145,9 +145,23 @@ export function TurnStatusLine({
       role="status"
       aria-live="polite"
     >
-      {statusIcon(status, streaming)}
+      {/* Keyed remount on settle/state change → 120ms fade-in (P0-4);
+          the spinner svg keeps its own animate-spin inside the wrapper. */}
+      <span
+        key={streaming ? 'live' : status}
+        className="animate-status-icon block shrink-0"
+        aria-hidden
+      >
+        {statusIcon(status, streaming)}
+      </span>
       <span className="min-w-0 truncate" title={line} data-testid="turn-status-text">
-        {line}
+        {summaryText}
+        {elapsedLabel && (
+          <>
+            {' · '}
+            <span className="font-mono tabular-nums">{elapsedLabel}</span>
+          </>
+        )}
       </span>
     </div>
   )

@@ -72,7 +72,8 @@ describe('ToolCallRow', () => {
       />,
     )
     expect(screen.getByTestId('tool-card-running')).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByTestId('tool-result-view')).not.toBeInTheDocument()
+    // clip-expand keeps the view mounted but collapsed (grid-rows 0fr + opacity 0)
+    expect(screen.getByTestId('tool-result-view').closest('.clip-expand')).not.toHaveClass('is-open')
 
     rerender(
       <ToolCallRow
@@ -88,7 +89,8 @@ describe('ToolCallRow', () => {
       />,
     )
     expect(screen.getByTestId('tool-row')).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByTestId('tool-inline-diff')).not.toBeInTheDocument()
+    // collapsed: view stays mounted inside the hidden clip (grid-rows 0fr + opacity 0)
+    expect(screen.getByTestId('tool-result-view').closest('.clip-expand')).not.toHaveClass('is-open')
   })
 
   it('sanitizes DSML from expanded output', () => {

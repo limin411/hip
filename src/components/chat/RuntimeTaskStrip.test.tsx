@@ -28,6 +28,7 @@ let mockTasks: Array<{
   kind: 'shell' | 'agent' | 'monitor' | 'schedule'
   description: string
   status: string
+  logTail?: string
 }> = []
 
 vi.mock('@/store/taskRuntimeStore', () => ({
@@ -80,5 +81,33 @@ describe('RuntimeTaskStrip', () => {
     mockTasks = [task()]
     render(<RuntimeTaskStrip />)
     expect(screen.queryByTestId('runtime-task-strip')).not.toBeInTheDocument()
+  })
+
+  it('expands a row with logTail via the toggle and collapses again', () => {
+    mockTasks = [task({ id: 't-log', logTail: 'line 1\nline 2' })]
+    render(<RuntimeTaskStrip />)
+    const toggle = screen.getByTestId('runtime-task-toggle')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    // detail stays mounted inside the hidden clip (grid-rows 0fr + opacity 0)
+    expect(screen.getByTestId('runtime-task-detail').closest('.clip-expand')).not.toHaveClass(
+      'is-open',
+    )
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('runtime-task-detail').closest('.clip-expand')).toHaveClass('is-open')
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByTestId('runtime-task-detail').closest('.clip-expand')).not.toHaveClass(
+      'is-open',
+    )
+  })
+
+  it('row without detail is not expandable (toggle disabled, no chevron)', () => {
+    mockTasks = [task({ id: 't-plain', logTail: undefined })]
+    render(<RuntimeTaskStrip />)
+    expect(screen.getByTestId('runtime-task-toggle')).toBeDisabled()
+    expect(screen.queryByTestId('runtime-task-detail')).not.toBeInTheDocument()
   })
 })

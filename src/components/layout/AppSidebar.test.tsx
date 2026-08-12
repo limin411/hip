@@ -199,23 +199,23 @@ describe('AppSidebar', () => {
     expect(navParent).toHaveClass('justify-end')
   })
 
-  it('active nav uses surface wash without left rail or hairline ring', () => {
+  it('active nav uses white wash without left rail or hairline ring', () => {
     render(<AppSidebar />)
     const chats = screen.getByTestId('sidebar-nav-chats')
     expect(chats).not.toHaveClass('before:bg-accent')
-    expect(chats).toHaveClass('bg-state-active')
+    expect(chats).toHaveClass('bg-white')
     expect(chats.className).not.toMatch(/shadow-\[0_0_0_1px/)
     const projects = screen.getByTestId('sidebar-nav-projects')
     expect(projects).not.toHaveClass('before:bg-accent')
     expect(projects).toHaveClass('hover:bg-state-hover')
   })
 
-  it('active session row uses surface wash without left rail or hairline ring', () => {
+  it('active session row uses white wash without left rail or hairline ring', () => {
     render(<AppSidebar />)
     const sessionBtn = screen.getByTestId('sidebar-session-chat-1')
     const row = sessionBtn.closest('div')
     expect(row).not.toHaveClass('before:bg-accent')
-    expect(row).toHaveClass('bg-state-active')
+    expect(row).toHaveClass('bg-white')
     expect(row?.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 

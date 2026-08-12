@@ -16,8 +16,8 @@ import {
   ChevronRight,
   Code2,
   Folder,
-  FolderTree,
   MessageSquare,
+  Monitor,
   PanelLeftClose,
   Search,
   Terminal,
@@ -393,7 +393,7 @@ export function AppSidebar() {
           section="knowledge"
           active={sidebarSection === 'knowledge'}
           label={t('sidebar.nav.knowledge')}
-          icon={<FolderTree size={16} strokeWidth={1.75} />}
+          icon={<Folder size={16} strokeWidth={1.75} />}
           count={topLevelCount > 0 ? topLevelCount : undefined}
           onClick={() => onNav('knowledge')}
         />
@@ -401,7 +401,7 @@ export function AppSidebar() {
           section="terminals"
           active={sidebarSection === 'terminals' && activeView === 'terminals'}
           label={t('sidebar.nav.terminals')}
-          icon={<Terminal size={16} strokeWidth={1.75} />}
+          icon={<Monitor size={16} strokeWidth={1.75} />}
           onClick={() => onNav('terminals')}
         />
         <NavItem

@@ -68,11 +68,11 @@ describe('SidebarAccountFooter', () => {
     expect(screen.getByTestId('account-settings-button')).toHaveAttribute('aria-current', 'page')
   })
 
-  it('active footer uses surface wash without left rail or hairline ring', () => {
+  it('active footer uses white wash without left rail or hairline ring', () => {
     render(<SidebarAccountFooter {...footerProps} active="settings" />)
     const settings = screen.getByTestId('account-settings-button')
     expect(settings).not.toHaveClass('before:bg-accent')
-    expect(settings).toHaveClass('bg-state-active')
+    expect(settings).toHaveClass('bg-white')
     expect(settings.className).not.toMatch(/shadow-\[0_0_0_1px/)
 
     const history = screen.getByTestId('account-history-button')

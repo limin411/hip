@@ -10,7 +10,11 @@ import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { useDomainStore } from './sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalStore } from '@/store/terminalStore'
-import { useTerminalAgentStore, type TerminalExecFlight } from '@/store/terminalAgentStore'
+import {
+  useTerminalAgentStore,
+  HANDED_OFF_MAX_MS,
+  type TerminalExecFlight,
+} from '@/store/terminalAgentStore'
 import { sshWrite } from '@/ipc/ssh'
 import { sftpReadFile, sftpWriteFile } from '@/ipc/sftp'
 import { isTerminalSession } from '@/lib/sessions'
@@ -172,20 +176,9 @@ async function runExec(
     return
   }
 
-  // P1 guard folded into the bridge: interactive TUIs are never driven automatically.
-  if (isInteractiveTuiCommand(command)) {
-    send({
-      type: 'session:uiToolResult',
-      sessionId,
-      callId,
-      ok: true,
-      status: 'rejected',
-      mayStillRun: false,
-      error:
-        'interactive command (vim/nvim/top/htop/passwd/ssh) blocked — run it manually in the terminal',
-    })
-    return
-  }
+  // Interactive TUIs are no longer rejected (T2): the agent may start vim/htop/
+  // passwd/ssh, but the keyboard is handed to the user immediately after write.
+  const tuiLaunch = isInteractiveTuiCommand(command)
 
   const ring0 = useTerminalStore.getState().getSession(tmId)
   const startCursor = ring0 ? ring0.trimOffset + ring0.ring.length : 0
@@ -196,12 +189,22 @@ async function runExec(
     command,
     startedAt: Date.now(),
     deadline,
+    phase: 'running',
   }
   useTerminalAgentStore.getState().setExecFlight(tmId, flight)
 
   let finished = false
+  /** Local mirror of the store flight's handed-off marker (closure-safe). */
+  let handedOffAt: number | undefined
   const finish = (
-    status: 'completed' | 'timed_out' | 'user_interleaved' | 'rejected' | 'error' | 'aborted',
+    status:
+      | 'completed'
+      | 'timed_out'
+      | 'user_interleaved'
+      | 'handed_off_resumed'
+      | 'rejected'
+      | 'error'
+      | 'aborted',
     opts: { output?: string; mayStillRun?: boolean; error?: string } = {},
   ) => {
     if (finished) return
@@ -225,9 +228,21 @@ async function runExec(
     })
   }
   flightAborters.set(tmId, () => {
-    useTerminalStore.getState().consumeUserInterleaved(tmId)
     finish('aborted', { mayStillRun: true, error: 'waiting aborted by user' })
   })
+
+  // Enter handed_off: keyboard ownership → user, deadline pause starts (T2).
+  const enterHandedOff = () => {
+    if (handedOffAt !== undefined) return
+    handedOffAt = Date.now()
+    const liveFlight = useTerminalAgentStore.getState().execFlightByTerminal[tmId]
+    useTerminalAgentStore.getState().setExecFlight(tmId, {
+      ...(liveFlight ?? flight),
+      phase: 'handed_off',
+      handedOffAt,
+    })
+    useTerminalAgentStore.getState().setDriver(tmId, 'user')
+  }
 
   try {
     // Danger commands get a UI second confirmation even after sidecar auto-approval.
@@ -247,39 +262,48 @@ async function runExec(
     if (finished) return
     await sleep(EXEC_POLL_MS)
     if (finished) return
+    const live = useManagedTerminalStore.getState().getTerminal(tmId)
+    if (!live || live.status !== 'connected') {
+      finish('aborted', { mayStillRun: true, error: 'terminal disconnected during execution' })
+      return
+    }
+    const liveFlight = useTerminalAgentStore.getState().execFlightByTerminal[tmId]
+    const phase = liveFlight?.phase ?? 'running'
+    // Keyboard take-over: user typed while the agent drove (T2). TUI launches
+    // (vim/htop/passwd/ssh) hand over immediately after write — never driven
+    // automatically, but no longer rejected either.
+    if (phase === 'running' && (useTerminalStore.getState().consumeUserInterleaved(tmId) || tuiLaunch)) {
+      enterHandedOff()
+      continue
+    }
+    if (
+      phase === 'handed_off' &&
+      Date.now() - ((liveFlight as TerminalExecFlight).handedOffAt ?? Date.now()) >= HANDED_OFF_MAX_MS
+    ) {
+      finish('handed_off_resumed', {
+        mayStillRun: true,
+        error: 'user did not hand the keyboard back within the pause limit',
+      })
+      return
+    }
     const sess = useTerminalStore.getState().getSession(tmId)
     const len = sess?.ring.length ?? 0
     if (len !== lastLen) {
       lastOutputAt = Date.now()
       lastLen = len
     }
-    const live = useManagedTerminalStore.getState().getTerminal(tmId)
-    if (!live || live.status !== 'connected') {
-      finish('aborted', { mayStillRun: true, error: 'terminal disconnected during execution' })
+    // Completion signals: fence D-marker (authoritative, T1) → prompt-tail fallback.
+    const { output } = useTerminalStore.getState().getRingSince(tmId, startCursor)
+    const fenceDone = useFence && extractFenceExitCode(output) !== null
+    const promptDone = Date.now() - lastOutputAt >= EXEC_SILENCE_MS && hasPromptTail(output)
+    if (fenceDone || promptDone) {
+      finish(handedOffAt !== undefined ? 'user_interleaved' : 'completed', { output })
       return
     }
-    if (Date.now() >= deadline) {
-      const interleaved = useTerminalStore.getState().consumeUserInterleaved(tmId)
-      finish(interleaved ? 'user_interleaved' : 'timed_out', { mayStillRun: true })
+    // Deadline — paused while handed_off (resume extends it by the pause).
+    if (phase !== 'handed_off' && Date.now() >= deadline) {
+      finish(handedOffAt !== undefined ? 'user_interleaved' : 'timed_out', { mayStillRun: true })
       return
-    }
-    // Fence signal first (spec T1): an invisible OSC 633 D-marker carrying the
-    // real exit code is authoritative completion — no prompt-tail guessing.
-    if (useFence) {
-      const { output } = useTerminalStore.getState().getRingSince(tmId, startCursor)
-      if (extractFenceExitCode(output) !== null) {
-        const interleaved = useTerminalStore.getState().consumeUserInterleaved(tmId)
-        finish(interleaved ? 'user_interleaved' : 'completed', { output })
-        return
-      }
-    }
-    if (Date.now() - lastOutputAt >= EXEC_SILENCE_MS) {
-      const { output } = useTerminalStore.getState().getRingSince(tmId, startCursor)
-      if (hasPromptTail(output)) {
-        const interleaved = useTerminalStore.getState().consumeUserInterleaved(tmId)
-        finish(interleaved ? 'user_interleaved' : 'completed', { output })
-        return
-      }
     }
   }
 }

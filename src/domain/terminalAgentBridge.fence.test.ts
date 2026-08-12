@@ -8,12 +8,11 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ClientMessage, ServerMessage, SessionConfig } from '@hip/protocol'
-import { handleTerminalBridgeMessage } from './terminalAgentBridge'
+import { handleTerminalBridgeMessage, FENCE_END, FENCE_TERM } from './terminalAgentBridge'
 import { useDomainStore } from './sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalStore } from '@/store/terminalStore'
-import { useTerminalAgentStore } from '@/store/terminalAgentStore'
-import { FENCE_END, FENCE_TERM } from './terminalAgentBridge'
+import { useTerminalAgentStore, HANDED_OFF_MAX_MS } from '@/store/terminalAgentStore'
 
 vi.mock('@/ipc/ssh', () => ({
   sshWrite: vi.fn(),
@@ -145,5 +144,71 @@ describe('terminal bridge fence (PR-1)', () => {
     await sleep(1500)
     const result = sent.find((m) => m.type === 'session:uiToolResult')
     expect(result).toMatchObject({ status: 'timed_out', mayStillRun: true })
+  })
+})
+
+describe('terminal bridge handed-off state machine (PR-2, spec T2)', () => {
+  beforeEach(() => {
+    vi.mocked(sshWrite).mockClear().mockResolvedValue(undefined as never)
+    useTerminalAgentStore.setState({ execFlightByTerminal: {}, driverByTerminal: {} })
+    useTerminalStore.setState({ bySession: {}, userInterleaved: {} })
+    seedStores()
+    vi.useRealTimers()
+  })
+
+  it('user typing flips the flight to handed_off and pauses the deadline', async () => {
+    const { sent } = bridgeRequest({ waitMs: 800 })
+    await sleep(300)
+    // User types into the shared terminal while the agent drives.
+    useTerminalStore.getState().noteUserInput(TM_ID)
+    await sleep(400)
+    const flight = useTerminalAgentStore.getState().execFlightByTerminal[TM_ID]
+    expect(flight?.phase).toBe('handed_off')
+    expect(useTerminalAgentStore.getState().driverByTerminal[TM_ID]).toBe('user')
+    // Deadline paused: waitMs 800ms has long passed but no timed_out yet.
+    await sleep(700)
+    expect(sent.some((m) => m.type === 'session:uiToolResult')).toBe(false)
+  })
+
+  it('handing back resumes the flight and completes with user_interleaved', async () => {
+    const { sent } = bridgeRequest({ waitMs: 800 })
+    await sleep(300)
+    useTerminalStore.getState().noteUserInput(TM_ID)
+    await sleep(400)
+    useTerminalAgentStore.getState().resumeExecFlight(TM_ID)
+    await sleep(200)
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(500)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'user_interleaved', exitCode: 0 })
+    expect(useTerminalAgentStore.getState().execFlightByTerminal[TM_ID]).toBeNull()
+  })
+
+  it('interactive TUI commands launch, hand over immediately, and complete on exit', async () => {
+    const { sent } = bridgeRequest({ command: 'vim /etc/hosts' })
+    await sleep(350)
+    const flight = useTerminalAgentStore.getState().execFlightByTerminal[TM_ID]
+    expect(flight?.phase).toBe('handed_off')
+    // User exits vim → the fence D marker appears → completed (user_interleaved).
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(500)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'user_interleaved', exitCode: 0 })
+    expect(sent.some((m) => m.type === 'session:uiToolResult' && 'status' in m && m.status === 'rejected')).toBe(false)
+  })
+
+  it('a stalled handed-off flight is closed as handed_off_resumed after the pause limit', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const now = Date.now()
+    vi.setSystemTime(now)
+    const { sent } = bridgeRequest({ waitMs: 10000 })
+    await sleep(300)
+    useTerminalStore.getState().noteUserInput(TM_ID)
+    await sleep(400)
+    // Advance past HANDED_OFF_MAX_MS without handing back.
+    vi.setSystemTime(now + HANDED_OFF_MAX_MS + 1000)
+    await sleep(700)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'handed_off_resumed', mayStillRun: true })
   })
 })

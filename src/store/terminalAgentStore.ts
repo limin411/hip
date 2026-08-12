@@ -2,15 +2,27 @@ import { create } from 'zustand'
 import type { SessionConfig } from '@hip/protocol'
 import { isTerminalSession } from '@/lib/sessions'
 
-/** One in-flight shared-PTY exec per terminal (single flight, spec §5.3). */
+/** One in-flight shared-PTY exec per terminal (single flight + queue, spec §5.3). */
 export interface TerminalExecFlight {
   callId: string
   sessionId: string
   command: string
   startedAt: number
-  /** UI-side wait deadline (Date.now() + waitMs). */
+  /** UI-side wait deadline (Date.now() + waitMs); paused while handed_off. */
   deadline: number
+  /**
+   * Driver state machine (terminal-shared-pty T2): running → handed_off ⇄
+   * resumed → finished. handed_off pauses the deadline; resume extends it by
+   * the pause duration.
+   */
+  phase: 'running' | 'handed_off' | 'resumed'
+  /** Set when the user took the keyboard (handed_off entered); undefined until then. */
+  handedOffAt?: number
 }
+
+export type TerminalDriver = 'user' | 'agent'
+
+export const HANDED_OFF_MAX_MS = 10 * 60 * 1000
 
 interface TerminalAgentStore {
   /** Active agent session per `tm_*` (right-rail Agent tab shows this). */
@@ -19,11 +31,17 @@ interface TerminalAgentStore {
   sidebarExpanded: Record<string, boolean>
   /** Per-tm single-flight exec lock. */
   execFlightByTerminal: Record<string, TerminalExecFlight | null>
+  /** Who owns the keyboard per `tm_*` (T2 one-driver). */
+  driverByTerminal: Record<string, TerminalDriver>
 
   setActiveSession: (terminalId: string, sessionId: string | null) => void
   setSidebarExpanded: (terminalId: string, expanded: boolean) => void
   toggleSidebarExpanded: (terminalId: string) => void
   setExecFlight: (terminalId: string, flight: TerminalExecFlight | null) => void
+  /** Keyboard ownership flips (T2): bridge flips to user on handed_off. */
+  setDriver: (terminalId: string, driver: TerminalDriver) => void
+  /** User hands the keyboard back: phase → resumed, deadline extended by the pause. */
+  resumeExecFlight: (terminalId: string) => void
   getActiveSession: (terminalId: string) => string | null
 }
 
@@ -43,6 +61,7 @@ export const useTerminalAgentStore = create<TerminalAgentStore>((set, get) => ({
   activeSessionByTerminal: {},
   sidebarExpanded: {},
   execFlightByTerminal: {},
+  driverByTerminal: {},
 
   setActiveSession: (terminalId, sessionId) =>
     set((s) => ({
@@ -74,7 +93,36 @@ export const useTerminalAgentStore = create<TerminalAgentStore>((set, get) => ({
         ...s.execFlightByTerminal,
         [terminalId]: flight,
       },
+      // Entering a flight hands the keyboard to the agent; finishing returns it.
+      driverByTerminal: {
+        ...s.driverByTerminal,
+        [terminalId]: flight ? 'agent' : 'user',
+      },
     })),
+
+  setDriver: (terminalId, driver) =>
+    set((s) => ({
+      driverByTerminal: { ...s.driverByTerminal, [terminalId]: driver },
+    })),
+
+  resumeExecFlight: (terminalId) =>
+    set((s) => {
+      const flight = s.execFlightByTerminal[terminalId]
+      if (!flight || flight.phase !== 'handed_off') return {}
+      const now = Date.now()
+      const pauseMs = now - (flight.handedOffAt ?? now)
+      return {
+        execFlightByTerminal: {
+          ...s.execFlightByTerminal,
+          [terminalId]: {
+            ...flight,
+            phase: 'resumed',
+            deadline: flight.deadline + pauseMs,
+          },
+        },
+        driverByTerminal: { ...s.driverByTerminal, [terminalId]: 'agent' },
+      }
+    }),
 
   getActiveSession: (terminalId) => get().activeSessionByTerminal[terminalId] ?? null,
 }))

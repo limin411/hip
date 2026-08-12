@@ -98,6 +98,11 @@ function formatExecResult(result: UiToolResultPayload): string {
     lines.push(
       'User input interleaved with the command output; treat the result cautiously and confirm with the user if uncertain.',
     )
+  } else if (result.status === 'handed_off_resumed') {
+    lines.push(
+      'The user took over the terminal and did not hand the keyboard back within the pause limit; ' +
+        'the command may still be running. Never claim success. Poll terminal_read or ask the user.',
+    )
   } else if (result.status === 'rejected') {
     lines.push('The command was rejected by the user and was NOT written to the terminal.')
   }
@@ -166,8 +171,11 @@ export function buildTerminalTools(opts: TerminalToolOpts): StructuredToolInterf
         'command is wrapped in an invisible fence (OSC 633 semantics): the UI signals ' +
         'completion with the real exit code instead of guessing from the prompt. ' +
         'Returns the captured output with an explicit status: completed / timed_out / ' +
-        'user_interleaved / rejected / error / aborted. ' +
-        'A timed_out result means the command MAY STILL BE RUNNING — never claim success; poll terminal_read or ask the user. ' +
+        'user_interleaved / handed_off_resumed / rejected / error / aborted. ' +
+        'A timed_out, user_interleaved or handed_off_resumed result means the command MAY ' +
+        'STILL BE RUNNING — never claim success; poll terminal_read or ask the user. ' +
+        'Interactive programs (vim/htop/passwd/ssh) may be launched, but the keyboard is ' +
+        'handed to the user immediately — do not attempt to drive them. ' +
         'Prefer non-interactive flags (-y, --noconfirm, DEBIAN_FRONTEND=noninteractive). ' +
         'Commands ending in exit/exec are incompatible with the fence (the marker never prints); set fence:false for them.',
       schema: z.object({

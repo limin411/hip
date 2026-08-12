@@ -235,7 +235,14 @@ export type ClientMessage =
       sessionId: string
       callId: string
       ok: boolean
-      status: 'completed' | 'timed_out' | 'user_interleaved' | 'rejected' | 'error' | 'aborted'
+      status:
+        | 'completed'
+        | 'timed_out'
+        | 'user_interleaved'
+        | 'handed_off_resumed'
+        | 'rejected'
+        | 'error'
+        | 'aborted'
       output?: string
       /** True when the command may still be running (timed_out/user_interleaved). */
       mayStillRun?: boolean

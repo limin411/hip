@@ -342,6 +342,7 @@ describe('TerminalAgentPanel tool card collapsing', () => {
           command: 'tail -f /var/log/x.log',
           startedAt: 1,
           deadline: Date.now() + 15000,
+          phase: 'running',
         },
       },
     })
@@ -359,6 +360,33 @@ describe('TerminalAgentPanel tool card collapsing', () => {
 
     cancelSpy.mockRestore()
     useTerminalAgentStore.setState({ execFlightByTerminal: {} })
+    unmount()
+  })
+
+  it('shows the handoff banner during a handed_off flight and resumes on click', () => {
+    useTerminalAgentStore.setState({
+      execFlightByTerminal: {
+        tm_1: {
+          callId: 'c1',
+          sessionId: 'ta_1',
+          command: 'sudo apt install -y htop',
+          startedAt: Date.now(),
+          deadline: Date.now() + 120000,
+          phase: 'handed_off',
+          handedOffAt: Date.now(),
+        },
+      },
+      driverByTerminal: { tm_1: 'user' },
+    })
+    const resumeSpy = vi.spyOn(useTerminalAgentStore.getState(), 'resumeExecFlight')
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    expect(screen.getByTestId('terminal-handoff-banner')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('terminal-handoff-resume'))
+    expect(resumeSpy).toHaveBeenCalledWith('tm_1')
+
+    resumeSpy.mockRestore()
+    useTerminalAgentStore.setState({ execFlightByTerminal: {}, driverByTerminal: {} })
     unmount()
   })
 

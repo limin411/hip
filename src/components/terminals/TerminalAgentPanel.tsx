@@ -954,7 +954,31 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
             >
               <Loader2 size={12} className="shrink-0 animate-spin text-accent" aria-hidden />
               <span className="min-w-0 flex-1 truncate font-mono text-caption">{flight.command}</span>
-              <span className="shrink-0">{t('terminals.agent.running')}…</span>
+              <span className="shrink-0">
+                {flight.phase === 'handed_off'
+                  ? t('terminals.agent.handedOff')
+                  : `${t('terminals.agent.running')}…`}
+              </span>
+            </div>
+          ) : null}
+
+          {flight?.phase === 'handed_off' ? (
+            <div
+              className="flex shrink-0 items-center gap-2 border border-warning/30 bg-warning/5 px-3 py-2 text-meta"
+              data-testid="terminal-handoff-banner"
+            >
+              <TriangleAlert size={13} className="shrink-0 text-warning" aria-hidden />
+              <span className="min-w-0 flex-1 text-ink-secondary">
+                {t('terminals.agent.handoffBanner')}
+              </span>
+              <button
+                type="button"
+                className="shrink-0 rounded-md bg-warning/15 px-2 py-1 text-caption font-medium text-warning transition-colors hover:bg-warning/25"
+                data-testid="terminal-handoff-resume"
+                onClick={() => useTerminalAgentStore.getState().resumeExecFlight(terminalId)}
+              >
+                {t('terminals.agent.handoffCta')}
+              </button>
             </div>
           ) : null}
 

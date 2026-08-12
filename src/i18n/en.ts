@@ -1893,6 +1893,9 @@ export const en = {
         execError: 'Command failed',
         execAborted: 'Execution wait aborted',
         userInterleaved: 'You typed while the command was running; results may be mixed.',
+        handedOff: 'Handed over · waiting on you',
+        handoffBanner: 'You are typing — press “Hand back” when done so the agent can continue',
+        handoffCta: 'Hand back',
         sendCtrlC: 'Send Ctrl-C',
         continueWatching: 'Keep watching',
         continueWatchingPrompt:

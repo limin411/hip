@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { SessionConfig } from '@hip/protocol'
 import { terminalSessionsFor, useTerminalAgentStore } from './terminalAgentStore'
 
@@ -42,10 +42,65 @@ describe('terminalAgentStore exec flight (single-flight lock)', () => {
       command: 'df -h',
       startedAt: 1,
       deadline: 2,
+      phase: 'running',
     })
     expect(useTerminalAgentStore.getState().execFlightByTerminal.tm_1?.callId).toBe('c1')
     s.setExecFlight('tm_1', null)
     expect(useTerminalAgentStore.getState().execFlightByTerminal.tm_1).toBeNull()
+  })
+
+  it('flips driver to agent on flight start and back to user on clear', () => {
+    const s = useTerminalAgentStore.getState()
+    s.setExecFlight('tm_1', {
+      callId: 'c1',
+      sessionId: 's1',
+      command: 'df -h',
+      startedAt: 1,
+      deadline: 2,
+      phase: 'running',
+    })
+    expect(useTerminalAgentStore.getState().driverByTerminal.tm_1).toBe('agent')
+    s.setDriver('tm_1', 'user')
+    expect(useTerminalAgentStore.getState().driverByTerminal.tm_1).toBe('user')
+    s.setExecFlight('tm_1', null)
+    expect(useTerminalAgentStore.getState().driverByTerminal.tm_1).toBe('user')
+  })
+
+  it('resumeExecFlight extends the deadline by the pause and hands the keyboard back', () => {
+    const s = useTerminalAgentStore.getState()
+    const startedAt = Date.now()
+    s.setExecFlight('tm_1', {
+      callId: 'c1',
+      sessionId: 's1',
+      command: 'sudo apt install -y htop',
+      startedAt,
+      deadline: startedAt + 5000,
+      phase: 'handed_off',
+      handedOffAt: startedAt + 1000,
+    })
+    s.setDriver('tm_1', 'user')
+    vi.setSystemTime(startedAt + 3000)
+    s.resumeExecFlight('tm_1')
+    const f = useTerminalAgentStore.getState().execFlightByTerminal.tm_1
+    expect(f?.phase).toBe('resumed')
+    // 2s pause is added back: deadline 5000 → 7000 (relative to startedAt).
+    expect(f?.deadline).toBe(startedAt + 7000)
+    expect(useTerminalAgentStore.getState().driverByTerminal.tm_1).toBe('agent')
+    vi.useRealTimers()
+  })
+
+  it('resumeExecFlight is a no-op unless the flight is handed_off', () => {
+    const s = useTerminalAgentStore.getState()
+    s.setExecFlight('tm_1', {
+      callId: 'c1',
+      sessionId: 's1',
+      command: 'df -h',
+      startedAt: 1,
+      deadline: 2,
+      phase: 'running',
+    })
+    s.resumeExecFlight('tm_1')
+    expect(useTerminalAgentStore.getState().execFlightByTerminal.tm_1?.phase).toBe('running')
   })
 
   it('active session is per-terminal', () => {

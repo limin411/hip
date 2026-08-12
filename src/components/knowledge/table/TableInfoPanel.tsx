@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { CalendarDays, CheckSquare, ChevronDown, Hash, Type } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { csvToTable, type TableColType } from '@/domain/knowledge/tableModel'
+import { cn } from '@/lib/utils'
 
 /** Idle debounce so stats do not re-parse on every draft tick（对齐 OUTLINE_BODY_DEBOUNCE_MS）。 */
 const INFO_DEBOUNCE_MS = 200
@@ -38,6 +39,8 @@ export function TableInfoPanel() {
     draft ? csvToTable(draft.csv, draft.meta) : null,
   )
   const prevDraftRef = useRef(draft)
+  /** 点击定位后该项短暂高亮（0.6s，PR-3 反馈）。 */
+  const [flashColId, setFlashColId] = useState<string | null>(null)
 
   useEffect(() => {
     if (prevDraftRef.current === draft) return
@@ -52,6 +55,12 @@ export function TableInfoPanel() {
     )
     return () => window.clearTimeout(id)
   }, [draft])
+
+  useEffect(() => {
+    if (flashColId == null) return
+    const id = window.setTimeout(() => setFlashColId(null), 600)
+    return () => window.clearTimeout(id)
+  }, [flashColId])
 
   /** 类型分布（顺序按首现列序）。 */
   const dist = useMemo(() => {
@@ -132,10 +141,14 @@ export function TableInfoPanel() {
                   type="button"
                   data-testid={`table-info-col-${i}`}
                   data-col-id={c.id}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-state-hover"
-                  onClick={() =>
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-state-hover',
+                    flashColId === c.id && 'bg-state-hover',
+                  )}
+                  onClick={() => {
+                    setFlashColId(c.id)
                     useKnowledgeStore.getState().requestTableColumnJump(c.id)
-                  }
+                  }}
                 >
                   <span
                     className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md"

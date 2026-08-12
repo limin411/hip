@@ -168,6 +168,8 @@ export function TableEditor({ tableId }: { tableId: string }) {
     ri: number
     ci: number
   } | null>(null)
+  /** rail 列清单定位后列头闪烁（table-right-panel PR-3）。 */
+  const [flashColCi, setFlashColCi] = useState<number | null>(null)
   const closeMenus = () => {
     setColMenuCi(null)
     setRowMenuRi(null)
@@ -995,6 +997,30 @@ export function TableEditor({ tableId }: { tableId: string }) {
 
   const wrapRef = useRef<HTMLDivElement>(null)
 
+  /** rail 列定位请求：水平滚动到列 + 列头闪烁（消费 pendingTableColumnJump）。 */
+  const jump = useKnowledgeStore((s) => s.pendingTableColumnJump)
+  useEffect(() => {
+    if (!jump) return
+    const ci = table.cols.findIndex((c) => c.id === jump.colId)
+    const wrap = wrapRef.current
+    if (ci < 0 || !wrap) {
+      useKnowledgeStore.getState().clearTableColumnJump()
+      return
+    }
+    let x = 44 // 行号列
+    for (let j = 0; j < ci; j++) x += table.cols[j].width
+    wrap.scrollLeft = Math.max(0, x - 16)
+    setFlashColCi(ci)
+    useKnowledgeStore.getState().clearTableColumnJump()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jump])
+
+  useEffect(() => {
+    if (flashColCi == null) return
+    const id = window.setTimeout(() => setFlashColCi(null), 1200)
+    return () => window.clearTimeout(id)
+  }, [flashColCi])
+
   /** 右键：单元格 → 选中 + 上下文菜单；行号/列头 → 复用行/列菜单。 */
   const onGridContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
@@ -1440,9 +1466,13 @@ export function TableEditor({ tableId }: { tableId: string }) {
                   ref={(el) => {
                     if (ci === colMenuCi) thRef.current = el
                   }}
-                  style={{ width: col.width, minWidth: col.width }}
+                  style={{
+                    width: col.width,
+                    minWidth: col.width,
+                    backgroundColor: flashColCi === ci ? 'var(--tbl-sel-strong)' : undefined,
+                  }}
                   className={cn(
-                    'group sticky top-0 z-10 h-8 cursor-pointer border-b border-r border-border bg-[var(--tbl-header-bg)] px-2 text-left text-caption font-medium text-ink transition-colors hover:bg-[var(--tbl-row-hover)]',
+                    'group sticky top-0 z-10 h-8 cursor-pointer border-b border-r border-border bg-[var(--tbl-header-bg)] px-2 text-left text-caption font-medium text-ink transition-colors duration-1000 hover:bg-[var(--tbl-row-hover)]',
                     !freezeHeader && 'relative',
                     sortRef.current?.col === col.id && 'bg-state-hover',
                     colDrag?.ci === ci && 'opacity-40',

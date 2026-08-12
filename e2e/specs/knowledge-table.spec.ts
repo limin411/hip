@@ -95,6 +95,26 @@ describe('knowledge table flow @knowledge @table', () => {
     expect(await secondCell.getText()).toContain('e2e-marker-beta')
   })
 
+  it('right rail shows table info and column jump flashes the header (table-right-panel PR-3)', async () => {
+    // rail 标题联动
+    await browser.$('[data-testid="knowledge-table-info"]').waitForDisplayed()
+    expect(await browser.$('[data-testid="panel-title"]').getText()).toContain('表格信息')
+    // 列清单（新建表格 3 列）→ 点击第 0 列 → 列头闪烁
+    const colRow = await browser.$('[data-testid="table-info-col-0"]')
+    await colRow.waitForDisplayed()
+    await colRow.click()
+    const th = await browser.$('[data-testid="table-grid"] th[data-col="0"]')
+    await browser.waitUntil(
+      async () => (await th.getAttribute('style')).includes('tbl-sel-strong'),
+      { timeout: 5000 },
+    )
+    // 闪烁结束后恢复
+    await browser.waitUntil(
+      async () => !(await th.getAttribute('style')).includes('tbl-sel-strong'),
+      { timeout: 5000 },
+    )
+  })
+
   it('renames the table title inline (tree.json round-trip)', async () => {
     const title = await browser.$('[data-testid="table-editor-title"]')
     await title.doubleClick()

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, fireEvent, screen, within, cleanup } from '@testing-library/react'
+import { render, fireEvent, screen, within, cleanup, act } from '@testing-library/react'
 import { TableEditor } from './TableEditor'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 
@@ -1322,5 +1322,51 @@ describe('TableEditor table-ux-notion PR-10 (add row / context menu / visuals)',
     // 单元格带行 hover token 类
     const cell = document.querySelector('td[data-cell="0,0"]')!
     expect(cell.className).toContain('tbl-row-hover')
+  })
+})
+
+describe('TableEditor table-right-panel PR-3 (column jump from rail)', () => {
+  beforeEach(() => {
+    mountTable()
+    useKnowledgeStore.setState({
+      commitTable: vi.fn(async () => {
+        commitTableSpy()
+        return true
+      }) as never,
+    })
+  })
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('pendingTableColumnJump scrolls the grid and flashes the column header', async () => {
+    vi.useFakeTimers()
+    render(<TableEditor tableId="tbl_1" />)
+    const wrap = document.querySelector('[data-testid="table-grid-wrap"]') as HTMLElement
+    wrap.scrollLeft = 0
+    const st = useKnowledgeStore.getState()
+    st.requestTableColumnJump('col_2') // 第 2 列（44 + 150×2 - 16 = 328；happy-dom 布局会 clamp）
+    await act(async () => {})
+    expect(wrap.scrollLeft).toBeGreaterThan(0)
+    const th = document.querySelector('th[data-col="1"]') as HTMLElement
+    expect(th.style.backgroundColor).toBe('var(--tbl-sel-strong)')
+    // 已清除请求
+    expect(useKnowledgeStore.getState().pendingTableColumnJump).toBeNull()
+    // 1.2s 后 flash 清除
+    vi.advanceTimersByTime(1300)
+    await act(async () => {})
+    expect(th.style.backgroundColor).toBe('')
+    vi.useRealTimers()
+  })
+
+  it('unknown colId clears the pending jump without scrolling', async () => {
+    render(<TableEditor tableId="tbl_1" />)
+    const wrap = document.querySelector('[data-testid="table-grid-wrap"]') as HTMLElement
+    wrap.scrollLeft = 0
+    useKnowledgeStore.getState().requestTableColumnJump('ghost_col')
+    await act(async () => {})
+    expect(useKnowledgeStore.getState().pendingTableColumnJump).toBeNull()
+    expect(wrap.scrollLeft).toBe(0)
   })
 })

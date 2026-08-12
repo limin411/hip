@@ -367,6 +367,8 @@ interface KnowledgeState {
   pendingReveal: KnowledgePendingReveal | null
   /** Outline (TOC) click — consumed by KnowledgeWorkspace for mode-aware scroll. */
   pendingOutlineJump: KnowledgePendingOutlineJump | null
+  /** 表格列定位请求（rail 列清单 → TableEditor 滚动 + flash；非文档大纲跳转通道）。 */
+  pendingTableColumnJump: { colId: string; nonce: number } | null
   /** SQLite link-index panel (active doc). */
   backlinks: KnowledgeLinkBacklink[]
   outboundLinks: KnowledgeLinkOutboundRow[]
@@ -416,6 +418,8 @@ interface KnowledgeState {
    * Request scroll to an outline heading. Workspace applies based on editorMode
    * (source line / live text match).
    */
+  requestTableColumnJump: (colId: string) => void
+  clearTableColumnJump: () => void
   requestOutlineJump: (item: {
     id: string
     level: 1 | 2 | 3 | 4 | 5 | 6
@@ -732,6 +736,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   indexProgress: null,
   pendingReveal: null,
   pendingOutlineJump: null,
+  pendingTableColumnJump: null,
   backlinks: [],
   outboundLinks: [],
   brokenLinks: [],
@@ -1127,6 +1132,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       },
     })),
   clearPendingOutlineJump: () => set({ pendingOutlineJump: null }),
+
+  requestTableColumnJump: (colId) =>
+    set((s) => ({
+      pendingTableColumnJump: {
+        colId,
+        nonce: (s.pendingTableColumnJump?.nonce ?? 0) + 1,
+      },
+    })),
+  clearTableColumnJump: () => set({ pendingTableColumnJump: null }),
 
 
   refreshLinkPanel: async (docId) => {

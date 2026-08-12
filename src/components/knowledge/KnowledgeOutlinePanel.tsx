@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { PanelToggle } from '@/components/layout/PanelToggle'
 import { DocOutline } from './DocOutline'
+import { TableInfoPanel } from './table/TableInfoPanel'
 import { extractDocOutline } from '@/domain/knowledge/mdPreview'
 import { parseFrontmatter } from '@/domain/knowledge/frontmatter'
 import { BacklinkPanel } from './BacklinkPanel'
@@ -214,12 +215,9 @@ export function KnowledgeOutlinePanel() {
             <p className="text-meta text-ink-tertiary">{t('knowledge.outline.noDoc')}</p>
           </div>
         ) : isTable ? (
-          <div
-            className="flex h-full items-center justify-center px-4 py-8 text-center"
-            data-testid="knowledge-table-info-placeholder"
-            role="status"
-          >
-            <p className="text-meta text-ink-tertiary">{t('knowledge.tableInfo.empty')}</p>
+          <div className="flex flex-col gap-4 p-2 pb-6">
+            <TableInfoPanel />
+            <BacklinkPanel />
           </div>
         ) : (
           activeNode?.kind === 'board' ? (

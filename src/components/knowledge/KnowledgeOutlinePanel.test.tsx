@@ -240,7 +240,7 @@ describe('KnowledgeOutlinePanel table leaf (table-right-panel PR-1)', () => {
     expect(screen.getByTestId('knowledge-backlink-refresh')).toBeInTheDocument()
   })
 
-  it('table leaf placeholder shows until TableInfoPanel lands (PR-2)', () => {
+  it('table leaf renders TableInfoPanel + BacklinkPanel (PR-2)', () => {
     useKnowledgeStore.setState({
       activeDocId: 'tbl_1',
       nodes: [
@@ -251,12 +251,18 @@ describe('KnowledgeOutlinePanel table leaf (table-right-panel PR-1)', () => {
       backlinks: [],
       outboundLinks: [],
       linkPanelStatus: 'ready',
+      tableDraft: { id: 'tbl_1', csv: 'a,b\nc,d\n', meta: JSON.stringify({ cols: [
+        { id: 'c1', name: '任务', type: 'text', width: 150 },
+        { id: 'c2', name: '状态', type: 'select', width: 120 },
+      ] }) },
     })
     render(<KnowledgeOutlinePanel />)
-    expect(screen.getByTestId('knowledge-table-info-placeholder')).toBeInTheDocument()
-    expect(screen.getByTestId('knowledge-table-info-placeholder').textContent).toContain(
-      'knowledge.tableInfo.empty',
-    )
+    expect(screen.getByTestId('knowledge-table-info')).toBeInTheDocument()
+    // 统计区行数数字 + 列清单（i18n mock 不插值，断言结构）
+    expect(screen.getByTestId('table-info-stats').querySelector('span')!.textContent).toBe('2')
+    expect(screen.getByTestId('table-info-col-0').textContent).toContain('任务')
+    expect(screen.getByTestId('table-info-col-1').getAttribute('data-col-id')).toBe('c2')
+    expect(screen.getByTestId('knowledge-backlink-panel')).toBeInTheDocument()
   })
 
   it('board leaf: noBoard placeholder preserved, refresh hidden', () => {

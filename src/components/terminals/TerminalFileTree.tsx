@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
   ChevronRight,
-  File,
   Folder,
   FolderOpen,
   RefreshCw,
@@ -19,6 +18,7 @@ import {
   runSftpUploadIntoDir,
 } from '@/components/terminals/sftpActions'
 import { loadLocalDir, refreshLocalDir } from '@/components/terminals/termFsActions'
+import { fileIconForName } from '@/lib/fileIcon'
 import { cn } from '@/lib/utils'
 
 export { refreshSftpDir, refreshLocalDir }
@@ -47,6 +47,7 @@ function EntryRow({
   testId: string
   onClick: () => void
 }) {
+  const fileIcon = fileIconForName(entry.name)
   return (
     <div
       data-testid={testId}
@@ -70,12 +71,26 @@ function EntryRow({
       )}
       {entry.isDir ? (
         open ? (
-          <FolderOpen size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+          <FolderOpen
+            size={15}
+            strokeWidth={1.75}
+            className="shrink-0 text-amber-600/80 dark:text-amber-400/90"
+          />
         ) : (
-          <Folder size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+          <Folder
+            size={15}
+            strokeWidth={1.75}
+            className="shrink-0 text-amber-600/80 dark:text-amber-400/90"
+          />
         )
       ) : (
-        <File size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+        <fileIcon.Icon
+          size={15}
+          strokeWidth={1.75}
+          className={cn('shrink-0', fileIcon.className)}
+          data-testid="term-file-type-icon"
+          data-file-name={entry.name}
+        />
       )}
       <span className="truncate" title={entry.path}>
         {entry.name}

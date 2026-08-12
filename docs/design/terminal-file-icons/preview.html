@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>终端右侧面板文件图标升级 — 预览</title>
+<!--
+  终端右侧面板文件图标升级方案（terminal-file-icons）交互预览
+  配套 spec: ./terminal-file-icons-spec.md
+  图标: lucide (CDN, unpkg)。离线打开时图标退化为彩色小方块，不阻塞预览。
+-->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --bg-app: #ffffff;
+    --bg-subtle: #f6f5f3;
+    --bg-muted: #f1f1f1;
+    --border: #e0e0e0;
+    --border-strong: #c9c9c9;
+    --text-primary: #111111;
+    --text-secondary: #5e5e5e;
+    --text-tertiary: #757575;
+    --state-hover: #f0f0f0;
+    --accent: #c2410c;
+    --shadow: 0 1px 2px rgba(17, 17, 17, 0.06);
+  }
+  [data-theme="dark"] {
+    --bg-app: #0f0f0f;
+    --bg-subtle: #161616;
+    --bg-muted: #1e1e1e;
+    --border: #333333;
+    --border-strong: #4a4a4a;
+    --text-primary: #f0f0f0;
+    --text-secondary: #b3b3b3;
+    --text-tertiary: #8a8a8a;
+    --state-hover: #222222;
+    --accent: #ffb300;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-subtle);
+    color: var(--text-primary);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 20px;
+    background: var(--bg-app); border-bottom: 1px solid var(--border);
+  }
+  .topbar h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar .sub { color: var(--text-tertiary); font-size: 12px; margin-top: 2px; }
+  .topbar .right { display: flex; align-items: center; gap: 8px; }
+  .btn {
+    border: 1px solid var(--border); background: var(--bg-app); color: var(--text-secondary);
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+  }
+  .btn:hover { background: var(--state-hover); color: var(--text-primary); }
+  .link { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .link:hover { text-decoration: underline; }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 20px; }
+
+  .section-title {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 13px; font-weight: 600; margin: 26px 0 10px;
+  }
+  .section-title .tag {
+    font-size: 10px; font-weight: 500; color: var(--text-tertiary);
+    border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px;
+  }
+
+  /* ---------- comparison grid ---------- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--bg-app); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; box-shadow: var(--shadow);
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  .panel-title { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .badge {
+    font-size: 10px; font-weight: 500; border-radius: 999px; padding: 1px 8px;
+  }
+  .badge.before { background: var(--bg-muted); color: var(--text-tertiary); border: 1px solid var(--border); }
+  .badge.after { background: rgba(194, 65, 12, 0.1); color: var(--accent); border: 1px solid var(--accent); }
+  .panel-sub { font-size: 11px; color: var(--text-tertiary); }
+
+  /* ---------- tree ---------- */
+  .tree { padding: 6px 4px 10px; max-height: 520px; overflow: auto; }
+  .row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px 4px calc(var(--depth, 0) * 12px + 8px);
+    border-radius: 6px; cursor: pointer; white-space: nowrap;
+    min-height: 26px;
+  }
+  .row:hover { background: var(--state-hover); }
+  .row .name { overflow: hidden; text-overflow: ellipsis; }
+  .row .chev { color: var(--text-tertiary); flex-shrink: 0; }
+  .spacer { width: 14px; flex-shrink: 0; }
+  .root-row {
+    display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+    color: var(--text-secondary); font-size: 11px; font-weight: 500;
+    border-bottom: 1px solid var(--border); background: var(--bg-muted);
+  }
+  .root-row .icon { color: var(--text-tertiary); }
+  .toolbar { display: flex; gap: 4px; margin-left: auto; }
+  .toolbar .tbtn {
+    border: none; background: transparent; color: var(--text-tertiary);
+    border-radius: 6px; padding: 3px; cursor: pointer; display: flex;
+  }
+  .toolbar .tbtn:hover { background: var(--state-hover); color: var(--text-primary); }
+
+  /* ---------- file icons ---------- */
+  .ic { flex-shrink: 0; }
+  /* lucide 未加载时的退化：彩色小方块 */
+  body.no-lucide .ic::before {
+    content: ""; display: inline-block; width: 8px; height: 8px;
+    border-radius: 2px; background: currentColor; vertical-align: 1px;
+  }
+  body.no-lucide .ic svg { display: none; }
+
+  /* ---------- semantic palette (mirrors src/lib/fileIcon.ts C tokens) ---------- */
+  .c-ts       { color: #0284c7; } .c-js       { color: #d97706; }
+  .c-react    { color: #0891b2; } .c-py       { color: #2563eb; }
+  .c-rust     { color: #c2410c; } .c-go       { color: #0e7490; }
+  .c-java     { color: #b91c1c; } .c-csharp   { color: #6d28d9; }
+  .c-ruby     { color: #be123c; } .c-php      { color: #4f46e5; }
+  .c-swift    { color: #ea580c; } .c-kotlin   { color: #9333ea; }
+  .c-json     { color: #a16207; } .c-yaml     { color: #e11d48; }
+  .c-md       { color: #475569; } .c-html     { color: #ea580c; }
+  .c-css      { color: #6d28d9; } .c-shell    { color: #047857; }
+  .c-docker   { color: #0369a1; } .c-sql      { color: #0f766e; }
+  .c-image    { color: #c026d3; } .c-video    { color: #db2777; }
+  .c-audio    { color: #be185d; } .c-archive  { color: #92400e; }
+  .c-config   { color: #52525b; } .c-data     { color: #4d7c0f; }
+  .c-pdf      { color: #dc2626; } .c-default  { color: #757575; }
+  .c-c        { color: #1d4ed8; } .c-cpp      { color: #2563eb; }
+  .c-toml     { color: #57534e; } .c-xml      { color: #c2410c; }
+  .c-graphql  { color: #db2777; } .c-lock     { color: #71717a; }
+  .c-package  { color: #dc2626; } .c-elixir   { color: #7e22ce; }
+  .c-haskell  { color: #6d28d9; } .c-scala    { color: #b91c1c; }
+  .c-erlang   { color: #be123c; }
+  .c-folder   { color: rgba(217, 119, 6, 0.8); }   /* amber-600/80 */
+
+  [data-theme="dark"] .c-ts       { color: #38bdf8; }
+  [data-theme="dark"] .c-js       { color: #fbbf24; }
+  [data-theme="dark"] .c-react    { color: #22d3ee; }
+  [data-theme="dark"] .c-py       { color: #60a5fa; }
+  [data-theme="dark"] .c-rust     { color: #fb923c; }
+  [data-theme="dark"] .c-go       { color: #67e8f9; }
+  [data-theme="dark"] .c-java     { color: #f87171; }
+  [data-theme="dark"] .c-csharp   { color: #a78bfa; }
+  [data-theme="dark"] .c-ruby     { color: #fb7185; }
+  [data-theme="dark"] .c-php      { color: #818cf8; }
+  [data-theme="dark"] .c-swift    { color: #fdba74; }
+  [data-theme="dark"] .c-kotlin   { color: #c084fc; }
+  [data-theme="dark"] .c-json     { color: #facc15; }
+  [data-theme="dark"] .c-yaml     { color: #fb7185; }
+  [data-theme="dark"] .c-md       { color: #cbd5e1; }
+  [data-theme="dark"] .c-html     { color: #fb923c; }
+  [data-theme="dark"] .c-css      { color: #a78bfa; }
+  [data-theme="dark"] .c-shell    { color: #34d399; }
+  [data-theme="dark"] .c-docker   { color: #7dd3fc; }
+  [data-theme="dark"] .c-sql      { color: #2dd4bf; }
+  [data-theme="dark"] .c-image    { color: #e879f9; }
+  [data-theme="dark"] .c-video    { color: #f472b6; }
+  [data-theme="dark"] .c-audio    { color: #f9a8d4; }
+  [data-theme="dark"] .c-archive  { color: #f59e0b; }
+  [data-theme="dark"] .c-config   { color: #a1a1aa; }
+  [data-theme="dark"] .c-data     { color: #a3e635; }
+  [data-theme="dark"] .c-pdf      { color: #f87171; }
+  [data-theme="dark"] .c-default  { color: #8a8a8a; }
+  [data-theme="dark"] .c-c        { color: #93c5fd; }
+  [data-theme="dark"] .c-cpp      { color: #60a5fa; }
+  [data-theme="dark"] .c-toml     { color: #a8a29e; }
+  [data-theme="dark"] .c-xml      { color: #fdba74; }
+  [data-theme="dark"] .c-graphql  { color: #f472b6; }
+  [data-theme="dark"] .c-lock     { color: #a1a1aa; }
+  [data-theme="dark"] .c-package  { color: #f87171; }
+  [data-theme="dark"] .c-elixir   { color: #c084fc; }
+  [data-theme="dark"] .c-haskell  { color: #a78bfa; }
+  [data-theme="dark"] .c-scala    { color: #f87171; }
+  [data-theme="dark"] .c-erlang   { color: #fb7185; }
+  [data-theme="dark"] .c-folder   { color: rgba(251, 191, 36, 0.9); } /* amber-400/90 */
+
+  /* ---------- palette gallery ---------- */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 10px; font-size: 12px;
+  }
+  .chip .ext { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip .tone { margin-left: auto; font-size: 10px; color: var(--text-tertiary); flex-shrink: 0; }
+  .group-label {
+    margin: 16px 0 6px; font-size: 11px; font-weight: 600; color: var(--text-tertiary);
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+
+  /* ---------- footer notes ---------- */
+  .note {
+    margin-top: 20px; padding: 12px 14px; border-radius: 8px;
+    background: var(--bg-app); border: 1px dashed var(--border-strong);
+    color: var(--text-secondary); font-size: 12px;
+  }
+  .note ul { margin: 6px 0 0; padding-left: 18px; }
+  .note li { margin: 2px 0; }
+  .note b { color: var(--text-primary); font-weight: 600; }
+</style>
+</head>
+<body data-theme="light">
+
+<div class="topbar">
+  <div>
+    <h1>终端右侧面板 · 文件图标升级预览</h1>
+    <div class="sub">terminal-file-icons — 类型图标 + 语义色编码 + 琥珀文件夹，对齐项目场景 FileTree</div>
+  </div>
+  <div class="right">
+    <button class="btn" id="theme-btn">🌙 深色</button>
+    <a class="link" href="./terminal-file-icons-spec.md" target="_blank">查看 Spec ↗</a>
+  </div>
+</div>
+
+<main>
+  <div class="section-title">
+    1. 现状 vs 升级后
+    <span class="tag">本地 term_fs 与 SFTP 共用 EntryRow → 一处改动两端生效</span>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">
+          <span class="badge before">现状</span> 终端 · 文件管理
+        </span>
+        <span class="panel-sub">所有文件统一灰色 File</span>
+      </div>
+      <div id="tree-before" class="tree"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">
+          <span class="badge after">升级后</span> 终端 · 文件管理
+        </span>
+        <span class="panel-sub">= 项目场景 FileTree 同款</span>
+      </div>
+      <div id="tree-after" class="tree"></div>
+    </section>
+  </div>
+
+  <div class="section-title">
+    2. 图标调色板
+    <span class="tag">src/lib/fileIcon.ts 语义色 · light / dark 双主题</span>
+  </div>
+
+  <div class="gallery" id="gallery"></div>
+
+  <div class="note">
+    <b>验收要点</b>
+    <ul>
+      <li>同扩展名 → 同图标同色：终端树与项目树零分叉，共用 <b>fileIconForName</b>（约 120 条映射，自带单测）。</li>
+      <li>文件夹琥珀色（含展开态 FolderOpen），默认/未知文件保持灰色 —— 无视觉回归。</li>
+      <li>仅改 <b>TerminalFileTree.tsx</b> 一个文件；图标尺寸 14 → 15，Chevron 与根 header 不动。</li>
+    </ul>
+  </div>
+</main>
+
+<script>
+// ---------- tree data ----------
+// [icon-lucide-name, css-class, name] for files; ["dir", "folder", name, children]
+const TREE = [
+  ["dir", "folder", "src", [
+    ["file-code", "c-ts", "main.ts"],
+    ["file-code", "c-ts", "utils.ts"],
+    ["file-code", "c-react", "App.tsx"],
+    ["file-code", "c-react", "Button.tsx"],
+    ["dir", "folder", "styles", [
+      ["hash", "c-css", "theme.css"],
+      ["hash", "c-css", "index.scss"],
+    ]],
+  ]],
+  ["dir", "folder", "tests", [
+    ["file-code", "c-ts", "main.test.ts"],
+    ["file-code", "c-react", "App.test.tsx"],
+  ]],
+  ["dir", "folder", "public", [
+    ["file-image", "c-image", "logo.svg"],
+    ["file-image", "c-image", "favicon.png"],
+  ]],
+  ["dir", "folder", "scripts", [
+    ["terminal", "c-shell", "deploy.sh"],
+    ["terminal", "c-shell", "gen.sh"],
+  ]],
+  ["dir", "folder", "config", [
+    ["file-cog", "c-ts", "tsconfig.json"],
+    ["file-cog", "c-config", ".env"],
+    ["file-code", "c-yaml", "settings.yaml"],
+  ]],
+  ["package", "c-package", "package.json"],
+  ["file-json", "c-lock", "pnpm-lock.yaml"],
+  ["package", "c-docker", "Dockerfile"],
+  ["book-open", "c-md", "README.md"],
+  ["book-open", "c-md", "CHANGELOG.md"],
+  ["file-cog", "c-config", ".gitignore"],
+  ["database", "c-sql", "data.sqlite"],
+  ["file-spreadsheet", "c-data", "export.csv"],
+  ["file-archive", "c-archive", "archive.zip"],
+  ["file-type", "c-pdf", "report.pdf"],
+  ["file-text", "c-md", "notes.md"],
+];
+
+const ICON_ATTRS = (size) => `data-size="${size}" data-stroke-width="1.75"`;
+
+function fileRow(icon, cls, name, depth, colored) {
+  const i = colored
+    ? `<i ${ICON_ATTRS(15)} data-lucide="${icon}" class="ic ${cls}"></i>`
+    : `<i ${ICON_ATTRS(14)} data-lucide="file" class="ic c-default"></i>`;
+  return `<div class="row" style="--depth:${depth}">
+    <span class="spacer"></span>${i}<span class="name">${name}</span></div>`;
+}
+
+function dirRow(name, depth, colored) {
+  const open = depth === 1;
+  const chev = open ? "chevron-down" : "chevron-right";
+  const folder = open ? "folder-open" : "folder";
+  const cls = colored ? "c-folder" : "c-default";
+  const size = colored ? 15 : 14;
+  return `<div class="row" style="--depth:${depth}">
+    <i ${ICON_ATTRS(13)} data-lucide="${chev}" class="ic c-default chev"></i>
+    <i ${ICON_ATTRS(size)} data-lucide="${folder}" class="ic ${cls}"></i>
+    <span class="name">${name}</span></div>`;
+}
+
+function renderTree(container, colored) {
+  const toolbar = `<div class="toolbar">
+    <button class="tbtn" title="上传"><i data-lucide="upload" data-size="13" data-stroke-width="1.75"></i></button>
+    <button class="tbtn" title="刷新"><i data-lucide="refresh-cw" data-size="13" data-stroke-width="1.75"></i></button>
+  </div>`;
+  const root = `<div class="root-row">
+    <i data-lucide="folder" data-size="13" data-stroke-width="1.75" class="icon"></i>
+    <span>hip-app</span>${toolbar}</div>`;
+
+  const rows = [];
+  const walk = (nodes, depth) => {
+    for (const n of nodes) {
+      if (n[0] === "dir") {
+        rows.push(dirRow(n[2], depth, colored));
+        walk(n[3], depth + 1);
+      } else {
+        rows.push(fileRow(n[0], n[1], n[2], depth, colored));
+      }
+    }
+  };
+  walk(TREE, 0);
+  container.innerHTML = root + rows.join("");
+}
+
+renderTree(document.getElementById("tree-before"), false);
+renderTree(document.getElementById("tree-after"), true);
+
+// ---------- palette gallery ----------
+const GROUPS = [
+  ["代码语言", [
+    ["file-code", "c-ts", ".ts", "sky"], ["file-code", "c-react", ".tsx / .jsx", "cyan"],
+    ["file-code", "c-js", ".js", "amber"], ["file-code", "c-py", ".py", "blue"],
+    ["file-code", "c-rust", ".rs", "orange"], ["file-code", "c-go", ".go", "cyan"],
+    ["coffee", "c-java", ".java", "red"], ["file-code", "c-csharp", ".cs", "violet"],
+    ["file-code", "c-ruby", ".rb", "rose"], ["file-code", "c-php", ".php", "indigo"],
+    ["file-code", "c-swift", ".swift", "orange"], ["file-code", "c-kotlin", ".kt", "purple"],
+    ["terminal", "c-shell", ".sh / .bash", "emerald"], ["file-code", "c-elixir", ".ex", "purple"],
+    ["file-code", "c-haskell", ".hs", "violet"], ["file-code", "c-scala", ".scala", "red"],
+  ]],
+  ["Web / 样式", [
+    ["code2", "c-html", ".html", "orange"], ["hash", "c-css", ".css / .scss", "violet"],
+    ["file-image", "c-image", ".svg", "fuchsia"], ["braces", "c-graphql", ".graphql", "pink"],
+    ["code2", "c-xml", ".xml", "orange"],
+  ]],
+  ["配置 / 工程", [
+    ["file-json", "c-json", ".json", "yellow"], ["file-code", "c-yaml", ".yml", "rose"],
+    ["file-cog", "c-toml", ".toml", "stone"], ["file-cog", "c-config", ".env", "zinc"],
+    ["file-cog", "c-ts", "tsconfig.json", "sky"], ["file-cog", "c-config", ".gitignore", "zinc"],
+    ["settings2", "c-config", "Makefile", "zinc"], ["package", "c-package", "package.json", "red"],
+    ["package", "c-docker", "Dockerfile", "sky"], ["file-json", "c-lock", "yarn.lock", "zinc"],
+  ]],
+  ["文档 / 数据 / 媒体", [
+    ["file-text", "c-md", ".md", "slate"], ["book-open", "c-md", "README", "slate"],
+    ["file-type", "c-pdf", ".pdf", "red"], ["file-text", "c-default", ".txt", "gray"],
+    ["database", "c-sql", ".sql / .db", "teal"], ["file-spreadsheet", "c-data", ".csv", "lime"],
+    ["file-image", "c-image", ".png / .jpg", "fuchsia"], ["file-video", "c-video", ".mp4", "pink"],
+    ["file-audio", "c-audio", ".mp3", "pink"], ["file-archive", "c-archive", ".zip / .tar", "amber"],
+    ["binary", "c-config", ".bin / .wasm", "zinc"],
+  ]],
+];
+
+const gallery = document.getElementById("gallery");
+for (const [label, chips] of GROUPS) {
+  gallery.insertAdjacentHTML("beforeend", `<div class="group-label">${label}</div>`);
+  for (const [icon, cls, ext, tone] of chips) {
+    gallery.insertAdjacentHTML("beforeend",
+      `<div class="chip"><i ${ICON_ATTRS(15)} data-lucide="${icon}" class="ic ${cls}"></i>
+       <span class="ext">${ext}</span><span class="tone">${tone}</span></div>`);
+  }
+}
+
+// ---------- boot ----------
+if (!window.lucide) {
+  document.body.classList.add("no-lucide");
+} else {
+  lucide.createIcons();
+}
+const btn = document.getElementById("theme-btn");
+btn.addEventListener("click", () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme === "dark";
+  root.dataset.theme = dark ? "light" : "dark";
+  btn.textContent = dark ? "🌙 深色" : "☀️ 浅色";
+});
+</script>
+</body>
+</html>

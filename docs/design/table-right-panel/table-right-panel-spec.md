@@ -80,7 +80,8 @@ const isDoc = activeDocId != null && !isTable && activeNode?.kind !== 'board' &&
 
 - 表格打开时 rail 仍渲染 `BacklinkPanel`（区块语义不变：显示引用本表格的文档）；
 - 空态文案改为表格语境提示（复用现有 `emptyInbound` 即可，正文说明"被文档引用后显示在此"）——P0 不加新文案 key；
-- **数据层跟随项**（P1，独立验证）：`refreshLinkPanel` 对表格叶子验证 `knowledgeLinkIndexBacklinks` 按标题匹配是否生效；若不生效，在 Rust 索引侧补充"表格标题引用"匹配。P0 只保证 UI 就绪 + 手动刷新按钮可用。
+- **数据层**（P0 已确认链路）：`wikiDocsFromNodes` = `listDocsInTreeOrder(nodes)` 已含表格节点（`linkIndex.ts` L59），其他文档 `[[表格标题]]` 可 resolve 到 `tbl_*` docId；反链查询按 `target_doc_id` 匹配（`knowledge_link_index.rs` L312）——数据层天然支持表格入链。PR-4 补上打开表格时自动 upsert 标题索引 + `refreshLinkPanel`（与 openDoc 同构，原缺口：表格打开后反链恒空直到手动刷新）。
+- **P1 跟随项**（独立验证）：全量索引重建（`knowledgeLinkIndexReplaceAll`）在表格 rename 后是否需要重写引用方 raw（现 `rewriteWikiLinksAfterRename` 只扫 doc 正文）——若表格被引用且重命名，引用方 `[[旧标题]]` 将断链，需 P1 评估把表格标题纳入重写范围。
 
 ### T4 面板头部联动（P0）
 

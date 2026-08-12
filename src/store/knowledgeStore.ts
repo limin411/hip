@@ -1991,6 +1991,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       // Title-only search entry refresh (body is CSV; not body-indexed in P0).
       indexCurrentDoc(spaceId, id, node.title, '', spaceName, get().nodes)
       get().runSearch(get().searchQuery)
+      // 表格入链刷新（table-right-panel PR-4）：表格无正文，但 `[[表格标题]]`
+      // 可被其他文档引用 → upsert 标题索引后自动扫描反链（与 openDoc 同构）。
+      void upsertLinkIndexDoc(spaceId, id, node.title, '', get().nodes).then(() => {
+        if (gen === openDocGeneration && get().activeDocId === id) {
+          get().refreshLinkPanel(id)
+        }
+      })
     } catch (e) {
       // Stale open failure must not clear a newer successful open.
       if (gen !== openDocGeneration) return

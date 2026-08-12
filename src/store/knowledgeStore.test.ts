@@ -2785,6 +2785,23 @@ describe('knowledgeStore table flows (knowledge-table)', () => {
     expect(s.recent[0].docId).toBe('tbl_1')
   })
 
+  it('openTable refreshes link panel after title index upsert (PR-4)', async () => {
+    knowledgeReadTable.mockResolvedValueOnce({ csv: 'a,b\n1,2\n', meta: '{"cols":[]}' })
+    const refresh = vi
+      .spyOn(useKnowledgeStore.getState(), 'refreshLinkPanel')
+      .mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      nodes: [
+        { id: 'tbl_1', parentId: null, kind: 'table', title: '预算', order: 0, createdAt: 1, updatedAt: 1 },
+      ],
+    })
+    await useKnowledgeStore.getState().openTable('tbl_1')
+    // upsertLinkIndexDoc（标题索引）→ refreshLinkPanel('tbl_1'，microtask 链）
+    expect(knowledgeLinkIndexUpsert).toHaveBeenCalled()
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith('tbl_1'))
+    refresh.mockRestore()
+  })
+
   it('openTable on non-table node fails without toasting doc error', async () => {
     await useKnowledgeStore.getState().openTable('doc_1')
     expect(useKnowledgeStore.getState().activeDocId).toBeNull()

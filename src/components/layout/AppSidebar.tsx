@@ -762,7 +762,7 @@ export function AppSidebar() {
                         aria-hidden
                       />
                     ) : (
-                      <Folder size={12} className="shrink-0 text-ink-tertiary" aria-hidden />
+                      <ProjectFolderIcon className="shrink-0" />
                     )}
                     <span
                       className={cn(
@@ -911,6 +911,30 @@ export function AppSidebar() {
         />
       </div>
     </aside>
+  )
+}
+
+/** Rounded yellow folder for project group headers (macOS-style, amber two-tone). */
+function ProjectFolderIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={12}
+      height={12}
+      className={className}
+      aria-hidden
+    >
+      {/* Tab (behind, darker amber). */}
+      <path
+        d="M 3.5 8 V 6.25 a 1.75 1.75 0 0 1 1.75 -1.75 H 9.5 a 2 2 0 0 1 1.85 1.2 L 12.9 8 Z"
+        fill="#f59e0b"
+      />
+      {/* Body (rounded rect, lighter amber). */}
+      <path
+        d="M 6 8 H 18 A 3 3 0 0 1 21 11 V 16 A 3 3 0 0 1 18 19 H 6 A 3 3 0 0 1 3 16 V 11 A 3 3 0 0 1 6 8 Z"
+        fill="#fbbf24"
+      />
+    </svg>
   )
 }
 

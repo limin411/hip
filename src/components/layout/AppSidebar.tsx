@@ -10,10 +10,10 @@ import {
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
-  CheckSquare,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Code2,
   Folder,
   MessageSquare,
@@ -21,7 +21,7 @@ import {
   PanelLeftClose,
   Search,
   Terminal,
-  Zap,
+  Timer,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
 import { isMacPlatform } from '@/lib/platform'
@@ -410,14 +410,14 @@ export function AppSidebar() {
           // rail stays on Tasks; trash/history still reassign section away.
           active={sidebarSection === 'tasks'}
           label={t('sidebar.nav.tasks')}
-          icon={<CheckSquare size={16} strokeWidth={1.75} />}
+          icon={<ClipboardCheck size={16} strokeWidth={1.75} />}
           onClick={() => onNav('tasks')}
         />
         <NavItem
           section="automation"
           active={sidebarSection === 'automation' && activeView === 'automation'}
           label={t('sidebar.nav.automation')}
-          icon={<Zap size={16} strokeWidth={1.75} />}
+          icon={<Timer size={16} strokeWidth={1.75} />}
           onClick={() => onNav('automation')}
         />
       </nav>

@@ -503,4 +503,47 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     expect(screen.queryByTestId('terminal-plan-slot')).not.toBeInTheDocument()
     unmount()
   })
+
+  it('renders a chat-style interrupt card and Continue resumes the terminal session', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) =>
+        x.id === 'ta_1'
+          ? { ...x, interrupt: { turnId: 't1', question: 'confirm proceed?' } }
+          : x,
+      ),
+    }))
+    const sendSpy = vi.spyOn(sessionService, 'sendMessageToSession').mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    const card = screen.getByTestId('terminal-interrupt')
+    expect(card).toHaveTextContent('confirm proceed?')
+    expect(screen.queryByTestId('terminal-interrupt-continue')).toBeInTheDocument()
+
+    // Continue targets the terminal session — never the global active session.
+    fireEvent.click(screen.getByTestId('terminal-interrupt-continue'))
+    expect(sendSpy).toHaveBeenCalledWith('ta_1', 'chat.interruptContinueMessage')
+
+    sendSpy.mockRestore()
+    unmount()
+  })
+
+  it('hides the interrupt card while a plan approval owns the CTA (chat parity)', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) =>
+        x.id === 'ta_1'
+          ? {
+              ...x,
+              planApprovalPending: true,
+              activeTurnPlan: [{ id: 'p1', content: 'check disk', status: 'pending' }],
+              interrupt: { turnId: 't1', question: 'confirm proceed?' },
+            }
+          : x,
+      ),
+    }))
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    expect(screen.queryByTestId('terminal-interrupt')).not.toBeInTheDocument()
+    expect(screen.getByTestId('plan-progress-panel')).toBeInTheDocument()
+    unmount()
+  })
 })

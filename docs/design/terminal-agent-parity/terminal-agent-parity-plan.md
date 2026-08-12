@@ -28,7 +28,6 @@ if (e.nativeEvent.isComposing || e.key === 'Process') return
 ```
 
 ### P1 — 规划审批面板（功能缺口）
-
 - `TerminalAgentPanel` 用 `selectLivePlan`（`@/lib/todos`）计算当前会话的
   `LivePlanView`，非空时在权限卡上方渲染 `<PlanProgressPanel>`（复用 chat 组件，
   自带 awaiting 审批的 approve / amend / reject 按钮与进度条）。
@@ -37,6 +36,16 @@ if (e.nativeEvent.isComposing || e.key === 'Process') return
   视觉更轻）。
 - 与 chat 一致：`onApprove → respondPlan('approve')`、
   `onReject → respondPlan('reject')`、`onAmend → respondPlan('amend', content)`。
+
+#### 1b — 普通 interrupt 卡（chat-interrupt 同款）
+
+- 终端消息列表尾部渲染 chat 同款 interrupt 卡（`⏸ question` + hint + Continue），
+  独立 testid `terminal-interrupt`（避免与主对话的 `chat-interrupt` 在 e2e
+  全局 querySelector 中歧义）。
+- Continue 用会话级 `sendMessageToSession(active.id, chat.interruptContinueMessage)`
+  （终端会话非全局 active，不能像 chat 那样调 `sendMessage`）。
+- 与 chat 同规则隐藏：`shouldHideInterruptForPlanApproval` ——
+  planApprovalPending 或 plan_approval context 时由规划面板接管 CTA。
 
 ### P2 — 视觉对齐
 

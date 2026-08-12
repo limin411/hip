@@ -29,6 +29,7 @@ import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ComposerChip } from '@/components/chat/ComposerChip'
 import { ModelPicker } from '@/components/chat/ModelPicker'
 import { PlanProgressPanel } from '@/components/chat/PlanProgressPanel'
+import { shouldHideInterruptForPlanApproval } from '@/components/chat/planApproval'
 import { selectLivePlan } from '@/lib/todos'
 import {
   applyCommand,
@@ -849,6 +850,36 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
                   />
                 ))
               )}
+              {/* Pending HITL question — chat interrupt card parity (plan approval owns the CTA). */}
+              {active.interrupt &&
+              !shouldHideInterruptForPlanApproval(active.planApprovalPending, active.interrupt) ? (
+                <div
+                  className="border border-accent/30 bg-accent-subtle px-3 py-2.5 text-body text-ink"
+                  data-testid="terminal-interrupt"
+                >
+                  <p className="flex items-start gap-2">
+                    <span aria-hidden>⏸</span>
+                    <span>{active.interrupt.question}</span>
+                  </p>
+                  <p className="mt-1 text-meta text-ink-secondary">{t('chat.interruptHint')}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      data-testid="terminal-interrupt-continue"
+                      onClick={() =>
+                        sessionService.sendMessageToSession(
+                          active.id,
+                          t('chat.interruptContinueMessage'),
+                        )
+                      }
+                    >
+                      {t('chat.interruptContinue')}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <div ref={bottomRef} data-testid="terminal-transcript-end" />
             </div>
             {!atBottom && active.messages.length > 0 ? (

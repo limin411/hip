@@ -1,8 +1,10 @@
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Children, isValidElement, useMemo, type ReactNode } from 'react'
 import { open } from '@tauri-apps/plugin-shell'
 import { cn } from '@/lib/utils'
+import { chunkStreamText } from '@/lib/streamChunks'
 import { CodeBlock } from './CodeBlock'
 
 /** Shared prose chrome for chat bubbles, file preview, skill docs. */
@@ -75,20 +77,62 @@ const DEFAULT_COMPONENTS: Components = {
   },
 }
 
+/**
+ * Streaming paragraph (ui-enhancement-bui P0-1): raw text runs split into
+ * `.stream-chunk` spans that fade in on mount. Append-only growth keeps
+ * earlier spans stable (React reuses them by key), so only new chunks animate.
+ * Element children (code / strong / a …) are wrapped as one chunk unit each.
+ */
+function StreamingParagraph({ children }: { children?: ReactNode }) {
+  const nodes: ReactNode[] = []
+  Children.forEach(children, (child, idx) => {
+    if (typeof child === 'string' || typeof child === 'number') {
+      chunkStreamText(String(child)).forEach((c, j) => {
+        nodes.push(
+          <span key={`${idx}-${j}`} className="stream-chunk">
+            {c}
+          </span>,
+        )
+      })
+    } else if (isValidElement(child)) {
+      nodes.push(
+        <span key={`el-${idx}`} className="stream-chunk">
+          {child}
+        </span>,
+      )
+    }
+  })
+  return <p>{nodes}</p>
+}
+
 export interface MarkdownBodyProps {
   content: string
   className?: string
   components?: Components
   /** When false, skip remark-gfm (e.g. plain preview). Default true. */
   gfm?: boolean
+  /** Streaming: reveal raw text runs in opacity-fade chunks (P0-1). Default false. */
+  streaming?: boolean
 }
 
-export function MarkdownBody({ content, className, components, gfm = true }: MarkdownBodyProps) {
+export function MarkdownBody({
+  content,
+  className,
+  components,
+  gfm = true,
+  streaming = false,
+}: MarkdownBodyProps) {
+  const mergedComponents = useMemo(() => {
+    const base: Components = { ...DEFAULT_COMPONENTS, ...components }
+    if (streaming) base.p = StreamingParagraph
+    return base
+  }, [components, streaming])
+
   return (
     <div className={cn(markdownProseClassName, className)}>
       <ReactMarkdown
         remarkPlugins={gfm ? DEFAULT_REMARK_PLUGINS : undefined}
-        components={{ ...DEFAULT_COMPONENTS, ...components }}
+        components={mergedComponents}
       >
         {content}
       </ReactMarkdown>

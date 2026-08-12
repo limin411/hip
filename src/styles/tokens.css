@@ -97,6 +97,9 @@
   --duration-chrome: 100ms;
   --duration-content: 120ms;
   --duration-celebrate: 200ms;
+  /* ui-enhancement-bui（S1）：AI 进程可视化两档 —— 词块浮现（例外②）与展开（例外①） */
+  --duration-stream: 240ms;
+  --duration-expand: 300ms;
   --ease-out: var(--ease-standard);
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   /* Density defaults — FOUC-safe before data-density exists (comfortable) */
@@ -466,6 +469,85 @@ a:hover {
 }
 .animate-roundtable-seat {
   animation: roundtable-seat-enter 200ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+/* ── ui-enhancement-bui 动效资产（S1）──────────────────────────────
+   两个明示例外之外全部维持纯 opacity / 背景色过渡纪律：
+   ① .clip-expand —— grid-rows 高度展开（无位移的布局动画）
+   ② .stream-chunk —— 词块级 opacity 浮现（≤ --duration-stream）
+   prefers-reduced-motion 全局兑底（上方 @media）自动冻结全部。 */
+
+/* ① 展开容器：grid-template-rows 0fr↔1fr + opacity，双向过渡 */
+.clip-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--duration-expand, 300ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    opacity var(--duration-expand, 300ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+.clip-expand.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.clip-expand-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ② 流式词块：append-only 增长下新 span 挂载即浮现，旧 span 被 React 复用不重放 */
+@keyframes stream-chunk-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.stream-chunk {
+  animation: stream-chunk-in var(--duration-stream, 240ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+/* 状态图标替换（spinner→✓/✗/⚠）：挂载即淡入 120ms，与图标自身 spin 动画互不干扰 */
+@keyframes status-icon-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-status-icon {
+  animation: status-icon-in var(--duration-content, 120ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+/* 点阵加载（3×3 纯 opacity 相位波纹，700ms 周期） */
+@keyframes pixel-wave {
+  0%, 100% { opacity: 0.12; }
+  50%      { opacity: 1; }
+}
+.px-grid {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 4px);
+  gap: 2px;
+  vertical-align: middle;
+}
+.px-grid i {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
+  animation: pixel-wave 0.7s linear infinite;
+}
+.px-grid i:nth-child(2) { animation-delay: 80ms; }
+.px-grid i:nth-child(3) { animation-delay: 160ms; }
+.px-grid i:nth-child(4) { animation-delay: 240ms; }
+.px-grid i:nth-child(5) { animation-delay: 320ms; }
+.px-grid i:nth-child(6) { animation-delay: 400ms; }
+.px-grid i:nth-child(7) { animation-delay: 480ms; }
+.px-grid i:nth-child(8) { animation-delay: 560ms; }
+.px-grid i:nth-child(9) { animation-delay: 640ms; }
+
+/* 侧栏行 stagger（首屏 / 组展开）：纯 opacity，每行 12ms 递增 */
+@keyframes sidebar-row-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-sidebar-row {
+  animation: sidebar-row-enter var(--duration-content, 240ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation-delay: calc(var(--row-i, 0) * 12ms);
 }
 
 /*

@@ -256,7 +256,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
                     streaming={streaming}
                   />
                 ) : (
-                  <MarkdownBody content={displayContent} />
+                  <MarkdownBody content={displayContent} streaming={streaming} />
                 )}
               </div>
             )}

@@ -1,7 +1,7 @@
 # 文档管理 · 表格 × 右侧面板 关联性整改 Spec
 
 - 系列：`docs/design/table-right-panel/`
-- 配套：`docs/design/table-right-panel/table-right-panel-preview.html`（问题对照 + 右侧 rail 联动交互原型，浏览器直接打开）
+- 配套：`docs/design/table-right-panel/table-right-panel-preview.html`（问题对照 + 右侧 rail 联动交互原型，浏览器直接打开）；`docs/design/table-right-panel/table-right-panel-plan.md`（执行计划：PR-1..5 拆解、文件级任务、测试与验收、节奏与风险）
 - 状态：待评审
 - 日期：2026-08-11
 - 前置基线：`docs/design/table-ux-notion/table-ux-notion-spec.md`（表格编辑器交互整改，本版不重复表格域设计）；`docs/design/knowledge-table/knowledge-table-spec.md`（表格功能模型）

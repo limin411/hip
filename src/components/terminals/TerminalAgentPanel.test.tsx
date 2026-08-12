@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import type { Message } from '@hip/protocol'
 import { useDomainStore } from '@/domain/sessionStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { useTerminalHostStore } from '@/store/terminalHostStore'
@@ -390,8 +391,7 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     unmount()
   })
 
-  it('queues user prompts while an exec flight runs and delivers them when it ends', async () => {
-    useTerminalAgentStore.setState({
+  it('queues user prompts while an exec flight runs and delivers them when it ends', async () => {    useTerminalAgentStore.setState({
       execFlightByTerminal: {
         tm_1: {
           callId: 'c1',
@@ -424,6 +424,60 @@ describe('TerminalAgentPanel tool card collapsing', () => {
 
     sendSpy.mockRestore()
     useTerminalAgentStore.setState({ execFlightByTerminal: {} })
+    unmount()
+  })
+
+  it('shows the confirm card for a danger prompt and writes a sticky rule on always-allow', async () => {
+    useTerminalAgentStore.setState({
+      pendingConfirmByTerminal: {
+        tm_1: {
+          terminalId: 'tm_1',
+          kind: 'danger',
+          title: 'git push --force origin main',
+          resolve: vi.fn(),
+        },
+      },
+    })
+    const updateSpy = vi.spyOn(useHipConfigStore.getState(), 'updateSection').mockResolvedValue()
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    expect(screen.getByTestId('terminal-confirm-card')).toBeInTheDocument()
+    expect(screen.getByText(/git push --force/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('terminal-confirm-always'))
+    expect(updateSpy).toHaveBeenCalledWith('terminal', expect.any(Function))
+    const updater = updateSpy.mock.calls[0]?.[1] as (prev: { approveRules?: string[] }) => object
+    expect(updater({})).toEqual({ approveRules: ['git push *'] })
+    expect(useTerminalAgentStore.getState().pendingConfirmByTerminal.tm_1).toBeNull()
+
+    updateSpy.mockRestore()
+    useTerminalAgentStore.setState({ pendingConfirmByTerminal: {} })
+    unmount()
+  })
+
+  it('confirm-card always-deny writes a deny rule and rejects', () => {
+    const resolve = vi.fn()
+    useTerminalAgentStore.setState({
+      pendingConfirmByTerminal: {
+        tm_1: {
+          terminalId: 'tm_1',
+          kind: 'danger',
+          title: 'rm -rf /var/lib/docker',
+          resolve,
+        },
+      },
+    })
+    const updateSpy = vi.spyOn(useHipConfigStore.getState(), 'updateSection').mockResolvedValue()
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    fireEvent.click(screen.getByTestId('terminal-confirm-never'))
+    expect(updateSpy).toHaveBeenCalledWith('terminal', expect.any(Function))
+    const updater = updateSpy.mock.calls[0]?.[1] as (prev: { denyRules?: string[] }) => object
+    expect(updater({})).toEqual({ denyRules: ['rm -rf *'] })
+    expect(resolve).toHaveBeenCalledWith({ ok: false, sticky: 'deny' })
+
+    updateSpy.mockRestore()
+    useTerminalAgentStore.setState({ pendingConfirmByTerminal: {} })
     unmount()
   })
 

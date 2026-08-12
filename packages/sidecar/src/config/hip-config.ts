@@ -406,6 +406,16 @@ function normalizeTerminal(raw: Record<string, unknown>): TerminalConfig {
       out.colorTheme = id
     }
   }
+  const approve = raw.approveRules ?? raw.approve_rules
+  if (Array.isArray(approve)) {
+    const rules = approve.filter((r): r is string => typeof r === 'string' && r.trim().length > 0).map((r) => r.trim())
+    if (rules.length > 0) out.approveRules = rules
+  }
+  const deny = raw.denyRules ?? raw.deny_rules
+  if (Array.isArray(deny)) {
+    const rules = deny.filter((r): r is string => typeof r === 'string' && r.trim().length > 0).map((r) => r.trim())
+    if (rules.length > 0) out.denyRules = rules
+  }
   return out
 }
 

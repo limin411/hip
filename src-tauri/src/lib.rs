@@ -1770,6 +1770,8 @@ doomLoopStrategy = "auto_continue"
                 shell: Some("cmd".into()),
                 color_theme: Some("dracula".into()),
                 bell: None,
+                approve_rules: None,
+                deny_rules: None,
             }),
             code_block: None,
             knowledge: None,

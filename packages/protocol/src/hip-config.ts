@@ -184,6 +184,14 @@ export interface TerminalConfig {
   colorTheme?: TerminalColorThemeId
   /** Bell indication. JSON/TS: `bell`. TOML: `bell`. Default `visual`. */
   bell?: TerminalBellPref
+  /**
+   * User rules for terminal_exec command approval (T4): glob-ish command
+   * prefixes that always allow (`git status*`) or always deny (`rm -rf /*`)
+   * without prompting. JSON/TS: `approveRules`. TOML: `approve_rules`.
+   */
+  approveRules?: string[]
+  /** Always-deny command rules; evaluated before approve rules. */
+  denyRules?: string[]
 }
 
 /**

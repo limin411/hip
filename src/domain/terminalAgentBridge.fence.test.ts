@@ -12,8 +12,9 @@ import { handleTerminalBridgeMessage, FENCE_END, FENCE_TERM } from './terminalAg
 import { useDomainStore } from './sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalStore } from '@/store/terminalStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useTerminalAgentStore, HANDED_OFF_MAX_MS } from '@/store/terminalAgentStore'
-import { EXEC_QUEUE_TIMEOUT_MS } from './terminalAgentBridge'
+import { EXEC_QUEUE_TIMEOUT_MS, userCommandRules } from './terminalAgentBridge'
 
 vi.mock('@/ipc/ssh', () => ({
   sshWrite: vi.fn(),
@@ -298,5 +299,83 @@ describe('terminal bridge exec queue (PR-3, spec T3)', () => {
     expect(result).toMatchObject({ status: 'error' })
     expect(result && 'error' in result ? String(result.error) : '').toMatch(/queued_timed_out/)
     expect(useTerminalAgentStore.getState().execQueueByTerminal[TM_ID]?.length).toBe(0)
+  })
+})
+
+describe('terminal bridge rule-based confirm (PR-4, spec T4)', () => {
+  beforeEach(() => {
+    vi.mocked(sshWrite).mockClear().mockResolvedValue(undefined as never)
+    useTerminalAgentStore.setState({
+      execFlightByTerminal: {},
+      execQueueByTerminal: {},
+      driverByTerminal: {},
+      pendingConfirmByTerminal: {},
+    })
+    useTerminalStore.setState({ bySession: {}, userInterleaved: {} })
+    // No user rules by default in these tests.
+    useHipConfigStore.setState({ config: { version: 1 } })
+    seedStores()
+    vi.useRealTimers()
+  })
+
+  it('a deny rule rejects without writing or prompting', async () => {
+    const { sent } = bridgeRequest({ command: 'rm -rf /' })
+    await sleep(400)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'rejected' })
+    expect(vi.mocked(sshWrite)).not.toHaveBeenCalled()
+    expect(useTerminalAgentStore.getState().pendingConfirmByTerminal[TM_ID] ?? null).toBeNull()
+  })
+
+  it('an ask rule shows the confirm card and runs after allow', async () => {
+    const { sent } = bridgeRequest({ command: 'git push --force origin main' })
+    await sleep(400)
+    const pending = useTerminalAgentStore.getState().pendingConfirmByTerminal[TM_ID]
+    expect(pending?.kind).toBe('danger')
+    expect(pending?.title).toContain('git push')
+    expect(vi.mocked(sshWrite)).not.toHaveBeenCalled()
+    useTerminalAgentStore.getState().settleConfirm(TM_ID, { ok: true })
+    await sleep(300)
+    expect(vi.mocked(sshWrite)).toHaveBeenCalledTimes(1)
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(600)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'completed' })
+  })
+
+  it('rejecting the confirm card rejects the exec without writing', async () => {
+    const { sent } = bridgeRequest({ command: 'rm -rf /var/lib/docker' })
+    await sleep(400)
+    useTerminalAgentStore.getState().settleConfirm(TM_ID, { ok: false })
+    await sleep(300)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'rejected' })
+    expect(vi.mocked(sshWrite)).not.toHaveBeenCalled()
+  })
+
+  it('an unanswered confirm card times out into rejection', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    const { sent } = bridgeRequest({ command: 'shutdown -h now' })
+    await vi.advanceTimersByTimeAsync(400)
+    expect(useTerminalAgentStore.getState().pendingConfirmByTerminal[TM_ID]).not.toBeNull()
+    await vi.advanceTimersByTimeAsync(61_000)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'rejected' })
+    vi.useRealTimers()
+  })
+
+  it('user allow rules from hip.toml run the command without a prompt', async () => {
+    useHipConfigStore.setState({
+      config: { version: 1, terminal: { approveRules: ['git push *'] } },
+    })
+    expect(userCommandRules()).toEqual([{ action: 'allow', pattern: 'git push *' }])
+    const { sent } = bridgeRequest({ command: 'git push --force origin main' })
+    await sleep(400)
+    expect(useTerminalAgentStore.getState().pendingConfirmByTerminal[TM_ID] ?? null).toBeNull()
+    expect(vi.mocked(sshWrite)).toHaveBeenCalledTimes(1)
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(600)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'completed' })
   })
 })

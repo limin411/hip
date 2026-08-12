@@ -1898,6 +1898,13 @@ export const en = {
         handoffCta: 'Hand back',
         queuedMsgs: '{{count}} message queued — will send when the command finishes',
         queuedMsgs_plural: '{{count}} messages queued — will send when the command finishes',
+        confirmHighRisk: 'HIGH RISK',
+        confirmOverwrite: 'OVERWRITE',
+        confirmTitle: 'Run this command?',
+        confirmOverwriteTitle: 'Overwrite remote file?',
+        confirmOnce: 'Allow once',
+        confirmAlwaysAllow: 'Always allow',
+        confirmAlwaysDeny: 'Always deny',
         sendCtrlC: 'Send Ctrl-C',
         continueWatching: 'Keep watching',
         continueWatchingPrompt:

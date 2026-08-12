@@ -13,8 +13,17 @@ import { useTerminalStore } from '@/store/terminalStore'
 import {
   useTerminalAgentStore,
   HANDED_OFF_MAX_MS,
+  type PendingUiConfirm,
   type TerminalExecFlight,
 } from '@/store/terminalAgentStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import {
+  commandRuleDecision,
+  matchesCommandRule,
+  rulePatternFromCommand,
+  PRESET_TERMINAL_RULES,
+  type CommandRule,
+} from './terminalRules'
 import { sshWrite } from '@/ipc/ssh'
 import { sftpReadFile, sftpWriteFile } from '@/ipc/sftp'
 import { isTerminalSession } from '@/lib/sessions'
@@ -47,17 +56,20 @@ const DANGER_PATTERNS: RegExp[] = [
   /\bshutdown\b/,
 ]
 
-/** Interactive TUI commands the agent must not drive automatically (§6). */
+/**
+ * @deprecated 由 terminalRules 规则集取代（T4）。保留导出供调用方/旧测试迁移。
+ */
+export function isDangerousCommand(command: string): boolean {
+  return DANGER_PATTERNS.some((re) => re.test(command))
+}
+
+/** Interactive TUI commands the agent launches but hands the keyboard over (T2). */
 const TUI_PATTERNS: RegExp[] = [
   /\b(?:vim|nvim)\b/,
   /\b(?:top|htop)\b/,
   /\bpasswd\b/,
   /\bssh\b/,
 ]
-
-export function isDangerousCommand(command: string): boolean {
-  return DANGER_PATTERNS.some((re) => re.test(command))
-}
 
 export function isInteractiveTuiCommand(command: string): boolean {
   return TUI_PATTERNS.some((re) => re.test(command))
@@ -135,6 +147,46 @@ const flightAborters = new Map<string, () => void>()
 
 export function abortExecFlight(terminalId: string): void {
   flightAborters.get(terminalId)?.()
+}
+
+/** Confirm-card wait cap (T4): unanswered danger/overwrite prompts are rejected. */
+export const CONFIRM_TIMEOUT_MS = 60_000
+
+/** User rules from hip.toml `[terminal]` (T4). */
+export function userCommandRules(): CommandRule[] {
+  const t = useHipConfigStore.getState().config.terminal
+  const rules: CommandRule[] = []
+  for (const p of t?.approveRules ?? []) rules.push({ action: 'allow', pattern: p })
+  for (const p of t?.denyRules ?? []) rules.push({ action: 'deny', pattern: p })
+  return rules
+}
+
+function matchedAskRule(command: string, userRules: CommandRule[]): string {
+  for (const r of [...userRules, ...PRESET_TERMINAL_RULES]) {
+    if (r.action === 'ask' && matchesCommandRule(command, r.pattern)) return r.pattern
+  }
+  return rulePatternFromCommand(command)
+}
+
+/** Ask the UI confirm card; resolves false on timeout or reject. */
+export function requestUiConfirm(
+  tmId: string,
+  confirm: Omit<PendingUiConfirm, 'terminalId' | 'resolve'>,
+): Promise<{ ok: boolean; sticky?: 'allow' | 'deny' }> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      useTerminalAgentStore.getState().settleConfirm(tmId, { ok: false })
+      resolve({ ok: false })
+    }, CONFIRM_TIMEOUT_MS)
+    useTerminalAgentStore.getState().requestConfirm(tmId, {
+      terminalId: tmId,
+      ...confirm,
+      resolve: (d) => {
+        clearTimeout(timer)
+        resolve(d)
+      },
+    })
+  })
 }
 
 async function runExec(
@@ -282,9 +334,30 @@ async function runFlight(
 
   try {
     // Danger commands get a UI second confirmation even after sidecar auto-approval.
-    if (isDangerousCommand(command) && !window.confirm(`Run dangerous command?\n\n${command}`)) {
-      finish('rejected', { mayStillRun: false, error: 'dangerous command rejected by user' })
+    // Rule-based danger gating (T4): deny → reject; ask → UI confirm card;
+    // allow → run without a second prompt. Replaces window.confirm + regex.
+    const userRules: CommandRule[] = userCommandRules()
+    const ruleDecision = commandRuleDecision(command, { userRules })
+    if (ruleDecision === 'deny') {
+      finish('rejected', {
+        mayStillRun: false,
+        error: 'command blocked by a deny rule — nothing was written to the terminal',
+      })
       return
+    }
+    if (ruleDecision === 'ask') {
+      const decision = await requestUiConfirm(tmId, {
+        kind: 'danger',
+        title: command,
+        detail: `matched rule: ${matchedAskRule(command, userRules)}`,
+      })
+      if (!decision.ok) {
+        finish('rejected', {
+          mayStillRun: false,
+          error: 'dangerous command rejected by user',
+        })
+        return
+      }
     }
     await sshWrite(tmId, `${useFence ? wrapForFence(command) : wrapEc ? wrapForEc(command) : command}\n`)
   } catch (err) {
@@ -404,7 +477,7 @@ async function runWrite(
     return
   }
   if (!force) {
-    // Overwrite of an existing path needs a UI second confirmation (§6 / P2).
+    // Overwrite of an existing path needs a UI second confirmation (T4 confirm card).
     let exists = false
     try {
       await sftpReadFile(tmId, path, 1)
@@ -412,9 +485,21 @@ async function runWrite(
     } catch {
       exists = false
     }
-    if (exists && !window.confirm(`Overwrite remote file?\n\n${path}`)) {
-      send({ type: 'session:uiToolWrite:result', sessionId, callId, ok: false, error: 'overwrite rejected by user' })
-      return
+    if (exists) {
+      const decision = await requestUiConfirm(tmId, {
+        kind: 'overwrite',
+        title: path,
+      })
+      if (!decision.ok) {
+        send({
+          type: 'session:uiToolWrite:result',
+          sessionId,
+          callId,
+          ok: false,
+          error: 'overwrite rejected by user',
+        })
+        return
+      }
     }
   }
   try {

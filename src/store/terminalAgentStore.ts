@@ -35,6 +35,19 @@ export interface QueuedExecRequest {
   queuedAt: number
 }
 
+/** UI confirm-card request replacing window.confirm (T4). */
+export interface PendingUiConfirm {
+  terminalId: string
+  kind: 'danger' | 'overwrite'
+  /** Command text (danger) or remote path (overwrite). */
+  title: string
+  /** Optional extra line (e.g. matched rule). */
+  detail?: string
+  resolve: (decision: { ok: boolean; sticky?: 'allow' | 'deny' }) => void
+}
+
+export type ConfirmSticky = 'allow' | 'deny'
+
 interface TerminalAgentStore {
   /** Active agent session per `tm_*` (right-rail Agent tab shows this). */
   activeSessionByTerminal: Record<string, string | null>
@@ -46,6 +59,8 @@ interface TerminalAgentStore {
   execQueueByTerminal: Record<string, QueuedExecRequest[]>
   /** Who owns the keyboard per `tm_*` (T2 one-driver). */
   driverByTerminal: Record<string, TerminalDriver>
+  /** In-flight UI confirm card per `tm_*` (T4, replaces window.confirm). */
+  pendingConfirmByTerminal: Record<string, PendingUiConfirm | null>
 
   setActiveSession: (terminalId: string, sessionId: string | null) => void
   setSidebarExpanded: (terminalId: string, expanded: boolean) => void
@@ -53,6 +68,8 @@ interface TerminalAgentStore {
   setExecFlight: (terminalId: string, flight: TerminalExecFlight | null) => void
   enqueueExec: (terminalId: string, req: QueuedExecRequest) => void
   dequeueExec: (terminalId: string, callId: string) => void
+  requestConfirm: (terminalId: string, confirm: PendingUiConfirm) => void
+  settleConfirm: (terminalId: string, decision: { ok: boolean; sticky?: ConfirmSticky }) => void
   /** Keyboard ownership flips (T2): bridge flips to user on handed_off. */
   setDriver: (terminalId: string, driver: TerminalDriver) => void
   /** User hands the keyboard back: phase → resumed, deadline extended by the pause. */
@@ -78,6 +95,7 @@ export const useTerminalAgentStore = create<TerminalAgentStore>((set, get) => ({
   execFlightByTerminal: {},
   execQueueByTerminal: {},
   driverByTerminal: {},
+  pendingConfirmByTerminal: {},
 
   setActiveSession: (terminalId, sessionId) =>
     set((s) => ({
@@ -131,6 +149,18 @@ export const useTerminalAgentStore = create<TerminalAgentStore>((set, get) => ({
         [terminalId]: (s.execQueueByTerminal[terminalId] ?? []).filter((q) => q.callId !== callId),
       },
     })),
+
+  requestConfirm: (terminalId, confirm) =>
+    set((s) => ({
+      pendingConfirmByTerminal: { ...s.pendingConfirmByTerminal, [terminalId]: confirm },
+    })),
+
+  settleConfirm: (terminalId, decision) =>
+    set((s) => {
+      const pending = s.pendingConfirmByTerminal[terminalId]
+      if (pending) pending.resolve(decision)
+      return { pendingConfirmByTerminal: { ...s.pendingConfirmByTerminal, [terminalId]: null } }
+    }),
 
   setDriver: (terminalId, driver) =>
     set((s) => ({

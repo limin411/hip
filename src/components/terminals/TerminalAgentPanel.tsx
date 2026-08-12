@@ -22,6 +22,8 @@ import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { sshWrite } from '@/ipc/ssh'
 import { isTerminalSession } from '@/lib/sessions'
 import { abortExecFlight } from '@/domain/terminalAgentBridge'
+import { rulePatternFromCommand } from '@/domain/terminalRules'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { formatAbsolute, formatClockTime } from '@/lib/datetime'
 import { formatTokensCompact } from '@/lib/formatTokens'
 import { formatUsdMaybeIncomplete } from '@/lib/usageCost'
@@ -750,6 +752,7 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
   )
   const activeSessionId = useTerminalAgentStore((s) => s.activeSessionByTerminal[terminalId])
   const flight = useTerminalAgentStore((s) => s.execFlightByTerminal[terminalId])
+  const pendingConfirm = useTerminalAgentStore((s) => s.pendingConfirmByTerminal[terminalId])
   /** Messages queued while an exec flight held the terminal (T3, Warp-style). */
   const [queuedMsgs, setQueuedMsgs] = useState<{ content: string; at: number }[]>([])
   const host = useTerminalHostStore((s) =>
@@ -812,6 +815,24 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
       sessionService.sendMessageToSession(active.id, m.content)
     }
   }, [flight, queuedCount, active])
+
+  // Confirm card (T4): sticky decisions write a hip.toml `[terminal]` rule.
+  const settleUiConfirm = (
+    confirm: NonNullable<typeof pendingConfirm>,
+    decision: { ok: boolean; sticky?: 'allow' | 'deny' },
+  ) => {
+    if (decision.sticky) {
+      const pattern = rulePatternFromCommand(confirm.title)
+      const section = decision.sticky === 'allow' ? 'approveRules' : 'denyRules'
+      void useHipConfigStore
+        .getState()
+        .updateSection('terminal', (prev) => ({
+          ...prev,
+          [section]: [...(prev?.[section] ?? []), pattern],
+        }))
+    }
+    useTerminalAgentStore.getState().settleConfirm(terminalId, decision)
+  }
 
   const onScroll = () => {
     const el = scrollRef.current
@@ -1016,6 +1037,60 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
               <span className="min-w-0 flex-1">
                 {t('terminals.agent.queuedMsgs', { count: queuedCount })}
               </span>
+            </div>
+          ) : null}
+
+          {pendingConfirm ? (
+            <div
+              className="mx-3 mb-1 shrink-0 overflow-hidden rounded-lg border border-danger-soft bg-surface-subtle"
+              data-testid="terminal-confirm-card"
+            >
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+                <span className="rounded bg-danger/10 px-1.5 py-0.5 text-caption font-bold text-danger">
+                  {pendingConfirm.kind === 'danger' ? t('terminals.agent.confirmHighRisk') : t('terminals.agent.confirmOverwrite')}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-caption font-semibold text-ink">
+                  {pendingConfirm.kind === 'danger'
+                    ? t('terminals.agent.confirmTitle')
+                    : t('terminals.agent.confirmOverwriteTitle')}
+                </span>
+              </div>
+              <div className="px-3 py-2">
+                <p className="rounded-md bg-ink/5 px-2.5 py-1.5 font-mono text-caption leading-relaxed text-ink break-all">
+                  {pendingConfirm.title}
+                </p>
+                {pendingConfirm.detail ? (
+                  <p className="mt-1.5 text-meta leading-relaxed text-ink-tertiary">
+                    {pendingConfirm.detail}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex gap-1.5 px-3 pb-2.5">
+                <button
+                  type="button"
+                  className="flex-1 rounded-md bg-surface-muted px-2 py-1.5 text-caption font-medium text-ink-secondary transition-colors hover:bg-state-hover"
+                  data-testid="terminal-confirm-once"
+                  onClick={() => settleUiConfirm(pendingConfirm, { ok: true })}
+                >
+                  {t('terminals.agent.confirmOnce')}
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 rounded-md bg-success/10 px-2 py-1.5 text-caption font-medium text-success transition-colors hover:bg-success/20"
+                  data-testid="terminal-confirm-always"
+                  onClick={() => settleUiConfirm(pendingConfirm, { ok: true, sticky: 'allow' })}
+                >
+                  {t('terminals.agent.confirmAlwaysAllow')}
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 rounded-md bg-danger/10 px-2 py-1.5 text-caption font-medium text-danger transition-colors hover:bg-danger/20"
+                  data-testid="terminal-confirm-never"
+                  onClick={() => settleUiConfirm(pendingConfirm, { ok: false, sticky: 'deny' })}
+                >
+                  {t('terminals.agent.confirmAlwaysDeny')}
+                </button>
+              </div>
             </div>
           ) : null}
 

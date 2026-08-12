@@ -151,6 +151,12 @@ pub(crate) struct TerminalConfig {
     /// Bell indication: visual (default) | off. JSON key: bell.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) bell: Option<String>,
+    /// terminal_exec command rules that always allow without prompting (T4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) approve_rules: Option<Vec<String>>,
+    /// terminal_exec command rules that always deny (evaluated before approve).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) deny_rules: Option<Vec<String>>,
 }
 
 /// Optional `[code_block]` section. JSON uses camelCase for the UI.
@@ -479,6 +485,10 @@ pub(crate) struct TomlTerminalConfig {
     pub(crate) color_theme: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) bell: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "approveRules")]
+    pub(crate) approve_rules: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "denyRules")]
+    pub(crate) deny_rules: Option<Vec<String>>,
 }
 
 /// TOML mirror for `[code_block]` (snake_case keys; camelCase aliases for hand-edited files).
@@ -893,6 +903,8 @@ impl From<TerminalConfig> for TomlTerminalConfig {
             shell: t.shell,
             color_theme: t.color_theme,
             bell: t.bell,
+            approve_rules: t.approve_rules,
+            deny_rules: t.deny_rules,
         }
     }
 }
@@ -903,6 +915,8 @@ impl From<TomlTerminalConfig> for TerminalConfig {
             shell: t.shell,
             color_theme: t.color_theme,
             bell: t.bell,
+            approve_rules: t.approve_rules,
+            deny_rules: t.deny_rules,
         }
     }
 }
@@ -1127,6 +1141,8 @@ mod voice_preserve_tests {
                 shell: Some("zsh".into()),
                 color_theme: Some("dracula".into()),
                 bell: Some("off".into()),
+                approve_rules: None,
+                deny_rules: None,
             }),
             code_block: None,
             knowledge: None,

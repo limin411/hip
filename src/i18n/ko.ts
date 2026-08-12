@@ -1836,6 +1836,8 @@ export const ko = {
       "handedOff": "인계됨 · 사용자 대기 중",
       "handoffBanner": "입력 중 — 완료 후 「인계」 를 눌러 어시스턴트 계속",
       "handoffCta": "인계",
+      "queuedMsgs": "메시지 {{count}}건 대기 중 — 명령 종료 후 자동 전송",
+      "queuedMsgs_plural": "메시지 {{count}}건 대기 중 — 명령 종료 후 자동 전송",
       "sendCtrlC": "Ctrl-C 보내기",
       "continueWatching": "계속 관찰",
       "continueWatchingPrompt": "터미널을 계속 관찰하고 terminal_read로 폴링하여 결과를 보고하세요.",

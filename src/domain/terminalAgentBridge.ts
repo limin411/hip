@@ -22,6 +22,9 @@ import { isTerminalSession } from '@/lib/sessions'
 export const EXEC_OUTPUT_CAP = 64 * 1024
 export const EXEC_SILENCE_MS = 500
 export const EXEC_POLL_MS = 150
+/** FIFO queue: poll interval and per-request wait cap (T3). */
+export const EXEC_QUEUE_POLL_MS = 200
+export const EXEC_QUEUE_TIMEOUT_MS = 30_000
 
 /** Last line looks like a shell prompt (weak completion signal, spec §5.2). */
 export function hasPromptTail(output: string): boolean {
@@ -138,9 +141,7 @@ async function runExec(
   msg: Extract<ServerMessage, { type: 'session:terminalExec:request' }>,
   send: (m: ClientMessage) => void,
 ): Promise<void> {
-  const { sessionId, callId, command, waitMs } = msg
-  const useFence = msg.fence !== false
-  const wrapEc = msg.wrapEc === true
+  const { sessionId, callId } = msg
   const tmId = terminalIdForSession(sessionId)
   if (!tmId) {
     send({ type: 'session:uiToolResult', sessionId, callId, ok: false, status: 'error', error: 'terminal session not bound' })
@@ -163,18 +164,53 @@ async function runExec(
     })
     return
   }
-  const existing = useTerminalAgentStore.getState().execFlightByTerminal[tmId]
-  if (existing) {
-    send({
-      type: 'session:uiToolResult',
-      sessionId,
-      callId,
-      ok: false,
-      status: 'error',
-      error: 'another command is already running on this terminal',
-    })
-    return
+
+  // FIFO queue (T3): a second exec for the same terminal waits in line instead
+  // of failing — the head of the queue starts once the single flight is free.
+  useTerminalAgentStore.getState().enqueueExec(tmId, {
+    ...msg,
+    queuedAt: Date.now(),
+  })
+  for (;;) {
+    const queue = useTerminalAgentStore.getState().execQueueByTerminal[tmId] ?? []
+    const head = queue[0]
+    if (!head || head.callId !== callId) {
+      // Not at the head yet — another request is running (or ahead of us).
+      if (!queue.some((q) => q.callId === callId)) return
+      await sleep(EXEC_QUEUE_POLL_MS)
+      continue
+    }
+    if (Date.now() - head.queuedAt >= EXEC_QUEUE_TIMEOUT_MS) {
+      useTerminalAgentStore.getState().dequeueExec(tmId, callId)
+      send({
+        type: 'session:uiToolResult',
+        sessionId,
+        callId,
+        ok: false,
+        status: 'error',
+        error:
+          'queued_timed_out: another command held this terminal for too long; retry when it finishes',
+      })
+      return
+    }
+    if (!useTerminalAgentStore.getState().execFlightByTerminal[tmId]) {
+      useTerminalAgentStore.getState().dequeueExec(tmId, callId)
+      await runFlight(tmId, msg, send)
+      return
+    }
+    await sleep(EXEC_QUEUE_POLL_MS)
   }
+}
+
+/** The single-flight exec body (write + completion polling). */
+async function runFlight(
+  tmId: string,
+  msg: Extract<ServerMessage, { type: 'session:terminalExec:request' }>,
+  send: (m: ClientMessage) => void,
+): Promise<void> {
+  const { sessionId, callId, command, waitMs } = msg
+  const useFence = msg.fence !== false
+  const wrapEc = msg.wrapEc === true
 
   // Interactive TUIs are no longer rejected (T2): the agent may start vim/htop/
   // passwd/ssh, but the keyboard is handed to the user immediately after write.

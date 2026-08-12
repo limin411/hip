@@ -1839,6 +1839,8 @@ export const zhTW = {
       "handedOff": "已交還 · 等待你操作",
       "handoffBanner": "你正在輸入 — 完成後點「交還」讓助手繼續",
       "handoffCta": "交還",
+      "queuedMsgs": "{{count}} 條訊息排隊 — 指令結束後自動發送",
+      "queuedMsgs_plural": "{{count}} 條訊息排隊 — 指令結束後自動發送",
       "sendCtrlC": "傳送 Ctrl-C",
       "continueWatching": "繼續觀察",
       "continueWatchingPrompt": "請繼續觀察終端輸出：用 terminal_read 輪詢並回報結果。",

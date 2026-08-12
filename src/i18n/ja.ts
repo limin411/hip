@@ -1836,6 +1836,8 @@ export const ja = {
       "handedOff": "ハンドオフ済み · あなたの操作待ち",
       "handoffBanner": "入力中です — 完了したら「ハンドバック」でアシスタントを再開",
       "handoffCta": "ハンドバック",
+      "queuedMsgs": "{{count}} 件のメッセージを待機中 — コマンド完了後に自動送信",
+      "queuedMsgs_plural": "{{count}} 件のメッセージを待機中 — コマンド完了後に自動送信",
       "sendCtrlC": "Ctrl-C を送信",
       "continueWatching": "監視を続ける",
       "continueWatchingPrompt": "ターミナルを監視し続け、terminal_read でポーリングして結果を報告してください。",

@@ -13,6 +13,7 @@ import { useDomainStore } from './sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { useTerminalAgentStore, HANDED_OFF_MAX_MS } from '@/store/terminalAgentStore'
+import { EXEC_QUEUE_TIMEOUT_MS } from './terminalAgentBridge'
 
 vi.mock('@/ipc/ssh', () => ({
   sshWrite: vi.fn(),
@@ -210,5 +211,92 @@ describe('terminal bridge handed-off state machine (PR-2, spec T2)', () => {
     await sleep(700)
     const result = sent.find((m) => m.type === 'session:uiToolResult')
     expect(result).toMatchObject({ status: 'handed_off_resumed', mayStillRun: true })
+  })
+})
+
+describe('terminal bridge exec queue (PR-3, spec T3)', () => {
+  beforeEach(() => {
+    vi.mocked(sshWrite).mockClear().mockResolvedValue(undefined as never)
+    useTerminalAgentStore.setState({ execFlightByTerminal: {}, execQueueByTerminal: {}, driverByTerminal: {} })
+    useTerminalStore.setState({ bySession: {}, userInterleaved: {} })
+    seedStores()
+    vi.useRealTimers()
+  })
+
+  it('a second exec waits in the FIFO and runs after the first completes', async () => {
+    const sent1: ClientMessage[] = []
+    handleTerminalBridgeMessage(
+      {
+        type: 'session:terminalExec:request',
+        sessionId: SESSION_ID,
+        callId: 'call-1',
+        command: 'df -h',
+        waitMs: 5000,
+        poll: true,
+      },
+      (m) => sent1.push(m),
+    )
+    await sleep(300)
+    // Second exec for the same terminal: must NOT error immediately.
+    const sent2: ClientMessage[] = []
+    handleTerminalBridgeMessage(
+      {
+        type: 'session:terminalExec:request',
+        sessionId: SESSION_ID,
+        callId: 'call-2',
+        command: 'uptime',
+        waitMs: 5000,
+        poll: true,
+      },
+      (m) => sent2.push(m),
+    )
+    await sleep(300)
+    expect(sent2.some((m) => m.type === 'session:uiToolResult')).toBe(false)
+    expect(useTerminalAgentStore.getState().execQueueByTerminal[TM_ID]?.length).toBe(1)
+    // First completes → second is dequeued and runs.
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(900)
+    expect(sent1.find((m) => m.type === 'session:uiToolResult')).toMatchObject({ status: 'completed' })
+    const written = vi.mocked(sshWrite).mock.calls.map((c) => c[1])
+    expect(written.some((w) => w.includes('uptime'))).toBe(true)
+    expect(useTerminalAgentStore.getState().execQueueByTerminal[TM_ID]?.length).toBe(0)
+  })
+
+  it('a queued request times out when the flight never frees', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const now = Date.now()
+    vi.setSystemTime(now)
+    const sent1: ClientMessage[] = []
+    handleTerminalBridgeMessage(
+      {
+        type: 'session:terminalExec:request',
+        sessionId: SESSION_ID,
+        callId: 'call-1',
+        command: 'tail -f /var/log/x.log',
+        waitMs: 120000,
+        poll: true,
+      },
+      (m) => sent1.push(m),
+    )
+    await sleep(300)
+    const sent2: ClientMessage[] = []
+    handleTerminalBridgeMessage(
+      {
+        type: 'session:terminalExec:request',
+        sessionId: SESSION_ID,
+        callId: 'call-2',
+        command: 'uptime',
+        waitMs: 5000,
+        poll: true,
+      },
+      (m) => sent2.push(m),
+    )
+    await sleep(300)
+    vi.setSystemTime(now + EXEC_QUEUE_TIMEOUT_MS + 1000)
+    await sleep(900)
+    const result = sent2.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'error' })
+    expect(result && 'error' in result ? String(result.error) : '').toMatch(/queued_timed_out/)
+    expect(useTerminalAgentStore.getState().execQueueByTerminal[TM_ID]?.length).toBe(0)
   })
 })

@@ -1853,6 +1853,8 @@ export const zhCN = {
         handedOff: '已交还 · 等待你操作',
         handoffBanner: '你正在输入 — 完成后点「交还」让助手继续',
         handoffCta: '交还',
+        queuedMsgs: '{{count}} 条消息排队 — 命令结束后自动发送',
+        queuedMsgs_plural: '{{count}} 条消息排队 — 命令结束后自动发送',
         sendCtrlC: '发送 Ctrl-C',
         continueWatching: '继续观察',
         continueWatchingPrompt: '请继续观察终端输出：用 terminal_read 轮询并汇报结果。',

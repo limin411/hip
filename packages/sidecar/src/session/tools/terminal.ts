@@ -176,6 +176,9 @@ export function buildTerminalTools(opts: TerminalToolOpts): StructuredToolInterf
         'STILL BE RUNNING — never claim success; poll terminal_read or ask the user. ' +
         'Interactive programs (vim/htop/passwd/ssh) may be launched, but the keyboard is ' +
         'handed to the user immediately — do not attempt to drive them. ' +
+        'Commands run one at a time per terminal: a second terminal_exec while one is running ' +
+        'queues (30s cap) instead of failing; a queued_timed_out error means the previous ' +
+        'command held the terminal — retry later or ask the user. ' +
         'Prefer non-interactive flags (-y, --noconfirm, DEBIAN_FRONTEND=noninteractive). ' +
         'Commands ending in exit/exec are incompatible with the fence (the marker never prints); set fence:false for them.',
       schema: z.object({

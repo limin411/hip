@@ -594,6 +594,8 @@ function CompactComposer({
   onStop,
   permissionMode,
   onSelectPermissionMode,
+  flightActive,
+  onQueueMessage,
 }: {
   sessionId: string
   disabled: boolean
@@ -601,6 +603,9 @@ function CompactComposer({
   onStop: () => void
   permissionMode: 'chat' | 'edit' | 'full'
   onSelectPermissionMode: (m: 'chat' | 'edit' | 'full') => void
+  /** Exec flight in progress: sends are queued instead of delivered (T3). */
+  flightActive: boolean
+  onQueueMessage: (text: string) => void
 }) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
@@ -620,6 +625,12 @@ function CompactComposer({
     const compactMatch = value.match(/^\/compact(?:\s+(.*))?$/)
     if (compactMatch) {
       runCompact(compactMatch[1]?.trim() || undefined)
+      return
+    }
+    if (flightActive) {
+      // Exec flight holds the terminal — queue the prompt, deliver on flight end (T3).
+      onQueueMessage(value)
+      setText('')
       return
     }
     sessionService.sendTerminalContext(sessionId)
@@ -739,6 +750,8 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
   )
   const activeSessionId = useTerminalAgentStore((s) => s.activeSessionByTerminal[terminalId])
   const flight = useTerminalAgentStore((s) => s.execFlightByTerminal[terminalId])
+  /** Messages queued while an exec flight held the terminal (T3, Warp-style). */
+  const [queuedMsgs, setQueuedMsgs] = useState<{ content: string; at: number }[]>([])
   const host = useTerminalHostStore((s) =>
     term?.hostId ? s.hosts.find((h) => h.id === term.hostId) : undefined,
   )
@@ -787,6 +800,18 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
     if (!atBottom) return
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [active?.id, active?.messages.length, atBottom])
+
+  // Deliver queued prompts as soon as the exec flight ends (T3).
+  const queuedCount = queuedMsgs.length
+  useEffect(() => {
+    if (flight || !active || queuedCount === 0) return
+    const batch = queuedMsgs
+    setQueuedMsgs([])
+    for (const m of batch) {
+      sessionService.sendTerminalContext(active.id)
+      sessionService.sendMessageToSession(active.id, m.content)
+    }
+  }, [flight, queuedCount, active])
 
   const onScroll = () => {
     const el = scrollRef.current
@@ -982,10 +1007,24 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
             </div>
           ) : null}
 
+          {queuedCount > 0 ? (
+            <div
+              className="flex shrink-0 items-center gap-2 px-3 text-meta text-warning"
+              data-testid="terminal-queued-msgs"
+            >
+              <span className="shrink-0">⏳</span>
+              <span className="min-w-0 flex-1">
+                {t('terminals.agent.queuedMsgs', { count: queuedCount })}
+              </span>
+            </div>
+          ) : null}
+
           <CompactComposer
             sessionId={active.id}
-            disabled={!!flight || Boolean(active.planApprovalPending)}
+            disabled={Boolean(active.planApprovalPending)}
             running={turnRunning}
+            flightActive={!!flight}
+            onQueueMessage={(text) => setQueuedMsgs((q) => [...q, { content: text, at: Date.now() }])}
             onStop={() => {
               // 打断输出：若有 exec flight，先结束桥接等待并向共享 PTY 发送 Ctrl-C；
               // 任何 running 状态都取消本轮 LLM turn（与主对话 Stop 对齐）。

@@ -24,6 +24,17 @@ export type TerminalDriver = 'user' | 'agent'
 
 export const HANDED_OFF_MAX_MS = 10 * 60 * 1000
 
+export interface QueuedExecRequest {
+  callId: string
+  sessionId: string
+  command: string
+  waitMs: number
+  poll: boolean
+  wrapEc?: boolean
+  fence?: boolean
+  queuedAt: number
+}
+
 interface TerminalAgentStore {
   /** Active agent session per `tm_*` (right-rail Agent tab shows this). */
   activeSessionByTerminal: Record<string, string | null>
@@ -31,6 +42,8 @@ interface TerminalAgentStore {
   sidebarExpanded: Record<string, boolean>
   /** Per-tm single-flight exec lock. */
   execFlightByTerminal: Record<string, TerminalExecFlight | null>
+  /** Per-tm FIFO of exec requests waiting for the single flight (T3). */
+  execQueueByTerminal: Record<string, QueuedExecRequest[]>
   /** Who owns the keyboard per `tm_*` (T2 one-driver). */
   driverByTerminal: Record<string, TerminalDriver>
 
@@ -38,6 +51,8 @@ interface TerminalAgentStore {
   setSidebarExpanded: (terminalId: string, expanded: boolean) => void
   toggleSidebarExpanded: (terminalId: string) => void
   setExecFlight: (terminalId: string, flight: TerminalExecFlight | null) => void
+  enqueueExec: (terminalId: string, req: QueuedExecRequest) => void
+  dequeueExec: (terminalId: string, callId: string) => void
   /** Keyboard ownership flips (T2): bridge flips to user on handed_off. */
   setDriver: (terminalId: string, driver: TerminalDriver) => void
   /** User hands the keyboard back: phase → resumed, deadline extended by the pause. */
@@ -61,6 +76,7 @@ export const useTerminalAgentStore = create<TerminalAgentStore>((set, get) => ({
   activeSessionByTerminal: {},
   sidebarExpanded: {},
   execFlightByTerminal: {},
+  execQueueByTerminal: {},
   driverByTerminal: {},
 
   setActiveSession: (terminalId, sessionId) =>
@@ -97,6 +113,22 @@ export const useTerminalAgentStore = create<TerminalAgentStore>((set, get) => ({
       driverByTerminal: {
         ...s.driverByTerminal,
         [terminalId]: flight ? 'agent' : 'user',
+      },
+    })),
+
+  enqueueExec: (terminalId, req) =>
+    set((s) => ({
+      execQueueByTerminal: {
+        ...s.execQueueByTerminal,
+        [terminalId]: [...(s.execQueueByTerminal[terminalId] ?? []), req],
+      },
+    })),
+
+  dequeueExec: (terminalId, callId) =>
+    set((s) => ({
+      execQueueByTerminal: {
+        ...s.execQueueByTerminal,
+        [terminalId]: (s.execQueueByTerminal[terminalId] ?? []).filter((q) => q.callId !== callId),
       },
     })),
 

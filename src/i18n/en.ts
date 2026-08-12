@@ -1896,6 +1896,8 @@ export const en = {
         handedOff: 'Handed over · waiting on you',
         handoffBanner: 'You are typing — press “Hand back” when done so the agent can continue',
         handoffCta: 'Hand back',
+        queuedMsgs: '{{count}} message queued — will send when the command finishes',
+        queuedMsgs_plural: '{{count}} messages queued — will send when the command finishes',
         sendCtrlC: 'Send Ctrl-C',
         continueWatching: 'Keep watching',
         continueWatchingPrompt:

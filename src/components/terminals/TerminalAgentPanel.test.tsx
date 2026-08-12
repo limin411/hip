@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import type { Message } from '@hip/protocol'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
@@ -387,6 +387,43 @@ describe('TerminalAgentPanel tool card collapsing', () => {
 
     resumeSpy.mockRestore()
     useTerminalAgentStore.setState({ execFlightByTerminal: {}, driverByTerminal: {} })
+    unmount()
+  })
+
+  it('queues user prompts while an exec flight runs and delivers them when it ends', async () => {
+    useTerminalAgentStore.setState({
+      execFlightByTerminal: {
+        tm_1: {
+          callId: 'c1',
+          sessionId: 'ta_1',
+          command: 'npm run build',
+          startedAt: Date.now(),
+          deadline: Date.now() + 120000,
+          phase: 'running',
+        },
+      },
+    })
+    const sendSpy = vi.spyOn(sessionService, 'sendMessageToSession').mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    const input = screen.getByTestId('terminal-composer-input')
+
+    fireEvent.change(input, { target: { value: '顺便把 CHANGELOG 更新了' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    // Queued, not delivered: chip visible, sidecar untouched.
+    expect(screen.getByTestId('terminal-queued-msgs')).toBeInTheDocument()
+    expect(sendSpy).not.toHaveBeenCalled()
+    expect(input).toHaveValue('')
+
+    // Flight ends → queued prompt is delivered automatically.
+    useTerminalAgentStore.setState({ execFlightByTerminal: { tm_1: null } })
+    await waitFor(() =>
+      expect(sendSpy).toHaveBeenCalledWith('ta_1', '顺便把 CHANGELOG 更新了'),
+    )
+    expect(screen.queryByTestId('terminal-queued-msgs')).not.toBeInTheDocument()
+
+    sendSpy.mockRestore()
+    useTerminalAgentStore.setState({ execFlightByTerminal: {} })
     unmount()
   })
 

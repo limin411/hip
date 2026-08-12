@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>hip 视觉与动效提升 · 高保真预览（参考 beautifului.dev）</title>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   hip 令牌（与 src/styles/tokens.css 对齐的预览子集）
+   左侧「现状」= 当前 Flat Solid；右侧「提案」= 采纳 bui 思路后的降级映射
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F6F5F3; --bg-muted:#f1f1f1;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --ink:#111111; --ink-2:#5e5e5e; --ink-3:#757575;
+  --accent:#c2410c; --accent-strong:#7c2d12; --accent-subtle:#f0f0f0; --accent-active:#e6e6e6;
+  --on-accent:#fff; --btn-primary:#3a3a3a;
+  --success:#2f7d40; --danger:#c63b3b; --warning:#9a5d10;
+  --dur-chrome:100ms; --dur-content:120ms; --dur-stream:240ms; --dur-expand:300ms;
+  --ease:cubic-bezier(.2,0,0,1);
+  --font:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Consolas,monospace;
+}
+html.dark{
+  --bg-app:#121212; --bg-subtle:#181818; --bg-muted:#1f1f1f;
+  --border:#2e2e2e; --border-strong:#3e3e3e;
+  --ink:#f0f0f0; --ink-2:#a3a3a3; --ink-3:#7a7a7a;
+  --accent:#ffb300; --accent-strong:#ffcc80; --accent-subtle:#222; --accent-active:#2e2e2e;
+  --on-accent:#111; --btn-primary:#d4d4d4;
+  --success:#4caf50; --danger:#ff5252; --warning:#ffb74d;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);font-size:13px;line-height:1.7;color:var(--ink);background:var(--bg-app);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.mono{font-family:var(--mono)}
+.tabular{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── 预览页 chrome ─────────────────────────────────────── */
+.hero{padding:32px 40px 16px;max-width:1180px;margin:0 auto}
+.hero h1{font-size:20px;line-height:1.3;margin:0 0 4px}
+.hero .sub{color:var(--ink-2);font-size:13px;max-width:760px}
+.hero .tags{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.tag{font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);color:var(--ink-2);background:var(--bg-subtle)}
+.tag.new{border-color:var(--accent);color:var(--accent)}
+.legend{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--ink-3);flex-wrap:wrap}
+.legend b{color:var(--ink-2);font-weight:500}
+.theme-btn{position:fixed;top:18px;right:24px;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-subtle);color:var(--ink-2);transition:background-color var(--dur-chrome),color var(--dur-chrome)}
+.theme-btn:hover{background:var(--accent-subtle);color:var(--ink)}
+
+/* ── 对照面板 ─────────────────────────────────────────── */
+section.cmp{max-width:1180px;margin:28px auto 0;padding:0 40px}
+.cmp-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.cmp-head h2{font-size:15px;margin:0}
+.cmp-head .n{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.cmp-head .ref{font-size:11px;color:var(--ink-3)}
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.panel{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-app);display:flex;flex-direction:column;min-height:100%}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--bg-subtle);font-size:12px;color:var(--ink-2);font-weight:500}
+.panel-head .st{font-size:10px;padding:1px 7px;border-radius:6px;font-weight:500}
+.st-before{background:var(--bg-muted);color:var(--ink-3)}
+.st-after{background:var(--accent);color:var(--on-accent)}
+.panel-body{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:200px;background:var(--bg-app)}
+.panel-body.centered{justify-content:center}
+.play-row{display:flex;align-items:center;gap:10px;margin:10px 0 0;padding:0 40px;max-width:1180px}
+.play-btn{height:28px;padding:0 14px;border-radius:6px;background:var(--btn-primary);color:var(--bg-app);font-size:12px;font-weight:500;transition:background-color var(--dur-chrome)}
+html.dark .play-btn{color:var(--on-accent)}
+.play-btn:hover{filter:brightness(1.12)}
+.note{font-size:11px;color:var(--ink-3);margin-left:auto}
+
+/* ── 通用原子 ─────────────────────────────────────────── */
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes chunk-in{from{opacity:0}to{opacity:1}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes wave{0%,100%{opacity:.12}50%{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* 词块浮现（P0-1：纯 opacity，240ms） */
+.chunk{display:inline;animation:chunk-in var(--dur-stream) var(--ease) both}
+.caret{display:inline-block;width:2px;height:13px;margin-left:1px;vertical-align:-2px;border-radius:999px;background:var(--accent);animation:blink 1.1s step-end infinite}
+
+/* 展开（P0-2：grid-rows 例外 + 内部 stagger） */
+.clip{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows var(--dur-expand) var(--ease),opacity var(--dur-expand) var(--ease)}
+.is-open .clip{grid-template-rows:1fr;opacity:1}
+.clip-inner{overflow:hidden;min-height:0}
+.stagger>*{animation:fade-in 240ms var(--ease) both;animation-delay:calc(var(--i,0)*40ms)}
+.stagger.done>*{animation-delay:0ms}
+
+/* 状态行（P0-4：等宽计时 + 图标交叉过渡） */
+.statline{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2);min-height:22px}
+.ic-wrap{position:relative;width:14px;height:14px;flex-shrink:0}
+.ic-wrap .ic{position:absolute;inset:0;transition:opacity var(--dur-content) var(--ease)}
+.ic-wrap .ic.off{opacity:0}
+.spinner{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--border-strong);border-top-color:var(--accent);animation:spin .7s linear infinite}
+.check{color:var(--success)}
+.secs{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-3)}
+.label-dim{transition:color 300ms var(--ease)}
+.is-done .label-dim{color:var(--ink-3)}
+.timer{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-3);min-width:44px}
+
+/* 工具行（P0-3：hover 反馈 + chevron 交叉 + 明细展开） */
+.toolrow{display:flex;align-items:center;gap:8px;width:100%;border-radius:6px;padding:3px 8px;text-align:left;transition:background-color var(--dur-chrome)}
+.toolrow:hover,.toolrow.is-open{background:var(--accent-subtle)}
+.toolrow .t-main{font-size:12px;font-weight:500;color:var(--ink);white-space:nowrap}
+.toolrow .t-chip{flex:1;min-width:0;height:20px;display:inline-flex;align-items:center;gap:6px;padding:0 7px;border-radius:6px;background:var(--bg-subtle);border:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--ink-2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:border-color var(--dur-chrome),color var(--dur-chrome)}
+.toolrow:hover .t-chip{border-color:var(--border-strong);color:var(--ink)}
+.toolrow .t-chev{opacity:0;transition:opacity 150ms var(--ease);color:var(--ink-3);display:flex}
+.toolrow:hover .t-chev,.toolrow.is-open .t-chev{opacity:1}
+.toolrow.is-open .t-chev{transform:rotate(90deg)}
+.toolrow .clip{flex:1 0 100%;order:9}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--accent);animation:pulse 1.4s ease-in-out infinite}
+.dot.done{background:var(--success);animation:none}
+.row-detail{font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--ink-2);padding:6px 10px 8px 26px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--border);margin-left:11px}
+.add{color:var(--success)} .del{color:var(--danger)}
+.diff-chip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-subtle);font-family:var(--mono);font-size:11px;color:var(--ink-2);white-space:nowrap}
+.diff-chip .add{font-weight:600}.diff-chip .del{font-weight:600}
+.diff-row{display:flex;gap:6px;flex-wrap:wrap}
+
+/* 点阵加载（P1-3：3×3 纯 opacity 相位波纹） */
+.px-grid{display:grid;grid-template-columns:repeat(3,4px);gap:2px;flex-shrink:0}
+.px-grid i{width:4px;height:4px;border-radius:1px;background:var(--ink);animation:wave .7s linear infinite}
+.px-grid i:nth-child(2){animation-delay:80ms}.px-grid i:nth-child(3){animation-delay:160ms}
+.px-grid i:nth-child(4){animation-delay:240ms}.px-grid i:nth-child(5){animation-delay:320ms}
+.px-grid i:nth-child(6){animation-delay:400ms}.px-grid i:nth-child(7){animation-delay:480ms}
+.px-grid i:nth-child(8){animation-delay:560ms}.px-grid i:nth-child(9){animation-delay:640ms}
+
+/* Composer（P1-2） */
+.composer{border:1px solid var(--border);border-radius:10px;background:var(--bg-app);padding:10px 12px;display:flex;flex-direction:column;gap:8px;transition:border-color 150ms var(--ease)}
+.composer:focus-within{border-color:var(--border-strong)}
+.composer textarea{border:0;outline:none;resize:none;background:transparent;font-family:inherit;font-size:13px;line-height:1.5;color:var(--ink);width:100%;height:40px}
+.composer textarea::placeholder{color:var(--ink-3)}
+.send-row{display:flex;justify-content:space-between;align-items:center}
+.send{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:var(--btn-primary);color:var(--bg-app);opacity:.35;transition:opacity 150ms var(--ease);cursor:default}
+html.dark .send{color:var(--on-accent)}
+.send.on{opacity:1;cursor:pointer}
+.send.on:hover{filter:brightness(1.12)}
+.chip-enter{animation:fade-in var(--dur-content) var(--ease) both}
+.quote-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;height:22px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-subtle);font-size:11px;color:var(--ink-2)}
+.quote-chip .x{color:var(--ink-3);padding:0 2px}
+.quote-chip .x:hover{color:var(--danger)}
+
+/* 现状面板：硬切（无过渡） */
+.before .composer{border:1px solid var(--border)}
+.before .composer:focus-within{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px}
+.before .clip{display:block;opacity:1;transition:none}
+.before .stagger>*{animation:none}
+.before .ic-wrap .ic{transition:none}
+.before .send{transition:none}
+.before .toolrow:hover{background:none}
+.before .toolrow .t-chev{display:none}
+.before .px-grid{display:none}
+.before .timer{min-width:0}
+
+/* 聊天 mock（整窗整合预览） */
+.app{display:flex;height:560px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-app)}
+.sidebar{width:232px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg-subtle);display:flex;flex-direction:column}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg-app)}
+.sb-head{height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600}
+.lights{display:flex;gap:6px}
+.lights i{width:10px;height:10px;border-radius:50%}
+.lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.sb-nav{padding:8px;display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--border)}
+.sb-nav span{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:6px;font-size:12px;color:var(--ink-2)}
+.sb-nav span.active{background:var(--accent-active);color:var(--ink);font-weight:500}
+.sb-list{flex:1;overflow:hidden;padding:8px}
+.sb-group{font-size:10px;color:var(--ink-3);padding:8px 10px 4px;letter-spacing:.04em}
+.sb-item{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:6px;font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:fade-in 240ms var(--ease) both;animation-delay:calc(var(--i,0)*12ms)}
+.sb-item.active{background:var(--accent-active);color:var(--ink);font-weight:500}
+.sb-item .cnt{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+.sb-foot{border-top:1px solid var(--border);padding:6px 8px;display:flex;gap:2px}
+.sb-foot span{flex:1;text-align:center;padding:5px 0;border-radius:6px;font-size:12px;color:var(--ink-3)}
+.sb-foot span:hover{background:var(--accent-subtle);color:var(--ink-2)}
+.toolbar{height:40px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.toolbar .t-title{font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toolbar .conn{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--success);border:1px solid var(--border);border-radius:6px;padding:1px 7px;background:var(--bg-subtle)}
+.toolbar .conn i{width:5px;height:5px;border-radius:50%;background:var(--success)}
+.toolbar .sp{margin-left:auto;display:flex;gap:6px}
+.toolbar .sp button{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+.toolbar .sp button:hover{background:var(--accent-subtle);color:var(--ink-2)}
+.chat{flex:1;overflow-y:auto;padding:18px 24px 12px;display:flex;flex-direction:column;gap:16px;max-width:760px;margin:0 auto;width:100%}
+.msg-user{align-self:flex-end;max-width:72%;background:var(--bg-muted);border-radius:10px;padding:7px 12px;font-size:13px;animation:fade-in var(--dur-content) var(--ease) both}
+.msg-agent{width:100%;display:flex;flex-direction:column;gap:8px}
+.meta-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);font-weight:500}
+.meta-row .who{color:var(--ink)}
+.agent-text{font-size:13px;line-height:1.7;color:var(--ink);min-height:20px}
+.actions{display:flex;gap:4px;margin-top:2px;animation:fade-in var(--dur-content) var(--ease) both}
+.actions button{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+.actions button:hover{background:var(--accent-subtle);color:var(--ink-2)}
+.tool-strip{display:flex;flex-direction:column;gap:2px;border:1px solid var(--border);border-radius:10px;padding:6px;background:var(--bg-app)}
+.tool-strip-head{font-size:11px;color:var(--ink-3);padding:2px 8px 4px;display:flex;justify-content:space-between}
+.composer-wrap{padding:0 24px 14px;max-width:760px;margin:0 auto;width:100%;flex-shrink:0}
+.thinking{margin:0 -8px;padding:4px 8px;border-radius:8px;transition:background-color var(--dur-chrome)}
+.thinking:hover{background:var(--bg-subtle)}
+.thinking-head{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer}
+.thinking-head .chev{color:var(--ink-3);display:flex;transition:transform 200ms var(--ease)}
+.is-open .thinking-head .chev{transform:rotate(90deg)}
+.th-label{font-size:12px;font-weight:500;white-space:nowrap}
+.rail{border-left:1px solid var(--border);margin-left:5px;padding:2px 0 2px 14px;display:flex;flex-direction:column;gap:3px}
+.rail .step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2);min-height:26px;animation:fade-in 240ms var(--ease) both;animation-delay:calc(var(--i,0)*40ms)}
+.rail .step .s-ic{width:14px;display:flex;justify-content:center;color:var(--ink-3)}
+.rail .step b{font-weight:500;color:var(--ink)}
+.rail .step .s-chip{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+.demo-ctl{max-width:1180px;margin:14px auto 0;padding:0 40px;display:flex;align-items:center;gap:10px}
+#replayFull{height:30px;padding:0 16px;border-radius:6px;background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:500;transition:background-color var(--dur-chrome)}
+#replayFull:hover{background:var(--accent-strong)}
+footer{max-width:1180px;margin:34px auto 60px;padding:0 40px;font-size:11px;color:var(--ink-3);line-height:1.8}
+footer a{color:var(--ink-2)}
+@media (max-width:960px){.cmp-grid{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+<script>
+try{var t=localStorage.getItem('bui-preview-theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>hip 视觉与动效提升 · 高保真预览</h1>
+  <p class="sub">参考 <b>beautifului.dev</b>（19 个 AI 原生组件）的「进程可视化语言 / 微时刻反馈 / 信息纹理」，按 hip 现有设计哲学（Flat Solid、纯 fade、无阴影渐变）降级映射后的方案对照。左侧为<b>现状</b>，右侧为<b>提案</b>；每项可点「播放对比」。</p>
+  <div class="tags">
+    <span class="tag new">P0-1 词块浮现</span><span class="tag new">P0-2 轨迹展开</span><span class="tag new">P0-3 工具行展开</span><span class="tag new">P0-4 等宽计时</span>
+    <span class="tag new">P1-1 动作浮现</span><span class="tag new">P1-2 Composer 微反馈</span><span class="tag new">P1-3 点阵加载</span><span class="tag new">P1-4 列表 stagger</span>
+    <span class="tag">不采纳：阴影 / shimmer / blur / 缩放 / 渐变</span>
+  </div>
+  <div class="legend">
+    <span><b>原则</b>：全部新动效 = 纯 opacity / 背景色过渡，≤300ms</span>
+    <span><b>例外①</b> grid-rows 高度展开（无位移）</span>
+    <span><b>例外②</b> 词块 opacity 浮现 240ms</span>
+    <span><b>配套</b>：spec 见 <code>ui-enhancement-bui-spec.md</code></span>
+  </div>
+</header>
+<button class="theme-btn" id="themeBtn" title="切换主题">◐ 主题</button>
+
+<!-- ═══ P0-1 流式文本 ═══ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>P0-1 流式文本词块浮现</h2><span class="n">bui 03 · streaming-text</span></div>
+  <div class="cmp-grid">
+    <div class="panel before">
+      <div class="panel-head"><span>现状 — 整段插入 + 光标</span><span class="st st-before">硬切</span></div>
+      <div class="panel-body"><div class="agent-text" id="p1Before"></div></div>
+    </div>
+    <div class="panel after">
+      <div class="panel-head"><span>提案 — 词块 opacity 浮现（240ms）+ 动作行浮现</span><span class="st st-after">P0-1 / P1-1</span></div>
+      <div class="panel-body">
+        <div class="agent-text" id="p1After"></div>
+        <div class="actions" id="p1Actions" style="display:none">
+          <button title="复制">⧉</button><button title="重新生成">↻</button><button title="更多">⋯</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="play-row"><button class="play-btn" data-replay="p1">播放对比</button><span class="note">发送 → 文本逐块浮现，光标随之移动；完成后动作行淡入</span></div>
+</section>
+
+<!-- ═══ P0-2 思考轨迹 ═══ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>P0-2 思考轨迹展开动效</h2><span class="n">bui 02 · thinking-state</span></div>
+  <div class="cmp-grid">
+    <div class="panel before">
+      <div class="panel-head"><span>现状 — 条件渲染硬切展开</span><span class="st st-before">无动画</span></div>
+      <div class="panel-body">
+        <div class="thinking is-open" id="p2Before">
+          <div class="thinking-head"><span class="chev">›</span><span class="th-label label-dim">推理中 · 8s</span></div>
+          <div class="clip"><div class="clip-inner"><div class="rail">
+            <div class="step"><span class="s-ic">📄</span><b>读取 store 白名单</b><span class="s-chip">deps.ts</span></div>
+            <div class="step"><span class="s-ic">📄</span><b>检查 closure 捕获点</b><span class="s-chip">3 处</span></div>
+            <div class="step"><span class="s-ic">✏️</span><b>修改 sessionActions</b><span class="s-chip">+12 −4</span></div>
+          </div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel after">
+      <div class="panel-head"><span>提案 — grid-rows 平滑展开 + 行 stagger + 完成交叉过渡</span><span class="st st-after">P0-2</span></div>
+      <div class="panel-body">
+        <div class="thinking" id="p2After">
+          <div class="thinking-head"><span class="chev">›</span><span class="th-label label-dim">推理中 · <span class="secs" id="p2Secs">8s</span></span></div>
+          <div class="clip"><div class="clip-inner"><div class="rail">
+            <div class="step" style="--i:0"><span class="s-ic">📄</span><b>读取 store 白名单</b><span class="s-chip">deps.ts</span></div>
+            <div class="step" style="--i:1"><span class="s-ic">📄</span><b>检查 closure 捕获点</b><span class="s-chip">3 处</span></div>
+            <div class="step" style="--i:2"><span class="s-ic">✏️</span><b>修改 sessionActions</b><span class="s-chip">+12 −4</span></div>
+          </div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="play-row"><button class="play-btn" data-replay="p2">播放对比</button><span class="note">自动展开 → 完成：spinner→✓ 交叉过渡 + 标签降级</span></div>
+</section>
+
+<!-- ═══ P0-3 工具调用行 ═══ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>P0-3 工具调用行 chip 化 + hover 展开</h2><span class="n">bui 05 · tool-chips / 11 · diff-table</span></div>
+  <div class="cmp-grid">
+    <div class="panel before">
+      <div class="panel-head"><span>现状 — 静态行，无 hover / 不可展开</span><span class="st st-before">只读</span></div>
+      <div class="panel-body">
+        <div class="tool-strip"><div class="tool-strip-head"><span>运行中任务</span><span>2</span></div>
+          <div class="toolrow"><span class="dot"></span><span class="t-main">check:store-deps</span><span class="t-chip">yarn check:store-deps</span></div>
+          <div class="toolrow"><span class="dot"></span><span class="t-main">tsc</span><span class="t-chip">yarn tsc</span></div>
+          <div class="toolrow"><span class="dot done"></span><span class="t-main">单元测试</span><span class="t-chip">yarn test --store</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel after">
+      <div class="panel-head"><span>提案 — hover 底色 + chevron 显露 + 点击展开明细（+N/−N 色差）</span><span class="st st-after">P0-3</span></div>
+      <div class="panel-body">
+        <div class="tool-strip"><div class="tool-strip-head"><span>运行中任务</span><span>2</span></div>
+          <div class="toolrow is-open" id="p3Row1">
+            <span class="dot"></span><span class="t-main">check:store-deps</span><span class="t-chip">yarn check:store-deps</span><span class="t-chev">⌄</span>
+            <div class="clip"><div class="clip-inner"><div class="row-detail">
+              <span><span class="add">✓</span> 依赖图通过 · 0.8s</span>
+              <span>白名单命中 <span class="add">+2</span> 条 / <span class="del">−1</span> 条越界</span>
+            </div></div></div>
+          </div>
+          <div class="toolrow" id="p3Row2">
+            <span class="dot"></span><span class="t-main">tsc</span><span class="t-chip">yarn tsc</span><span class="t-chev">⌄</span>
+            <div class="clip"><div class="clip-inner"><div class="row-detail">
+              <span><span class="add">✓</span> 编译通过 · 3.2s</span>
+            </div></div></div>
+          </div>
+          <div class="toolrow" id="p3Row3">
+            <span class="dot done"></span><span class="t-main">单元测试</span><span class="t-chip">yarn test --store</span><span class="t-chev">⌄</span>
+            <div class="clip"><div class="clip-inner"><div class="row-detail">
+              <span><span class="add">✓</span> 34 passed · 2.1s</span>
+            </div></div></div>
+          </div>
+        </div>
+        <div class="diff-row" id="p3Diffs" style="display:none">
+          <span class="diff-chip">sessionActions.ts <span class="add">+12</span><span class="del">−4</span></span>
+          <span class="diff-chip">sessionService.ts <span class="add">+6</span><span class="del">−2</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="play-row"><button class="play-btn" data-replay="p3">播放对比</button><span class="note">右侧 hover / 点击各行体验展开；完成后 diff chips 淡入</span></div>
+</section>
+
+<!-- ═══ P0-4 状态行计时 ═══ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>P0-4 回合状态行：等宽计时 + 交叉过渡</h2><span class="n">bui 01 · loading-state</span></div>
+  <div class="cmp-grid">
+    <div class="panel before">
+      <div class="panel-head"><span>现状 — spinner + 文案 + 静态时长，完成硬切</span><span class="st st-before">硬切</span></div>
+      <div class="panel-body centered">
+        <div class="statline" id="p4Before"><div class="ic-wrap"><span class="ic spinner"></span><span class="ic check off">✓</span></div><span class="label-dim">正在执行 3 项工具调用</span><span class="timer">7s</span></div>
+      </div>
+    </div>
+    <div class="panel after">
+      <div class="panel-head"><span>提案 — mono tabular 实时计时 + 图标交叉 + 标签降级</span><span class="st st-after">P0-4</span></div>
+      <div class="panel-body centered">
+        <div class="statline" id="p4After"><div class="ic-wrap"><span class="ic spinner"></span><span class="ic check off">✓</span></div><span class="label-dim">正在执行 3 项工具调用</span><span class="timer" id="p4Timer">0:07</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="play-row"><button class="play-btn" data-replay="p4">播放对比</button><span class="note">左侧时长静止且完成即换图标；右侧数字跳动、完成时 120ms 交叉过渡</span></div>
+</section>
+
+<!-- ═══ P1-2 Composer ═══ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>P1-2 Composer 交互微反馈</h2><span class="n">bui 07 · chat-composer</span></div>
+  <div class="cmp-grid">
+    <div class="panel before">
+      <div class="panel-head"><span>现状 — focus 硬描边、chip 硬切</span><span class="st st-before">硬切</span></div>
+      <div class="panel-body centered">
+        <div class="composer">
+          <textarea id="p5BeforeInput" placeholder="输入指令，或 @ 提及文件…"></textarea>
+          <div class="send-row"><span style="font-size:11px;color:var(--ink-3)">⌘⏎ 发送</span><span class="send">↑</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel after">
+      <div class="panel-head"><span>提案 — focus-within 边框加深 150ms + 发送按钮 fill 过渡 + chip 淡入</span><span class="st st-after">P1-2</span></div>
+      <div class="panel-body centered">
+        <div class="composer" id="p5Composer">
+          <div class="quote-chip chip-enter" id="p5Quote" style="display:none"><span>引用：修复 check:store-deps 误报…</span><span class="x">✕</span></div>
+          <textarea id="p5AfterInput" placeholder="输入指令，或 @ 提及文件…"></textarea>
+          <div class="send-row"><span style="font-size:11px;color:var(--ink-3)">⌘⏎ 发送</span><span class="send" id="p5Send">↑</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="play-row"><button class="play-btn" data-replay="p5">播放对比</button><span class="note">分别点击两侧输入框看焦点反馈；播放时出现引用 chip 并点亮发送按钮</span></div>
+</section>
+
+<!-- ═══ P1-3 加载态 ═══ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>P1-3 后台任务加载态：点阵波纹 + 等宽计时</h2><span class="n">bui 01 · loading-state</span></div>
+  <div class="cmp-grid">
+    <div class="panel before">
+      <div class="panel-head"><span>现状 — 居中 spinner + 文案</span><span class="st st-before">通用</span></div>
+      <div class="panel-body centered"><div style="display:flex;align-items:center;gap:10px"><span class="spinner"></span><span style="font-size:13px;font-weight:500">正在连接 sidecar…</span></div></div>
+    </div>
+    <div class="panel after">
+      <div class="panel-head"><span>提案 — 3×3 点阵波纹（纯 opacity 相位差）+ 等宽计时</span><span class="st st-after">P1-3</span></div>
+      <div class="panel-body centered">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="px-grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span style="font-size:13px;font-weight:500">正在连接 sidecar…</span>
+          <span class="timer" id="p6Timer">0:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="play-row"><button class="play-btn" data-replay="p6">播放对比</button><span class="note">点阵波纹 700ms 周期纯 opacity 循环，reduced-motion 下冻结</span></div>
+</section>
+
+<!-- ═══ 整窗整合预览 ═══ -->
+<section class="cmp" style="margin-top:44px">
+  <div class="cmp-head"><h2>整窗整合预览 · 一次回合的完整流程</h2><span class="n">P0 + P1 全部叠加</span></div>
+  <div class="app" id="app">
+    <aside class="sidebar">
+      <div class="sb-head"><span class="lights"><i></i><i></i><i></i></span><span>HIP</span><span style="margin-left:auto;font-size:10px;color:var(--ink-3);font-family:var(--mono)">v0.9</span></div>
+      <div class="sb-nav"><span class="active">💬 会话</span><span>🗂 项目</span><span>📚 知识库</span><span>⌨ 终端</span></div>
+      <div class="sb-list">
+        <div class="sb-group">今天</div>
+        <div class="sb-item active" style="--i:0">修复 store 依赖纪律<span class="cnt">2</span></div>
+        <div class="sb-item" style="--i:1">知识库表格排序<span class="cnt">1</span></div>
+        <div class="sb-group">昨天</div>
+        <div class="sb-item" style="--i:2">终端共享 PTY 整改</div>
+        <div class="sb-item" style="--i:3">文档域 Notion 化</div>
+      </div>
+      <div class="sb-foot"><span>🗑</span><span>🕘</span><span>⚙</span></div>
+    </aside>
+    <div class="main">
+      <div class="toolbar">
+        <span class="t-title">修复 store 依赖纪律</span>
+        <span class="conn"><i></i>已连接</span>
+        <span class="sp"><button title="面板">▤</button><button title="更多">⋯</button></span>
+      </div>
+      <div class="chat" id="chat">
+        <div class="msg-user" id="chatUser">继续修复 check:store-deps 的误报路径，然后跑一遍 tsc 确认全绿。</div>
+        <div class="msg-agent">
+          <div class="meta-row" id="chatMeta"><span class="who">hip</span><span style="color:var(--ink-3);font-weight:400">· 推理中</span></div>
+          <div class="thinking" id="chatThinking">
+            <div class="thinking-head">
+              <span class="chev">›</span>
+              <span class="th-label label-dim">推理中 · <span class="secs" id="chatSecs">0s</span></span>
+            </div>
+            <div class="clip"><div class="clip-inner"><div class="rail">
+              <div class="step" style="--i:0"><span class="s-ic">📄</span><b>读取 store 依赖白名单</b><span class="s-chip">deps.ts</span></div>
+              <div class="step" style="--i:1"><span class="s-ic">📄</span><b>检查 closure 捕获点</b><span class="s-chip">sessionService.ts</span></div>
+              <div class="step" style="--i:2"><span class="s-ic">✏️</span><b>参数注入改造</b><span class="s-chip">+12 −4</span></div>
+            </div></div></div>
+          </div>
+          <div class="tool-strip" id="chatTools" style="display:none">
+            <div class="tool-strip-head"><span>运行中任务</span><span id="chatToolCount">2</span></div>
+            <div class="toolrow" id="chatTool1"><span class="dot"></span><span class="t-main">check:store-deps</span><span class="t-chip">yarn check:store-deps</span><span class="t-chev">⌄</span></div>
+            <div class="toolrow" id="chatTool2"><span class="dot"></span><span class="t-main">tsc</span><span class="t-chip">yarn tsc</span><span class="t-chev">⌄</span></div>
+          </div>
+          <div class="agent-text" id="chatText"></div>
+          <div class="actions" id="chatActions" style="display:none">
+            <button title="复制">⧉</button><button title="重新生成">↻</button><button title="引用">❝</button><button title="更多">⋯</button>
+          </div>
+        </div>
+      </div>
+      <div class="composer-wrap">
+        <div class="composer">
+          <textarea placeholder="输入指令，或 @ 提及文件…"></textarea>
+          <div class="send-row">
+            <span style="display:flex;gap:6px;align-items:center">
+              <span class="quote-chip chip-enter" style="display:none" id="chatQuote">引用：修复 check:store-deps 误报…<span class="x">✕</span></span>
+            </span>
+            <span class="send on">↑</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="demo-ctl">
+    <button id="replayFull">▶ 重播完整回合</button>
+    <span style="font-size:11px;color:var(--ink-3)">自动演示：列表 stagger → 用户消息 → 思考轨迹展开 → 工具行 → 词块流式 → 动作行浮现</span>
+  </div>
+</section>
+
+<footer>
+  本页为 <b>docs/design/ui-enhancement-bui</b> 系列的高保真预览，仅演示提案效果，未合入产品代码。详细差距诊断、实施计划与验收标准见
+  <a href="ui-enhancement-bui-spec.md">ui-enhancement-bui-spec.md</a>。所有新动效遵守 hip 动效原则：纯 opacity / 背景色过渡；grid-rows 高度展开与词块浮现为明示例外；<code>prefers-reduced-motion</code> 全局兜底。
+</footer>
+
+<script>
+/* ═══════════ 工具 ═══════════ */
+var $ = function (id) { return document.getElementById(id) }
+function clearTimers(list) { while (list.length) { clearTimeout(list.pop()); clearInterval(list.pop()) } }
+function after(ms, fn, list) { var t = setTimeout(fn, ms); list.push(t); return t }
+
+/* 流式文本：chunk 逐个 fade-in（纯 opacity），光标跟随 */
+function streamInto(el, text, list, opts) {
+  opts = opts || {}
+  var chunk = opts.chunk || 4, gap = opts.gap || 70
+  el.textContent = ''
+  var caret = document.createElement('span'); caret.className = 'caret'
+  el.appendChild(caret)
+  var i = 0
+  var t = setInterval(function () {
+    if (i >= text.length) { clearInterval(t); caret.remove(); if (opts.done) opts.done(); return }
+    var s = document.createElement('span'); s.className = 'chunk'
+    s.textContent = text.slice(i, i + chunk); i += chunk
+    el.insertBefore(s, caret)
+  }, gap)
+  list.push(t)
+}
+
+/* 计时器（mono tabular） */
+function startTimer(el, list, doneAt) {
+  var t0 = Date.now()
+  var t = setInterval(function () {
+    var s = Math.max(0, Math.floor((Date.now() - t0) / 1000))
+    if (doneAt != null && s >= doneAt) { clearInterval(t); return }
+    var m = Math.floor(s / 60), r = s % 60
+    el.textContent = m + ':' + (r < 10 ? '0' : '') + r
+  }, 200)
+  list.push(t)
+}
+
+/* 图标交叉过渡 */
+function swapIcons(root, done) {
+  root.querySelectorAll('.ic').forEach(function (ic, idx) {
+    ic.classList.toggle('off', idx === 0)
+  })
+  if (done) done()
+}
+
+/* ═══════════ P0-1 流式文本 ═══════════ */
+var T1 = '已定位误报根因：selectRaw 在 closure 里捕获了 sessionService，依赖图因此误判越界。修复方式为参数注入，并在 terminalLifecycle 统一收口。tsc 通过，34 个测试全部绿。'
+function playP1() {
+  var list = []
+  streamInto($('p1Before'), T1, list, { gap: 8 }) // 现状：几乎整段瞬间出现
+  $('p1Actions').style.display = 'none'
+  streamInto($('p1After'), T1, list, {
+    gap: 70,
+    done: function () { $('p1Actions').style.display = 'flex' }
+  })
+}
+
+/* ═══════════ P0-2 思考轨迹 ═══════════ */
+function playP2() {
+  var list = []
+  var elB = $('p2Before'), elA = $('p2After')
+  elB.classList.add('is-open'); elA.classList.add('is-open')
+  elB.classList.remove('is-done'); elA.classList.remove('is-done')
+  elB.querySelector('.th-label').innerHTML = '推理中 · <span class="secs">8s</span>'
+  // 提案：grid-rows 平滑展开（300ms）+ rail 行 stagger + mono 计时
+  var labelA = elA.querySelector('.th-label')
+  labelA.innerHTML = '推理中 · <span class="secs" id="p2Secs2">0s</span>'
+  startTimer($('p2Secs2'), list, 3)
+  after(3000, function () {
+    elB.classList.add('is-done'); elA.classList.add('is-done')
+    elB.querySelector('.th-label').innerHTML = '已完成 · <span class="secs">3s</span>'
+    labelA.innerHTML = '已完成 · <span class="secs">3s</span>'
+    // 展开收起都走同一过渡；现状面板恒显示（display:block 覆盖）
+    elB.classList.remove('is-open'); elA.classList.remove('is-open')
+  }, list)
+}
+
+/* ═══════════ P0-3 工具行 ═══════════ */
+function playP3() {
+  var list = []
+  var diffs = $('p3Diffs'); diffs.style.display = 'none'
+  var r2 = $('p3Row2'), r3 = $('p3Row3')
+  r2.classList.remove('is-open'); r3.classList.remove('is-open')
+  $('p3Row1').classList.add('is-open')
+  after(2200, function () { diffs.style.display = 'flex'; diffs.classList.add('chip-enter') }, list)
+}
+/* 展开/收起（仅提案面板与整合演示的行可交互；现状面板保持只读） */
+document.querySelectorAll('.panel.after .toolrow, #chatTools .toolrow').forEach(function (row) {
+  row.addEventListener('click', function () { row.classList.toggle('is-open') })
+})
+
+/* ═══════════ P0-4 状态行 ═══════════ */
+function playP4() {
+  var list = []
+  var b = $('p4Before'), a = $('p4After')
+  b.classList.remove('is-done'); a.classList.remove('is-done')
+  var bb = b.querySelector('.ic-wrap'), ab = a.querySelector('.ic-wrap')
+  if (bb) { bb.querySelectorAll('.ic').forEach(function (i) { i.classList.remove('off') }); bb.querySelector('.check').classList.add('off') }
+  if (ab) { ab.querySelectorAll('.ic').forEach(function (i) { i.classList.remove('off') }); ab.querySelector('.check').classList.add('off') }
+  $('p4Before').querySelector('.timer').textContent = '3s'
+  startTimer($('p4Timer'), list, 3)
+  after(3000, function () {
+    b.classList.add('is-done'); a.classList.add('is-done')
+    if (bb) swapIcons(bb); if (ab) swapIcons(ab)
+    $('p4Before').querySelector('.timer').textContent = '3s'
+    $('p4Timer').textContent = '0:03'
+  }, list)
+}
+
+/* ═══════════ P1-2 Composer ═══════════ */
+function playP5() {
+  var list = []
+  var q = $('p5Quote'); q.style.display = 'none'
+  var send = $('p5Send'); send.classList.remove('on')
+  after(500, function () {
+    q.style.display = 'inline-flex'; q.classList.remove('chip-enter'); void q.offsetWidth; q.classList.add('chip-enter')
+  }, list)
+  after(1000, function () { send.classList.add('on') }, list)
+}
+document.querySelectorAll('.quote-chip .x').forEach(function (x) {
+  x.addEventListener('click', function () { x.parentElement.style.display = 'none' })
+})
+
+/* ═══════════ P1-3 加载态 ═══════════ */
+function playP6() {
+  var list = []
+  $('p6Timer').textContent = '0:00'
+  startTimer($('p6Timer'), list, 10)
+}
+
+/* ═══════════ 整窗整合演示 ═══════════ */
+var APP_TEXT = '已定位误报根因：selectRaw 在 closure 里捕获了 sessionService，依赖图因此误判越界。修复方式为参数注入，并在 terminalLifecycle 统一收口。tsc 通过，34 个测试全部绿。'
+var appTimers = []
+
+function resetApp() {
+  clearTimers(appTimers)
+  $('chatUser').style.display = 'none'
+  $('chatMeta').style.display = 'none'
+  $('chatThinking').classList.remove('is-open', 'is-done')
+  $('chatThinking').style.display = 'none'
+  $('chatSecs').textContent = '0s'
+  $('chatTools').style.display = 'none'
+  $('chatText').textContent = ''
+  $('chatActions').style.display = 'none'
+  $('chatQuote').style.display = 'none'
+  $('chatTool1').classList.remove('is-open')
+  $('chatTool2').classList.remove('is-open')
+}
+
+function runAppDemo() {
+  resetApp()
+  var L = appTimers
+  // 0.3s 用户消息
+  after(300, function () {
+    $('chatUser').style.display = 'block'
+    $('chatMeta').style.display = 'flex'
+  }, L)
+  // 0.7s 思考行出现，1.1s 展开
+  after(700, function () {
+    $('chatThinking').style.display = 'block'
+    $('chatThinking').classList.add('is-open')
+    startTimer($('chatSecs'), L, 3)
+  }, L)
+  // 1.6s 工具行出现（stagger）
+  after(1600, function () {
+    $('chatTools').style.display = 'flex'
+    $('chatTool1').classList.add('is-open')
+  }, L)
+  // 2.4s 思考完成 → 交叉 + 降级；工具行 1 完成
+  after(2400, function () {
+    var t = $('chatThinking')
+    t.classList.add('is-done')
+    t.classList.remove('is-open')
+    $('chatSecs').textContent = '3s'
+    $('chatTool1').querySelector('.dot').classList.add('done')
+    $('chatToolCount').textContent = '1'
+  }, L)
+  // 2.6s 流式文本
+  after(2600, function () {
+    $('chatMeta').innerHTML = '<span class="who">hip</span><span style="color:var(--ink-3);font-weight:400">· 正在回复</span>'
+    streamInto($('chatText'), APP_TEXT, L, {
+      chunk: 5, gap: 70,
+      done: function () {
+        $('chatActions').style.display = 'flex'
+        $('chatTool2').querySelector('.dot').classList.add('done')
+        $('chatToolCount').textContent = '0'
+        $('chatMeta').innerHTML = '<span class="who">hip</span><span style="color:var(--success);font-weight:400">· 已完成</span>'
+        $('chatQuote').style.display = 'inline-flex'
+      }
+    })
+  }, L)
+}
+
+/* ═══════════ 播放按钮 ═══════════ */
+var REPLAYS = { p1: playP1, p2: playP2, p3: playP3, p4: playP4, p5: playP5, p6: playP6 }
+document.querySelectorAll('.play-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var fn = REPLAYS[btn.dataset.replay]
+    if (fn) fn()
+  })
+})
+$('replayFull').addEventListener('click', runAppDemo)
+
+/* ═══════════ 主题 ═══════════ */
+$('themeBtn').addEventListener('click', function () {
+  var dark = document.documentElement.classList.toggle('dark')
+  try { localStorage.setItem('bui-preview-theme', dark ? 'dark' : 'light') } catch (e) {}
+})
+
+/* 初始自动播放 */
+playP1(); playP2(); playP3(); playP4(); playP5(); playP6()
+setTimeout(runAppDemo, 900)
+</script>
+</body>
+</html>

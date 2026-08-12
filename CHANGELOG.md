@@ -37,6 +37,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
     no springy easing; `active:scale-*` removed; send/stop and jump-to-latest
     buttons are square (rounded-md) instead of round.
   - Scrims are plain (no backdrop blur); avatar gradient replaced with solid accent.
+
+- **Rounded-rectangle radius ladder** (replaces the sharp 2/4/6px scheme):
+  buttons/inputs/small controls `rounded-sm` 2→**6px**, cards/bubbles/Composer
+  `rounded/md/lg` 4→**10px**, overlays (Modal/dropdowns/palette)
+  `rounded-xl/2xl/3xl` 6→**14px**. Single-source change in
+  `tailwind.config.js` borderRadius tokens; `rounded-full` stays exclusive to
+  avatar / status dots / switch thumbs. DESIGN.md synced.
 - Fixed pre-existing issues blocking `yarn tsc`: duplicated whiteboard export keys
   in en/ja/ko/zh-CN i18n, unused `emptySel` in knowledgeStore tests, and a `never`
   type in boardOps tests.

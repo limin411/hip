@@ -80,16 +80,17 @@ export default {
         // 32px = T2 裁决值（Notion 40px 在小窗口内占比过高）。
         page: ['32px', { lineHeight: '1.25', letterSpacing: '-0.02em' }],
       },
-      // 扁平化：直角优先。按钮/输入 2px，卡片 4px，浮层 6px；full 仅保留给状态点/开关/avatar。
+      // 圆角矩形优先：整条阶梯上移到圆角矩形区间（macOS 风，替代旧直角 2/4/6）。
+      // 按钮/输入 6px，卡片 10px，浮层 14px；full 仅保留给状态点/开关/avatar。
       borderRadius: {
         none: '0',
-        sm: '2px',
-        DEFAULT: '4px',
-        md: '4px',
-        lg: '4px',
-        xl: '6px',
-        '2xl': '6px',
-        '3xl': '6px',
+        sm: '6px',
+        DEFAULT: '10px',
+        md: '10px',
+        lg: '10px',
+        xl: '14px',
+        '2xl': '14px',
+        '3xl': '14px',
         full: '9999px',
       },
       // 扁平化：界面主体不用阴影。

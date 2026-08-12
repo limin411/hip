@@ -8,7 +8,7 @@
 1. **固体优先 Solid over Glass（侧栏除外）** —— 除侧栏外所有表面 100% 不透明；层级由明度阶差 + 1px 边框表达，其余表面禁止 `backdrop-filter`。**侧栏毛玻璃**（`.sidebar-glass`）：macOS/Windows 窗口透明 + 原生材质（macOS sidebar vibrancy / Windows acrylic→mica）+ 半透明底 + `backdrop-filter: blur(24px) saturate(160%)`；Linux 无透明窗口（Tauri 不支持），侧栏兜底不透明实色。
 2. **边界优先 Border over Shadow** —— 浮层（下拉 / Modal / 面板）用实色 + 1px 边框 + scrim 分层；阴影只保留 Modal 一档极轻投影（`shadow-overlay`），其余全部 `none`。
 3. **色块优先 Color over Gradient** —— 状态用纯色实底 chip / 色条 / 圆点，禁止渐变、glow、shimmer。effort-max 为纯色。
-4. **直角优先 Sharp over Round** —— 按钮/输入框 2px、卡片 4px、浮层 6px；胶囊（`rounded-full`）仅保留给 avatar / 状态点 / 开关拇指。
+4. **圆角矩形优先 Rounded over Sharp** —— 按钮/输入框 6px、卡片 10px、浮层 14px（圆角矩形阶梯）；胶囊（`rounded-full`）仅保留给 avatar / 状态点 / 开关拇指。
 5. **克制动画 Fade-only Motion** —— 只允许 `opacity`（与 `background-color` 过渡）入场；无位移、无缩放、无弹性、无循环动画。时长 ≤ 200ms。
 6. **明度阶差 Hierarchy via Value** —— 层级由灰阶阶差 + 字重（400/500/600）支撑，不靠阴影。
 
@@ -133,13 +133,13 @@
 
 ## 5. 圆角与阴影
 
-### 圆角（扁平化收敛）
+### 圆角（圆角矩形阶梯）
 
 | Utility | 值 |
 |---|---|
-| `rounded-sm` | **2px**（按钮、输入框） |
-| `rounded / md / lg` | **4px**（卡片） |
-| `rounded-xl / 2xl / 3xl` | **6px**（浮层：Modal、下拉、palette） |
+| `rounded-sm` | **6px**（按钮、输入框、分段控件） |
+| `rounded / md / lg` | **10px**（卡片、气泡、Composer） |
+| `rounded-xl / 2xl / 3xl` | **14px**（浮层：Modal、下拉、palette） |
 | `rounded-full` | 仅 avatar / 状态点 / 开关拇指 |
 
 ### 阴影
@@ -166,15 +166,15 @@
 
 | 组件 | 样式 |
 |---|---|
-| `Button` | 主按钮 = 软单色实底（`--btn-primary`，**不用品牌橙填充**）；secondary = 浅底 + hover 灰；ghost = 纯文字；outline = 1px 边框；danger / dangerSoft。圆角 2px（`rounded-sm`）。禁用 `opacity-40` |
-| `Input / Textarea` | 2px 圆角（`rounded-sm`）、`--border` 边框、聚焦 2px accent focus ring |
-| `Switch / SegmentedControl` | 胶囊仅保留给开关拇指；分段控制为直角块 + 实底选中 |
+| `Button` | 主按钮 = 软单色实底（`--btn-primary`，**不用品牌橙填充**）；secondary = 浅底 + hover 灰；ghost = 纯文字；outline = 1px 边框；danger / dangerSoft。圆角 6px（`rounded-sm`）。禁用 `opacity-40` |
+| `Input / Textarea` | 6px 圆角（`rounded-sm`）、`--border` 边框、聚焦 2px accent focus ring |
+| `Switch / SegmentedControl` | 胶囊仅保留给开关拇指；分段控制为 6px 圆角块（`rounded-sm`）+ 实底选中 |
 | `Tabs` | 下划线指示（扁平经典形态） |
 | `DropdownMenu / Popover` | 实底 + 1px 边框 + scrim；纯 fade 入场 |
 | `Modal` | 唯一保留投影档 `shadow-overlay` + 1px 边框 + scrim；纯 fade |
-| `MessageBubble` | 用户气泡：灰底（`bg-surface-muted`）4px 圆角（`rounded-lg`）；agent 消息无头像，元信息为文字行（"你 / hip"） |
-| `Avatar` | 圆形/方形（方形 4px）；首字母回退底 = `--accent-subtle` 中性灰 + `--accent-strong` 文字；`gradient` 时用品牌橙实底 + 白字 |
-| `Composer / InputBar` | 浮动圆角卡片（`rounded-lg` 4px）+ 1px 边框；底部 chip 行（agent / 模型 / effort / 权限 / 执行模式 / 附件）；发送按钮为方形 2px |
+| `MessageBubble` | 用户气泡：灰底（`bg-surface-muted`）10px 圆角（`rounded-lg`）；agent 消息无头像，元信息为文字行（"你 / hip"） |
+| `Avatar` | 圆形/方形（方形 10px）；首字母回退底 = `--accent-subtle` 中性灰 + `--accent-strong` 文字；`gradient` 时用品牌橙实底 + 白字 |
+| `Composer / InputBar` | 浮动圆角卡片（`rounded-lg` 10px）+ 1px 边框；底部 chip 行（agent / 模型 / effort / 权限 / 执行模式 / 附件）；发送按钮 6px（`rounded-sm`） |
 | `EffortIntensityMeter` | 5 根竖条强度表（非滑块）；MAX 档实底纯色紫 + 16% 底 + 2px 边框 chip，无发光 |
 | 右栏 `PanelTabBar` | 紧凑下拉形态（当前标签 + chevron），非平铺 tab 条 |
 | 滚动条 | 5px 细滚动条，thumb = `--border`，hover 加深 |

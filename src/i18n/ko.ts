@@ -2573,6 +2573,13 @@ export const ko = {
     "blockHandle": {
       "add": "아래에 블록 추가"
     },
+    "tableInfo": {
+      "title": "테이블 정보",
+      "rowsCols": "{{rows}} 행 · {{cols}} 열",
+      "column": "열",
+      "width": "{{width}}px",
+      "empty": "빈 테이블: 아래의 「＋ 행 추가」로 시작"
+    },
     "table": {
       "addRow": "행 추가",
       "addCol": "열 추가",

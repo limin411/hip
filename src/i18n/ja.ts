@@ -2573,6 +2573,13 @@ export const ja = {
     "blockHandle": {
       "add": "下にブロックを追加"
     },
+    "tableInfo": {
+      "title": "テーブル情報",
+      "rowsCols": "{{rows}} 行 · {{cols}} 列",
+      "column": "列",
+      "width": "{{width}}px",
+      "empty": "空のテーブル：下の「＋ 行を追加」から開始"
+    },
     "table": {
       "addRow": "行を追加",
       "addCol": "列を追加",

@@ -199,3 +199,102 @@ describe('KnowledgeOutlinePanel', () => {
     expect(useUiStore.getState().knowledgePanelOpen).toBe(false)
   })
 })
+
+describe('KnowledgeOutlinePanel table leaf (table-right-panel PR-1)', () => {
+  beforeEach(() => {
+    useUiStore.setState({ activeView: 'knowledge', knowledgePanelOpen: true })
+    useKnowledgeStore.setState({
+      mode: 'workspace',
+      activeDocId: null,
+      nodes: [],
+      draftBody: '',
+      docBody: '',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'idle',
+    })
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('table leaf: title 表格信息, no outline section, no word count, refresh present', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'tbl_1',
+      nodes: [
+        { id: 'tbl_1', parentId: null, kind: 'table', title: '任务看板', order: 0, createdAt: 0, updatedAt: 0 },
+      ],
+      draftBody: '',
+      docBody: '',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
+    })
+    render(<KnowledgeOutlinePanel />)
+    // 标题联动
+    expect(screen.getByTestId('panel-title')).toHaveTextContent('knowledge.tableInfo.title')
+    // 无大纲区块、无字数统计
+    expect(screen.queryByTestId('knowledge-outline-section')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-panel-doc-stats')).not.toBeInTheDocument()
+    // 刷新按钮存在（表格可被引用，反链语义保留）
+    expect(screen.getByTestId('knowledge-backlink-refresh')).toBeInTheDocument()
+  })
+
+  it('table leaf placeholder shows until TableInfoPanel lands (PR-2)', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'tbl_1',
+      nodes: [
+        { id: 'tbl_1', parentId: null, kind: 'table', title: '任务看板', order: 0, createdAt: 0, updatedAt: 0 },
+      ],
+      draftBody: '',
+      docBody: '',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
+    })
+    render(<KnowledgeOutlinePanel />)
+    expect(screen.getByTestId('knowledge-table-info-placeholder')).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-table-info-placeholder').textContent).toContain(
+      'knowledge.tableInfo.empty',
+    )
+  })
+
+  it('board leaf: noBoard placeholder preserved, refresh hidden', () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'brd_1',
+      nodes: [
+        { id: 'brd_1', parentId: null, kind: 'board', title: '架构图', order: 0, createdAt: 0, updatedAt: 0 },
+      ],
+      draftBody: '',
+      docBody: '',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
+    })
+    render(<KnowledgeOutlinePanel />)
+    expect(screen.getByTestId('knowledge-doc-outline-no-doc').textContent).toContain(
+      'knowledge.outline.noBoard',
+    )
+    expect(screen.queryByTestId('knowledge-backlink-refresh')).not.toBeInTheDocument()
+  })
+
+  it('table leaf: refresh triggers refreshLinkPanel', () => {
+    const refreshLinkPanel = vi
+      .spyOn(useKnowledgeStore.getState(), 'refreshLinkPanel')
+      .mockResolvedValue(undefined)
+    useKnowledgeStore.setState({
+      activeDocId: 'tbl_1',
+      nodes: [
+        { id: 'tbl_1', parentId: null, kind: 'table', title: '任务看板', order: 0, createdAt: 0, updatedAt: 0 },
+      ],
+      draftBody: '',
+      docBody: '',
+      backlinks: [],
+      outboundLinks: [],
+      linkPanelStatus: 'ready',
+    })
+    render(<KnowledgeOutlinePanel />)
+    fireEvent.click(screen.getByTestId('knowledge-backlink-refresh'))
+    expect(refreshLinkPanel).toHaveBeenCalled()
+  })
+})

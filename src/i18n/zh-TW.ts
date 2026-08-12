@@ -2575,6 +2575,13 @@ export const zhTW = {
     "blockHandle": {
       "add": "在下方新增區塊"
     },
+    "tableInfo": {
+      "title": "表格資訊",
+      "rowsCols": "{{rows}} 行 · {{cols}} 列",
+      "column": "欄",
+      "width": "{{width}}px",
+      "empty": "空表格：點擊下方「＋ 新增列」開始"
+    },
     "table": {
       "addRow": "新增列",
       "addCol": "新增欄",

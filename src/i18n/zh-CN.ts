@@ -2610,6 +2610,13 @@ export const zhCN = {
       blockHandle: {
         add: '在下方添加块',
       },
+      tableInfo: {
+        title: '表格信息',
+        rowsCols: '{{rows}} 行 · {{cols}} 列',
+        column: '列',
+        width: '{{width}}px',
+        empty: '空表格：点击下方「＋ 添加行」开始',
+      },
       table: {
         addRow: '添加行',
         addCol: '添加列',

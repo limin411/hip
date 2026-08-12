@@ -2672,6 +2672,13 @@ export const en = {
       blockHandle: {
         add: 'Add block below',
       },
+      tableInfo: {
+        title: 'Table info',
+        rowsCols: '{{rows}} rows · {{cols}} columns',
+        column: 'Column',
+        width: '{{width}}px',
+        empty: 'Empty table: click “+ Add row” below to start',
+      },
       table: {
         addRow: 'Add row',
         addCol: 'Add column',

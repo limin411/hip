@@ -45,9 +45,13 @@ export function KnowledgeOutlinePanel() {
   const requestOutlineJump = useKnowledgeStore((s) => s.requestOutlineJump)
 
   const activeNode = activeDocId ? nodes.find((n) => n.id === activeDocId) : undefined
-  // Docs only; boards hidden. Unknown node id still treated as doc (open path).
+  // Table leaf: same-shape predicate as KnowledgeWorkspace.tsx（对齐 L287）。
+  const isTable =
+    activeDocId != null && activeNode?.kind === 'table' && activeDocId.startsWith('tbl_')
+  // Docs only; boards/tables hidden. Unknown node id still treated as doc (open path).
   const isDoc =
     activeDocId != null &&
+    !isTable &&
     activeNode?.kind !== 'board' &&
     !(activeDocId.startsWith('brd_') && activeNode == null)
 
@@ -62,6 +66,7 @@ export function KnowledgeOutlinePanel() {
       prevDocIdRef.current = null
       return
     }
+    if (isTable) return
     if (prevDocIdRef.current !== activeDocId) {
       prevDocIdRef.current = activeDocId
       setContent(liveContent)
@@ -181,10 +186,10 @@ export function KnowledgeOutlinePanel() {
           data-tauri-drag-region="false"
           data-testid="panel-title"
         >
-          {t('knowledge.outline.title')}
+          {isTable ? t('knowledge.tableInfo.title') : t('knowledge.outline.title')}
         </span>
         <div className="flex items-center gap-2" data-tauri-drag-region="false">
-          {activeDocId && isDoc ? (
+          {activeDocId && (isDoc || isTable) ? (
             <button
               type="button"
               className="rounded-md p-1 text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
@@ -200,7 +205,7 @@ export function KnowledgeOutlinePanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!activeDocId || !isDoc ? (
+        {!activeDocId ? (
           <div
             className="flex h-full items-center justify-center px-4 py-8 text-center"
             data-testid="knowledge-doc-outline-no-doc"
@@ -208,7 +213,24 @@ export function KnowledgeOutlinePanel() {
           >
             <p className="text-meta text-ink-tertiary">{t('knowledge.outline.noDoc')}</p>
           </div>
+        ) : isTable ? (
+          <div
+            className="flex h-full items-center justify-center px-4 py-8 text-center"
+            data-testid="knowledge-table-info-placeholder"
+            role="status"
+          >
+            <p className="text-meta text-ink-tertiary">{t('knowledge.tableInfo.empty')}</p>
+          </div>
         ) : (
+          activeNode?.kind === 'board' ? (
+            <div
+              className="flex h-full items-center justify-center px-4 py-8 text-center"
+              data-testid="knowledge-doc-outline-no-doc"
+              role="status"
+            >
+              <p className="text-meta text-ink-tertiary">{t('knowledge.outline.noBoard')}</p>
+            </div>
+          ) : (
           <div className="flex flex-col gap-4 p-2 pb-6">
             <section data-testid="knowledge-outline-section">
               <h3 className="px-1 pb-1 text-caption font-medium text-ink-tertiary">
@@ -237,6 +259,7 @@ export function KnowledgeOutlinePanel() {
               </span>
             </div>
           </div>
+          )
         )}
       </div>
     </div>

@@ -194,7 +194,8 @@ export function KnowledgeWorkspace() {
     if (!pendingOutlineJump || !activeDocId) return
     const clear = () => useKnowledgeStore.getState().clearPendingOutlineJump()
     const leaf = useKnowledgeStore.getState().nodes.find((n) => n.id === activeDocId)
-    if (leaf?.kind === 'board') {
+    if (leaf?.kind === 'board' || leaf?.kind === 'table') {
+      // 表格/画板无大纲跳转目标（表格跳转走 pendingTableColumnJump 通道）。
       clear()
       return
     }

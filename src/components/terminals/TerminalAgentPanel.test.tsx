@@ -420,4 +420,87 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     sendSpy.mockRestore()
     unmount()
   })
+
+  it('does not send on Enter while IME is composing (chat composer parity)', () => {
+    const sendSpy = vi.spyOn(sessionService, 'sendMessageToSession').mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    const input = screen.getByTestId('terminal-composer-input')
+
+    fireEvent.change(input, { target: { value: 'nihao' } })
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: false, isComposing: true })
+    expect(sendSpy).not.toHaveBeenCalled()
+    expect(input).toHaveValue('nihao')
+
+    // Plain Enter still sends.
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(sendSpy).toHaveBeenCalledWith('ta_1', 'nihao')
+
+    sendSpy.mockRestore()
+    unmount()
+  })
+
+  it('shows the plan approval panel and responds per-session (chat PlanProgressPanel parity)', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) =>
+        x.id === 'ta_1'
+          ? {
+              ...x,
+              planApprovalPending: true,
+              activeTurnPlan: [
+                { id: 'p1', content: 'check disk', status: 'pending' },
+              ],
+            }
+          : x,
+      ),
+    }))
+    const respondSpy = vi
+      .spyOn(sessionService, 'respondPlanFor')
+      .mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    // Sticky plan panel above the composer with the pending checklist.
+    expect(screen.getByTestId('terminal-plan-slot')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-progress-panel')).toHaveAttribute('data-phase', 'awaiting_approval')
+    expect(screen.getByText('check disk')).toBeInTheDocument()
+
+    // Approve targets the terminal session — never the global active session.
+    fireEvent.click(screen.getByTestId('plan-approve'))
+    expect(respondSpy).toHaveBeenCalledWith('ta_1', 'approve')
+
+    // While a plan awaits approval the composer is gated (chat sessionActionBlocked parity).
+    expect(screen.getByTestId('terminal-composer-input')).toBeDisabled()
+
+    respondSpy.mockRestore()
+    unmount()
+  })
+
+  it('hides the plan panel once the plan is approved and the turn is idle', () => {
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) =>
+        x.id === 'ta_1'
+          ? {
+              ...x,
+              planApprovalPending: true,
+              activeTurnPlan: [{ id: 'p1', content: 'check disk', status: 'pending' }],
+            }
+          : x,
+      ),
+    }))
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+    expect(screen.getByTestId('plan-progress-panel')).toBeInTheDocument()
+
+    // Approved → optimistic dismiss clears the pending flag; the next user turn
+    // clears the plan, so the panel hides.
+    act(() => {
+      useDomainStore.setState((s) => ({
+        sessions: s.sessions.map((x) =>
+          x.id === 'ta_1'
+            ? { ...x, planApprovalPending: false, activeTurnPlan: null }
+            : x,
+        ),
+      }))
+    })
+    expect(screen.queryByTestId('terminal-plan-slot')).not.toBeInTheDocument()
+    unmount()
+  })
 })

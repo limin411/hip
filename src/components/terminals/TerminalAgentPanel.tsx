@@ -28,6 +28,8 @@ import { formatUsdMaybeIncomplete } from '@/lib/usageCost'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ComposerChip } from '@/components/chat/ComposerChip'
 import { ModelPicker } from '@/components/chat/ModelPicker'
+import { PlanProgressPanel } from '@/components/chat/PlanProgressPanel'
+import { selectLivePlan } from '@/lib/todos'
 import {
   applyCommand,
   extractSlashQuery,
@@ -322,7 +324,16 @@ function MessageRow({
   )
 }
 
-/** Session-scoped HITL approval card styled like the chat interrupt card. */
+/** Session-scoped HITL approval card styled like the chat permission prompt
+ *  (PermissionModal): same container/typography/button dialects, allow-first order. */
+function orderPermissionOptions(
+  options: Array<{ optionId: string; name: string; kind: string }>,
+): Array<{ optionId: string; name: string; kind: string }> {
+  const allow = options.filter((o) => !o.kind.startsWith('reject'))
+  const reject = options.filter((o) => o.kind.startsWith('reject'))
+  return [...allow, ...reject]
+}
+
 function PermissionCard({
   sessionId,
   requestId,
@@ -338,23 +349,23 @@ function PermissionCard({
 }) {
   return (
     <div
-      className="rounded-lg border border-accent/30 bg-accent-subtle px-3 py-2.5"
+      className="flex flex-col gap-3 rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3 animate-view-enter"
       data-testid="terminal-permission-card"
     >
-      <p className="flex items-center gap-1.5 text-caption font-medium text-ink">
-        <ShieldCheck size={13} className="shrink-0 text-accent" aria-hidden />
+      <p className="flex items-center gap-1.5 text-body font-medium text-ink">
+        <ShieldCheck size={15} strokeWidth={1.75} className="shrink-0 text-accent" aria-hidden />
         {t('terminals.agent.permissionTitle')}
       </p>
-      <div className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface/80 px-2 py-1.5 font-mono text-caption leading-relaxed text-ink-secondary">
+      <div className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-surface px-3 py-2 font-mono text-meta leading-relaxed text-ink-secondary">
         {tool.content ?? tool.title}
       </div>
-      <p className="mt-1 text-meta text-ink-tertiary">{t('terminals.agent.execHint')}</p>
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
-        {options.map((opt) => (
+      <p className="text-meta text-ink-tertiary">{t('terminals.agent.execHint')}</p>
+      <div className="flex flex-wrap gap-2">
+        {orderPermissionOptions(options).map((opt) => (
           <Button
             key={opt.optionId}
             size="sm"
-            variant={opt.kind.startsWith('allow') ? 'primary' : 'ghost'}
+            variant={opt.kind.startsWith('allow') ? 'primary' : 'outline'}
             onClick={() => {
               sessionService.respondPermission(sessionId, requestId, { optionId: opt.optionId })
               useDomainStore.getState().clearPermission(requestId)
@@ -594,14 +605,14 @@ function CompactComposer({
     <div className="shrink-0 px-3 pb-3 pt-1.5" data-testid="terminal-composer">
       <div
         className={cn(
-          'relative rounded-lg border bg-surface-subtle p-2.5 transition-colors duration-chrome',
+          'relative rounded-lg border bg-surface-subtle p-2.5',
           // Full access — red border, chat composer parity: gradient flow while a
           // turn runs, glow pulse when idle/stopped.
           mode === 'full'
             ? running
               ? 'composer-danger-flow'
               : 'composer-danger-glow border-danger-soft'
-            : 'border-border focus-within:border-accent/40',
+            : 'border-border',
         )}
         data-testid="terminal-composer-card"
       >
@@ -629,6 +640,8 @@ function CompactComposer({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
+            // IME: Enter confirms composition (pinyin etc.) — must not send (chat composer parity).
+            if (e.nativeEvent.isComposing || e.key === 'Process') return
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               send()
@@ -637,11 +650,11 @@ function CompactComposer({
           rows={2}
           placeholder={t('terminals.agent.placeholder')}
           disabled={disabled}
-          className="min-h-10 w-full resize-none border-0 bg-transparent px-0.5 py-1 text-body leading-relaxed text-ink outline-none placeholder:text-ink-tertiary disabled:opacity-50"
+          className="w-full resize-none rounded-none border-0 bg-transparent px-2 py-1 text-body text-ink placeholder:text-ink-tertiary transition-[border-color,box-shadow,background-color] duration-chrome ease-out focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-60"
           data-testid="terminal-composer-input"
         />
-        <div className="mt-1 flex items-center justify-between gap-2 border-t border-border/60 pt-1.5">
-          <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex items-center justify-between px-0.5 pt-1.5">
+          <div className="flex min-w-0 items-center gap-0.5">
             <ModelPicker sessionId={sessionId} />
             <PermissionModeChip
               mode={mode}
@@ -712,6 +725,25 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
     useDomainStore((s) =>
       activeSessionId ? s.sessions.find((x) => x.id === activeSessionId) : undefined,
     ) ?? sessionsForTerminal[0]
+
+  // Sticky plan/todo panel above the composer (chat ComposerPlanPanel parity):
+  // live plan while drafting/executing, approval CTA while awaiting approval.
+  const livePlan = useMemo(
+    () =>
+      active
+        ? selectLivePlan({
+            messages: active.messages,
+            status: active.status,
+            forcePlan: Boolean(active.config.forcePlan),
+            planApprovalPending: active.planApprovalPending,
+            activeTurnPlan: active.activeTurnPlan,
+            activeTurnPlanMarkdown: active.activeTurnPlanMarkdown,
+            activeTurnPlanPath: active.activeTurnPlanPath,
+            activeTurnPlanMarkdownTruncated: active.activeTurnPlanMarkdownTruncated,
+          })
+        : null,
+    [active],
+  )
 
   useEffect(() => {
     if (active && !active.loaded) {
@@ -836,6 +868,17 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
             ) : null}
           </div>
 
+          {livePlan ? (
+            <div className="shrink-0 px-3 pb-2" data-testid="terminal-plan-slot">
+              <PlanProgressPanel
+                view={livePlan}
+                onApprove={() => sessionService.respondPlanFor(active.id, 'approve')}
+                onReject={() => sessionService.respondPlanFor(active.id, 'reject')}
+                onAmend={(content) => sessionService.respondPlanFor(active.id, 'amend', content)}
+              />
+            </div>
+          ) : null}
+
           {active.pendingPermission ? (
             <div className="shrink-0 px-3 pb-2">
               <PermissionCard
@@ -861,7 +904,7 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
 
           <CompactComposer
             sessionId={active.id}
-            disabled={!!flight}
+            disabled={!!flight || Boolean(active.planApprovalPending)}
             running={turnRunning}
             onStop={() => {
               // 打断输出：若有 exec flight，先结束桥接等待并向共享 PTY 发送 Ctrl-C；

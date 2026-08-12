@@ -660,28 +660,38 @@ export class SessionActions {
     })
   }
 
-  /** Respond to a plan approval interrupt (approve / reject / amend). */
-  respondPlan(action: 'approve' | 'reject' | 'amend', amendContent?: string): void {
-    const { activeSessionId, sessions } = useDomainStore.getState()
-    if (!activeSessionId) return
-    const sess = sessions.find((s) => s.id === activeSessionId)
+  /** Respond to a plan approval interrupt (approve / reject / amend) for a specific session. */
+  respondPlanFor(
+    sessionId: string,
+    action: 'approve' | 'reject' | 'amend',
+    amendContent?: string,
+  ): void {
+    const { sessions } = useDomainStore.getState()
+    const sess = sessions.find((s) => s.id === sessionId)
     // Idempotent: ignore double-clicks after optimistic dismiss (eval multi-pump / UI re-entry).
     if (!sess?.planApprovalPending) return
     // Drop PlanApprovalCard immediately so eval/UI do not keep a disabled shell for the whole execute turn.
-    useDomainStore.getState().respondPlanOptimistic(activeSessionId, action)
+    useDomainStore.getState().respondPlanOptimistic(sessionId, action)
     // FE-only seed (seedPlanApproval): no sidecar pause — complete locally so KD-16
     // does not restore the card via not_awaiting from a real plan:respond.
-    if (isFeOnlyPlanApproval(activeSessionId)) {
-      unmarkFeOnlyPlanApproval(activeSessionId)
+    if (isFeOnlyPlanApproval(sessionId)) {
+      unmarkFeOnlyPlanApproval(sessionId)
       this.inject({
         type: 'plan:respond:result',
-        sessionId: activeSessionId,
+        sessionId,
         ok: true,
         action,
       })
       return
     }
-    this.transport.send({ type: 'plan:respond', sessionId: activeSessionId, action, amendContent })
+    this.transport.send({ type: 'plan:respond', sessionId, action, amendContent })
+  }
+
+  /** Respond to a plan approval interrupt (approve / reject / amend) on the active session. */
+  respondPlan(action: 'approve' | 'reject' | 'amend', amendContent?: string): void {
+    const { activeSessionId } = useDomainStore.getState()
+    if (!activeSessionId) return
+    this.respondPlanFor(activeSessionId, action, amendContent)
   }
 
   cancel(): void {

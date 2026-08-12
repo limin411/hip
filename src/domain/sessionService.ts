@@ -618,6 +618,14 @@ export class SessionService {
     return this.sessionActions.resume(content, attachments)
   }
 
+  respondPlanFor(
+    sessionId: string,
+    action: 'approve' | 'reject' | 'amend',
+    amendContent?: string,
+  ) {
+    return this.sessionActions.respondPlanFor(sessionId, action, amendContent)
+  }
+
   respondPlan(action: 'approve' | 'reject' | 'amend', amendContent?: string) {
     return this.sessionActions.respondPlan(action, amendContent)
   }

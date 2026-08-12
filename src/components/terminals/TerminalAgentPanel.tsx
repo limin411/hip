@@ -103,6 +103,27 @@ function ToolStatusChip({ tool, timedOut, t }: { tool: ToolCall; timedOut: boole
   )
 }
 
+/** Parse `exitCode: N` from a formatted terminal_exec result (fence / wrapEc). */
+export function execExitCodeFromOutput(output: string | undefined): number | null {
+  if (!output) return null
+  const m = /exitCode:\s*(\d+)/.exec(output)
+  return m ? Number(m[1]) : null
+}
+
+function ExitChip({ code }: { code: number }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-caption font-medium',
+        code === 0 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger',
+      )}
+      data-testid="terminal-tool-exit"
+    >
+      exit {code}
+    </span>
+  )
+}
+
 function ToolCard({
   tool,
   t,
@@ -123,6 +144,7 @@ function ToolCard({
   }
   const isExec = tool.name === 'terminal_exec'
   const timedOut = isExec && /status: timed_out/.test(tool.output ?? '')
+  const exitCode = isExec && tool.status === 'finished' ? execExitCodeFromOutput(tool.output) : null
   let parsedInput: unknown = null
   try {
     parsedInput = JSON.parse(inputText)
@@ -193,6 +215,9 @@ function ToolCard({
           </span>
         )}
         <ToolStatusChip tool={tool} timedOut={timedOut} t={t} />
+        {isExec && tool.status === 'finished' && exitCode !== null ? (
+          <ExitChip code={exitCode} />
+        ) : null}
       </button>
 
       {showBody && isExec && command ? (

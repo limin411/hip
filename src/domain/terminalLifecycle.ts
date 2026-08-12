@@ -44,8 +44,12 @@ export function disposeTerminal(id: string, opts?: { clearAgent?: boolean }): vo
  * setActiveSession, so it must not route through dispose + ensure).
  */
 export function resetTerminalForReconnect(id: string): void {
+  // Bump generation so in-flight exec flights observe a ring reset (T5):
+  // cursor validity dies with the old ring — agents must re-read before acting.
+  const prevGen = useTerminalStore.getState().getSession(id)?.generation ?? 0
   useTerminalStore.getState().clearSession(id)
   useTerminalStore.getState().ensureSession(id)
+  useTerminalStore.getState().setGeneration(id, prevGen + 1)
   useTerminalFsStore.getState().clearTerminal(id)
   useTerminalAgentStore.getState().setExecFlight(id, null)
 }

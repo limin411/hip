@@ -11,6 +11,8 @@ const h = vi.hoisted(() => {
     order,
     ensureSession: mk('ensureSession'),
     clearSession: mk('clearSession'),
+    getSession: vi.fn(() => ({ generation: 0 })),
+    setGeneration: mk('setGeneration'),
     clearTerminal: mk('clearTerminal'),
     setExecFlight: mk('setExecFlight'),
     setActiveSession: mk('setActiveSession'),
@@ -22,7 +24,12 @@ const h = vi.hoisted(() => {
 
 vi.mock('@/store/terminalStore', () => ({
   useTerminalStore: {
-    getState: () => ({ ensureSession: h.ensureSession, clearSession: h.clearSession }),
+    getState: () => ({
+      ensureSession: h.ensureSession,
+      clearSession: h.clearSession,
+      getSession: h.getSession,
+      setGeneration: h.setGeneration,
+    }),
   },
 }))
 
@@ -125,14 +132,17 @@ describe('ensureTerminalSession', () => {
 })
 
 describe('resetTerminalForReconnect', () => {
-  it('clears residue then rebuilds ring, resetting exec flight only (no setActiveSession)', () => {
+  it('clears residue then rebuilds ring with a bumped generation, resetting exec flight only (no setActiveSession)', () => {
+    h.getSession.mockReturnValue({ generation: 2 })
     resetTerminalForReconnect('tm_1')
     expect(h.order).toEqual([
       'clearSession:tm_1',
       'ensureSession:tm_1',
+      'setGeneration:tm_1',
       'clearTerminal:tm_1',
       'setExecFlight:tm_1',
     ])
+    expect(h.setGeneration).toHaveBeenCalledWith('tm_1', 3)
     expect(h.setActiveSession).not.toHaveBeenCalled()
   })
 })

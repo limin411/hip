@@ -270,6 +270,7 @@ async function runFlight(
 
   const ring0 = useTerminalStore.getState().getSession(tmId)
   const startCursor = ring0 ? ring0.trimOffset + ring0.ring.length : 0
+  const startGeneration = ring0?.generation ?? 0
   const deadline = Date.now() + waitMs
   const flight: TerminalExecFlight = {
     callId,
@@ -373,7 +374,21 @@ async function runFlight(
     if (finished) return
     const live = useManagedTerminalStore.getState().getTerminal(tmId)
     if (!live || live.status !== 'connected') {
-      finish('aborted', { mayStillRun: true, error: 'terminal disconnected during execution' })
+      finish('error', {
+        mayStillRun: true,
+        error: `terminal_closed: terminal is ${live?.status ?? 'missing'} — reconnect the SSH session before retrying`,
+      })
+      return
+    }
+    // Ring generation drift (T5): reconnect / pty restart rebuilds the ring and
+    // invalidates our write cursor — explicit ring_reset instead of a generic abort.
+    const curGen = useTerminalStore.getState().getSession(tmId)?.generation
+    if (curGen !== undefined && curGen !== startGeneration) {
+      finish('error', {
+        mayStillRun: true,
+        error:
+          'ring_reset: terminal was reconnected and its output buffer reset — re-read the terminal before continuing',
+      })
       return
     }
     const liveFlight = useTerminalAgentStore.getState().execFlightByTerminal[tmId]

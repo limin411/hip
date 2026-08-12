@@ -15,6 +15,7 @@ import { useTerminalStore } from '@/store/terminalStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useTerminalAgentStore, HANDED_OFF_MAX_MS } from '@/store/terminalAgentStore'
 import { EXEC_QUEUE_TIMEOUT_MS, userCommandRules } from './terminalAgentBridge'
+import { resetTerminalForReconnect } from './terminalLifecycle'
 
 vi.mock('@/ipc/ssh', () => ({
   sshWrite: vi.fn(),
@@ -377,5 +378,63 @@ describe('terminal bridge rule-based confirm (PR-4, spec T4)', () => {
     await sleep(600)
     const result = sent.find((m) => m.type === 'session:uiToolResult')
     expect(result).toMatchObject({ status: 'completed' })
+  })
+})
+
+describe('terminal bridge ring lifecycle (PR-5, spec T5)', () => {
+  beforeEach(() => {
+    vi.mocked(sshWrite).mockClear().mockResolvedValue(undefined as never)
+    useTerminalAgentStore.setState({
+      execFlightByTerminal: {},
+      execQueueByTerminal: {},
+      driverByTerminal: {},
+      pendingConfirmByTerminal: {},
+    })
+    useTerminalStore.setState({ bySession: {}, userInterleaved: {} })
+    seedStores()
+    vi.useRealTimers()
+  })
+
+  it('a reconnect rebuilds the ring with a bumped generation', () => {
+    useTerminalStore.getState().setGeneration(TM_ID, 3)
+    resetTerminalForReconnect(TM_ID)
+    expect(useTerminalStore.getState().getSession(TM_ID)?.generation).toBe(4)
+    expect(useTerminalStore.getState().getSession(TM_ID)?.ring).toEqual([])
+  })
+
+  it('an in-flight exec fails with ring_reset when the terminal reconnects', async () => {
+    const { sent } = bridgeRequest({ waitMs: 20000 })
+    await sleep(300)
+    // Simulate reconnect: ring rebuilt with a bumped generation.
+    resetTerminalForReconnect(TM_ID)
+    await sleep(600)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'error', mayStillRun: true })
+    expect(result && 'error' in result ? String(result.error) : '').toMatch(/ring_reset/)
+  })
+
+  it('an in-flight exec fails with terminal_closed when the SSH session drops', async () => {
+    const { sent } = bridgeRequest({ waitMs: 20000 })
+    await sleep(300)
+    useManagedTerminalStore.setState((s) => ({
+      terminals: s.terminals.map((t) =>
+        t.id === TM_ID ? { ...t, status: 'disconnected' as const } : t,
+      ),
+    }))
+    await sleep(600)
+    const result = sent.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'error', mayStillRun: true })
+    expect(result && 'error' in result ? String(result.error) : '').toMatch(/terminal_closed/)
+  })
+
+  it('a completed flight is unaffected by a later reconnect (generation checked per-flight)', async () => {
+    const { sent } = bridgeRequest({ waitMs: 5000 })
+    await sleep(300)
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(600)
+    expect(sent.find((m) => m.type === 'session:uiToolResult')).toMatchObject({ status: 'completed' })
+    // Reconnect afterwards must not retroactively fail the already-sent result.
+    resetTerminalForReconnect(TM_ID)
+    expect(sent.filter((m) => m.type === 'session:uiToolResult').length).toBe(1)
   })
 })

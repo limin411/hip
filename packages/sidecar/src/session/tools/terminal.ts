@@ -80,7 +80,13 @@ function waitForUi(
 
 function formatExecResult(result: UiToolResultPayload): string {
   if (!result.ok) {
-    return `terminal_exec failed (${result.status}): ${result.error ?? 'unknown error'}`
+    const err = result.error ?? 'unknown error'
+    const guidance = err.includes('ring_reset')
+      ? '\nThe terminal was reconnected and its output buffer was reset — use terminal_read to re-read the current terminal state before continuing.'
+      : err.includes('terminal_closed')
+        ? '\nThe terminal disconnected — ask the user to reconnect the SSH session before retrying.'
+        : ''
+    return `terminal_exec failed (${result.status}): ${err}${guidance}`
   }
   const lines = [
     `status: ${result.status}`,

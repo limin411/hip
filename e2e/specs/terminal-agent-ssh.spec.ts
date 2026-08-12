@@ -149,6 +149,12 @@ describe('terminal agent over real SSH @terminal-ssh', function () {
       },
     )
 
+    // Fence completion signal (terminal-shared-pty T1): the card shows the real
+    // exit code chip — df -h must have completed with exit 0 (not prompt-guessed).
+    const exitChip = await browser.$('[data-testid="terminal-tool-exit"]')
+    await exitChip.waitForExist({ timeout: 10000 })
+    expect(await exitChip.getText()).toContain('0')
+
     // Assistant reply lands in the session-scoped message list.
     const assistant = await browser.$('[data-testid="terminal-msg-assistant"]')
     await browser.waitUntil(

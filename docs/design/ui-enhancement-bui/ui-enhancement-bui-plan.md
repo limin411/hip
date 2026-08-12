@@ -2,6 +2,7 @@
 
 > 系列：`ui-enhancement-bui` ｜ spec：`ui-enhancement-bui-spec.md` ｜ 预览：`ui-enhancement-bui-preview.html`
 > 本文档按 spec §4/§5 落地，S1–S6 六个阶段，每阶段独立提交、可回滚。
+> **执行状态：S1–S6 已全部实施（2026-08，commit `10000db1` / `23ea68a9` / 收尾提交）；落地差异见 spec §5 状态注。**
 
 ---
 

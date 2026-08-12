@@ -155,11 +155,15 @@
 
 ## 6. 动效
 
-- 三档时长：`--duration-chrome 100ms`（按钮/行 hover）、`--duration-content 120ms`（内容进场）、`--duration-celebrate 200ms`（庆祝/欢迎语）。
+- 三档时长：`--duration-chrome 100ms`（按钮/行 hover）、`--duration-content 120ms`（内容进场）、`--duration-celebrate 200ms`（庆祝/欢迎语）；另两档（ui-enhancement-bui，2026-08）：`--duration-stream 240ms`（流式词块浮现）、`--duration-expand 300ms`（展开）。
 - 缓动：`--ease-standard cubic-bezier(0.2, 0, 0, 1)`（linear 化 decelerate，无弹性）。
 - 入场全部**纯 fade**：`message-enter`、`menu-in`、`modal-in`、`overlay-in`、`panel-in`、`view-enter`、`greeting-enter`。
-- 保留的循环动画：`blink`（状态点）、`dot-bounce`（纯 opacity，打字指示器）。
+- 保留的循环动画：`blink`（状态点）、`dot-bounce`（纯 opacity，打字指示器）、`pixel-wave`（3×3 点阵加载，纯 opacity 相位波纹）。
 - 交互反馈：hover 仅改底色（`hover:bg-state-hover`）；focus ring 2px 方形描边（`--focus-ring` = accent）；`transition-[background-color,color,border-color]`。
+- **允许清单（明示例外，ui-enhancement-bui）**：
+  1. `.clip-expand` —— `grid-template-rows 0fr↔1fr` 高度展开（无位移的布局动画，用于轨迹/工具行/任务明细）；
+  2. `.stream-chunk` —— 词块级 opacity 浮现（流式文本，≤ `--duration-stream`）。
+  其余动效一律维持纯 fade / 背景色过渡纪律：禁位移、缩放、blur、弹性、渐变、shimmer（既有 `composer-danger-*` 例外不动）。
 - 无障碍：`prefers-reduced-motion` 兜底 —— 全局动画/过渡压至 0.01ms、滚动切为 auto。
 
 ## 7. 关键组件样式

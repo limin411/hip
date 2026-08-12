@@ -787,13 +787,13 @@ export function AppSidebar() {
                   </button>
                   {groupExpanded ? (
                     <ul className="m-0 list-none p-0" aria-label={groupTitle}>
-                      {group.sessions.map((session) => (
+                      {group.sessions.map((session, i) => (
                         <SidebarSessionRow
                           key={session.id}
                           session={session}
                           activeSessionId={activeSessionId}
                           activeView={activeView}
-                          
+                          enterIndex={i}
                         />
                       ))}
                     </ul>
@@ -846,13 +846,13 @@ export function AppSidebar() {
                   </button>
                   {groupExpanded ? (
                     <ul className="m-0 list-none p-0" aria-label={groupLabel}>
-                      {group.sessions.map((session) => (
+                      {group.sessions.map((session, i) => (
                         <SidebarSessionRow
                           key={session.id}
                           session={session}
                           activeSessionId={activeSessionId}
                           activeView={activeView}
-                          
+                          enterIndex={i}
                         />
                       ))}
                     </ul>
@@ -918,10 +918,13 @@ function SidebarSessionRow({
   session,
   activeSessionId,
   activeView,
+  /** Stagger index for first-mount fade (ui-enhancement-bui P1-4); omit to skip. */
+  enterIndex,
 }: {
   session: SessionVM
   activeSessionId: string | null
   activeView: string
+  enterIndex?: number
 }) {
   const { t } = useTranslation()
   const sidebarSection = useUiStore((s) => s.sidebarSection)
@@ -942,7 +945,11 @@ function SidebarSessionRow({
   const indentClass = sidebarSection === 'projects' ? 'pl-10' : 'pl-[26px]'
 
   return (
-    <li data-testid={`sidebar-session-group-${session.id}`}>
+    <li
+      data-testid={`sidebar-session-group-${session.id}`}
+      className={cn(enterIndex != null && 'animate-sidebar-row')}
+      style={enterIndex != null ? { ['--row-i' as string]: enterIndex } : undefined}
+    >
       <DeclarativeContextMenu
         kind="sessionHistory"
         payload={{

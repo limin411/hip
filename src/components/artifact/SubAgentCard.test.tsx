@@ -123,15 +123,18 @@ describe('SubAgentCard context menu', () => {
     expandCard()
     const disclosure = screen.getByTestId('thinking-disclosure')
     expect(disclosure).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('thinking')).not.toBeInTheDocument()
+    // clip-expand keeps the content mounted but hidden (grid-rows 0fr + opacity 0)
+    const clip = screen.getByText('thinking').closest('.clip-expand')
+    expect(clip).not.toBeNull()
+    expect(clip).not.toHaveClass('is-open')
 
     fireEvent.click(disclosure)
     expect(disclosure).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText('thinking')).toBeInTheDocument()
+    expect(screen.getByText('thinking').closest('.clip-expand')).toHaveClass('is-open')
 
     fireEvent.click(disclosure)
     expect(disclosure).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('thinking')).not.toBeInTheDocument()
+    expect(screen.getByText('thinking').closest('.clip-expand')).not.toHaveClass('is-open')
   })
 
   it('collapses reply by default when done and expands on click', () => {

@@ -282,7 +282,7 @@ function MessageBubbleImpl({ message, streaming, isLastAssistant, hidePlan }: Me
       )}
       {!streaming && (
         <div
-          className="mt-1 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5"
+          className="mt-1 flex min-h-[var(--trail-min-h)] animate-view-enter items-center gap-[var(--meta-gap)] text-meta leading-5"
         >
           <MessageActions message={message} isLastAssistant={!!isLastAssistant} />
           {message.role === 'assistant' && message.memoryCitations && message.memoryCitations.length > 0 && (

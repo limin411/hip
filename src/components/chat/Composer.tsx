@@ -90,12 +90,12 @@ export function Composer({
       className={cn(
         isCard
           ? cn(
-              'relative rounded-lg border bg-surface-subtle p-2.5',
+              'relative rounded-lg border bg-surface-subtle p-2.5 transition-colors',
               danger
                 ? running
                   ? 'composer-danger-flow'
                   : 'composer-danger-glow border-danger-soft'
-                : 'border-border',
+                : 'border-border focus-within:border-border-strong',
             )
           // Flat dock: no focus chrome — InputBar already draws the top rule.
           : 'bg-surface-subtle',
@@ -106,7 +106,7 @@ export function Composer({
       {hasAnns && (
         <div
           className={cn(
-            'mb-2 flex items-center gap-2 rounded-md border border-border bg-surface-muted px-2.5 py-1.5',
+            'mb-2 flex animate-view-enter items-center gap-2 rounded-md border border-border bg-surface-muted px-2.5 py-1.5',
           )}
           data-testid="composer-diff-annotations"
         >
@@ -127,7 +127,7 @@ export function Composer({
       {hasQuote && (
         <div
           className={cn(
-            'mb-2 flex items-start gap-2 rounded-md border-l-2 border-accent bg-surface-muted px-2.5 py-1.5',
+            'mb-2 flex animate-view-enter items-start gap-2 rounded-md border-l-2 border-accent bg-surface-muted px-2.5 py-1.5',
           )}
           data-testid="composer-quote"
         >
@@ -149,7 +149,7 @@ export function Composer({
         </div>
       )}
       {attachments.length > 0 && (
-        <div className={cn('flex flex-wrap gap-1 pb-2', isCard && 'px-2')}>
+        <div className={cn('flex animate-view-enter flex-wrap gap-1 pb-2', isCard && 'px-2')}>
           {attachments.map((a) => (
             <div
               key={a.id}

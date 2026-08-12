@@ -219,6 +219,12 @@ hip 现有原则（`DESIGN.md`）：固体优先（禁玻璃）、边界优先�
 | S5 | P1 四项 | `MessageBubble.tsx`、`Composer.tsx`、`LoadingScreen.tsx`、`AppSidebar.tsx` | 1d |
 | S6 | 收尾 | DESIGN.md §6 动效新增"允许清单"；`docs/design` 截图对比；视觉 QA 清单走查 | 0.5d |
 
+> **实施状态（2026-08）**：S1–S6 已全部落地（`10000db1` / `23ea68a9` / 收尾提交）。落地差异：
+> - S2 未做 rail 行级 stagger（轨迹为单块 pre，无行列表；rail 高度动画违反禁缩放，按 spec 裁决跳过）；
+> - S3 hover 显露 chevron 落地为**常显 chevron**（可发现性 + 触屏友好）；
+> - S4 图标"交叉过渡"落地为 keyed 挂载淡入（`animate-status-icon` 120ms，spec §4 的"或直接 opacity 过渡"分支）；
+> - P1-3 点阵加载仅用于 `LoadingScreen`，运行条状态点保留原 `animate-pulse`（点阵与其共用的视觉噪声重复）。
+
 ### 动效"允许清单"（写入 DESIGN.md §6）
 
 1. 时长新增一档：`--duration-stream: 240ms`（流式词块）、`--duration-expand: 300ms`（展开）。

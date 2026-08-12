@@ -115,6 +115,7 @@ export function buildTerminalTools(opts: TerminalToolOpts): StructuredToolInterf
       wait_ms?: number
       poll?: boolean
       wrapEc?: boolean
+      fence?: boolean
     }) => {
       if (!bridge) return 'Error: terminal bridge is not available for this session'
       if (!requestApproval) return 'Error: terminal_exec is not permitted in this permission mode'
@@ -149,6 +150,7 @@ export function buildTerminalTools(opts: TerminalToolOpts): StructuredToolInterf
         waitMs,
         poll: input.poll !== false,
         ...(input.wrapEc === true ? { wrapEc: true } : {}),
+        ...(input.fence !== false ? { fence: true } : {}),
       })
       const raw = await pending
       if (raw.type === 'session:uiToolRead:result') {
@@ -160,16 +162,21 @@ export function buildTerminalTools(opts: TerminalToolOpts): StructuredToolInterf
       name: 'terminal_exec',
       description:
         'Run one command in the SSH managed terminal the user is looking at (shared PTY). ' +
-        'The command is typed into the visible terminal after user approval. Returns the captured ' +
-        'output with an explicit status: completed / timed_out / user_interleaved / rejected / error / aborted. ' +
+        'The command is typed into the visible terminal after user approval. By default the ' +
+        'command is wrapped in an invisible fence (OSC 633 semantics): the UI signals ' +
+        'completion with the real exit code instead of guessing from the prompt. ' +
+        'Returns the captured output with an explicit status: completed / timed_out / ' +
+        'user_interleaved / rejected / error / aborted. ' +
         'A timed_out result means the command MAY STILL BE RUNNING — never claim success; poll terminal_read or ask the user. ' +
-        'Prefer non-interactive flags (-y, --noconfirm, DEBIAN_FRONTEND=noninteractive).',
+        'Prefer non-interactive flags (-y, --noconfirm, DEBIAN_FRONTEND=noninteractive). ' +
+        'Commands ending in exit/exec are incompatible with the fence (the marker never prints); set fence:false for them.',
       schema: z.object({
         command: z.string().describe('single shell command to run (no trailing newline)'),
         reason: z.string().optional().describe('why this command is needed (shown in the approval prompt)'),
         wait_ms: z.number().optional().describe('max milliseconds to wait for output (default 15000, max 120000)'),
         poll: z.boolean().optional().describe('poll the terminal ring before returning (default true)'),
-        wrapEc: z.boolean().optional().describe('opt-in __HIP_EC wrapper for structured exit codes'),
+        wrapEc: z.boolean().optional().describe('legacy __HIP_EC wrapper; prefer the default fence'),
+        fence: z.boolean().optional().describe('invisible OSC-633 completion fence (default true); set false for exit/exec-ending commands'),
       }),
     },
   )

@@ -66,6 +66,42 @@ export function extractExitCode(output: string): number | null {
   return m ? Number(m[1]) : null
 }
 
+/**
+ * Command fence (spec T1 / terminal-shared-pty PR-1): wraps the command so its
+ * completion is signaled by an invisible OSC 633 marker carrying the real exit
+ * code — no prompt-tail guessing. The marker bytes are ignored by xterm
+ * (unregistered OSC → OscHandlerFallback, verified in PR-0), so the user sees
+ * only the command itself and its output.
+ *
+ * The wrapper text is pure ASCII literal escapes (`$'\x1b…'`): the ESC bytes are
+ * produced by printf at execution time, so readline never sees raw control bytes
+ * in its input buffer (embedding raw ESC in the written text would corrupt the
+ * visible command line).
+ */
+export const FENCE_START = '\x1b]633;A\x1b\\'
+export const FENCE_END = '\x1b]633;D;'
+export const FENCE_TERM = '\x1b\\'
+const FENCE_EXIT_RE = /\x1b\]633;D;(\d+)\x1b\\/g
+
+/** Wrap one command with fence markers (default exec path). */
+export function wrapForFence(command: string): string {
+  return `printf $'\\x1b]633;A\\x1b\\\\'; ${command}; printf $'\\x1b]633;D;%s\\x1b\\\\' "$?"`
+}
+
+/** Last `OSC 633 ; D ; <code> ST` in the output; null when no fence marker. */
+export function extractFenceExitCode(output: string): number | null {
+  FENCE_EXIT_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  let last: string | null = null
+  while ((m = FENCE_EXIT_RE.exec(output)) !== null) last = m[1]
+  return last === null ? null : Number(last)
+}
+
+/** Fence exit code first, legacy __HIP_EC marker as fallback. */
+export function extractExecExitCode(output: string): number | null {
+  return extractFenceExitCode(output) ?? extractExitCode(output)
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
@@ -99,6 +135,7 @@ async function runExec(
   send: (m: ClientMessage) => void,
 ): Promise<void> {
   const { sessionId, callId, command, waitMs } = msg
+  const useFence = msg.fence !== false
   const wrapEc = msg.wrapEc === true
   const tmId = terminalIdForSession(sessionId)
   if (!tmId) {
@@ -172,7 +209,7 @@ async function runExec(
     flightAborters.delete(tmId)
     useTerminalAgentStore.getState().setExecFlight(tmId, null)
     const { output } = useTerminalStore.getState().getRingSince(tmId, startCursor)
-    const exitCode = extractExitCode(output)
+    const exitCode = extractExecExitCode(output)
     send({
       type: 'session:uiToolResult',
       sessionId,
@@ -198,7 +235,7 @@ async function runExec(
       finish('rejected', { mayStillRun: false, error: 'dangerous command rejected by user' })
       return
     }
-    await sshWrite(tmId, `${wrapEc ? wrapForEc(command) : command}\n`)
+    await sshWrite(tmId, `${useFence ? wrapForFence(command) : wrapEc ? wrapForEc(command) : command}\n`)
   } catch (err) {
     finish('error', { mayStillRun: false, error: errorMessage(err) })
     return
@@ -225,6 +262,16 @@ async function runExec(
       const interleaved = useTerminalStore.getState().consumeUserInterleaved(tmId)
       finish(interleaved ? 'user_interleaved' : 'timed_out', { mayStillRun: true })
       return
+    }
+    // Fence signal first (spec T1): an invisible OSC 633 D-marker carrying the
+    // real exit code is authoritative completion — no prompt-tail guessing.
+    if (useFence) {
+      const { output } = useTerminalStore.getState().getRingSince(tmId, startCursor)
+      if (extractFenceExitCode(output) !== null) {
+        const interleaved = useTerminalStore.getState().consumeUserInterleaved(tmId)
+        finish(interleaved ? 'user_interleaved' : 'completed', { output })
+        return
+      }
     }
     if (Date.now() - lastOutputAt >= EXEC_SILENCE_MS) {
       const { output } = useTerminalStore.getState().getRingSince(tmId, startCursor)

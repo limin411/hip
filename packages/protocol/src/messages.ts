@@ -427,8 +427,14 @@ export type ServerMessage =
       command: string
       waitMs: number
       poll: boolean
-      /** Opt-in __HIP_EC exit-code wrapper (P1). */
+      /** Opt-in legacy __HIP_EC exit-code wrapper (P1, kept for compatibility). */
       wrapEc?: boolean
+      /**
+       * Command fence (default true): wraps the command with invisible OSC 633
+       * markers carrying the real exit code — completion is signaled by the
+       * fence instead of prompt-tail guessing (terminal-shared-pty T1).
+       */
+      fence?: boolean
     }
   /**
    * Read-only tool bridge request (terminal_read / sftp_read). No HITL — the UI

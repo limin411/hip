@@ -84,6 +84,24 @@ describe('terminal tools', () => {
     expect(out).toMatch(/\$ /)
   })
 
+  it('sends the completion fence by default (terminal-shared-pty T1)', async () => {
+    const { bridge, sent } = makeBridge()
+    const requestApproval = approval({ kind: 'allow_once' })
+    const [exec] = buildTerminalTools({ sessionId: 's1', requestApproval, bridge })
+    await exec.invoke({ command: 'df -h' })
+    const req = sent.find((m) => m.type === 'session:terminalExec:request')
+    expect(req).toMatchObject({ fence: true })
+  })
+
+  it('fence:false omits the fence flag (fallback path)', async () => {
+    const { bridge, sent } = makeBridge()
+    const requestApproval = approval({ kind: 'allow_once' })
+    const [exec] = buildTerminalTools({ sessionId: 's1', requestApproval, bridge })
+    await exec.invoke({ command: 'df -h', fence: false })
+    const req = sent.find((m) => m.type === 'session:terminalExec:request')
+    expect('fence' in (req ?? {})).toBe(false)
+  })
+
   it('rejected approval never sends the write request', async () => {
     const { bridge, sent } = makeBridge()
     const requestApproval = approval({ kind: 'reject_once' })

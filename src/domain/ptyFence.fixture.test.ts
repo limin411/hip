@@ -15,13 +15,13 @@
  */
 import { describe, expect, it, test } from 'vitest'
 import { spawn } from 'node:child_process'
-import { hasPromptTail } from './terminalAgentBridge'
+import { hasPromptTail, wrapForFence } from './terminalAgentBridge'
 
-/** 围栏字符串（PR-1 会把它收敛为 bridge 的 wrapForFence；夹具先行固化形态）。 */
-export function fenceWrapForFixture(command: string): string {
-  return `printf '\\x1b]633;A\\x1b\\\\'; ${command}; printf '\\x1b]633;D;%s\\x1b\\\\' "$?"`
-}
-
+/**
+ * 夹具直接使用 PR-1 的 wrapForFence（单源）；围栏文本必须是纯 ASCII 字面
+ * 转义（`$'\x1b…'`），执行时 printf 才产生 ESC 字节——readline 不会看到
+ * 原始控制字节。
+ */
 export const FENCE_START_MARKER = '\x1b]633;A\x1b\\'
 export const FENCE_END_MARKER = '\x1b]633;D;'
 
@@ -65,9 +65,18 @@ function markerValue(output: string, prefix: string): string | null {
 }
 
 describe.skipIf(!HAS_PTY_TOOL)('pty fence fixture (real shell via script)', () => {
+  test('wrapForFence is pure ASCII literal (no raw ESC bytes in the written text)', () => {
+    const wrapped = wrapForFence('echo fence-ok')
+    // The visible command line must not embed raw control bytes.
+    for (const ch of wrapped) {
+      if (ch.charCodeAt(0) < 0x20) throw new Error(`raw control byte in wrapper: ${JSON.stringify(wrapped)}`)
+    }
+    expect(wrapped).toContain("printf $'\\x1b]633;A\\x1b\\\\'")
+  })
+
   test('fence markers pass through the pty unchanged and carry exit code 0', async () => {
     for (const shell of SHELLS) {
-      const out = await runInPty(shell, fenceWrapForFixture('echo fence-ok'))
+      const out = await runInPty(shell, wrapForFence('echo fence-ok'))
       expect(out).toContain(FENCE_START_MARKER)
       expect(out).toContain('fence-ok')
       const code = markerValue(out, FENCE_END_MARKER)
@@ -77,7 +86,7 @@ describe.skipIf(!HAS_PTY_TOOL)('pty fence fixture (real shell via script)', () =
 
   test('fence D marker carries the real nonzero exit code', async () => {
     for (const shell of SHELLS) {
-      const out = await runInPty(shell, fenceWrapForFixture('false'))
+      const out = await runInPty(shell, wrapForFence('false'))
       expect(markerValue(out, FENCE_END_MARKER)).toBe('1')
     }
   })
@@ -86,7 +95,7 @@ describe.skipIf(!HAS_PTY_TOOL)('pty fence fixture (real shell via script)', () =
     for (const shell of SHELLS) {
       // `ls /nonexistent` fails but the fence's `$?` reflects the failing command;
       // a pipeline would reflect its last element — same as wrapEc today.
-      const out = await runInPty(shell, fenceWrapForFixture('ls /definitely-not-here 2>/dev/null'))
+      const out = await runInPty(shell, wrapForFence('ls /definitely-not-here 2>/dev/null'))
       expect(markerValue(out, FENCE_END_MARKER)).toBe('1')
     }
   })

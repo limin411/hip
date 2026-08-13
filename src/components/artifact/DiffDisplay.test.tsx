@@ -230,7 +230,7 @@ describe('DiffDisplay class polish', () => {
     expect(tail.className).toMatch(/text-ink-tertiary/)
   })
 
-  it('T4: word-diff spans use /35 tints with 2px rounding', () => {
+  it('T4: word-diff spans use /36 tints with 2px rounding', () => {
     render(
       <DiffDisplay
         files={[file]}
@@ -240,8 +240,8 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     // Equal-length del/add pair → word-diff; mid '1' vs '2' is changed.
-    const success = document.querySelector('.bg-success\\/35')
-    const danger = document.querySelector('.bg-danger\\/35')
+    const success = document.querySelector('.bg-diff-add\\/\\[0\\.36\\]')
+    const danger = document.querySelector('.bg-diff-del\\/\\[0\\.36\\]')
     expect(success).toBeTruthy()
     expect(danger).toBeTruthy()
     expect(success!.className).toContain('rounded-[2px]')
@@ -265,8 +265,8 @@ describe('DiffDisplay class polish', () => {
     const panes = document.querySelectorAll('div.overflow-x-auto')
     expect(panes).toHaveLength(2)
     // 左栏 del 侧有 danger 高亮 span，右栏 add 侧有 success 高亮 span
-    expect(panes[0]!.querySelector('.bg-danger\\/35')).toBeTruthy()
-    expect(panes[1]!.querySelector('.bg-success\\/35')).toBeTruthy()
+    expect(panes[0]!.querySelector('.bg-diff-del\\/\\[0\\.36\\]')).toBeTruthy()
+    expect(panes[1]!.querySelector('.bg-diff-add\\/\\[0\\.36\\]')).toBeTruthy()
   })
 
   it('T4: no word-diff spans for unpaired or overlong lines', () => {
@@ -287,14 +287,14 @@ describe('DiffDisplay class polish', () => {
       { type: 'del', content: 'gone', oldNo: 1, newNo: null },
       { type: 'ctx', content: 'after', oldNo: 2, newNo: 1 },
     ])
-    expect(panes[0]!.querySelector('.bg-danger\\/35')).toBeNull()
-    expect(panes[1]!.querySelector('.bg-success\\/35')).toBeNull()
+    expect(panes[0]!.querySelector('.bg-diff-del\\/\\[0\\.36\\]')).toBeNull()
+    expect(panes[1]!.querySelector('.bg-diff-add\\/\\[0\\.36\\]')).toBeNull()
     panes = panesOf([
       { type: 'del', content: 'short', oldNo: 1, newNo: null },
       { type: 'add', content: 'x'.repeat(2500), oldNo: null, newNo: 1 },
     ])
-    expect(panes[0]!.querySelector('.bg-danger\\/35')).toBeNull()
-    expect(panes[1]!.querySelector('.bg-success\\/35')).toBeNull()
+    expect(panes[0]!.querySelector('.bg-diff-del\\/\\[0\\.36\\]')).toBeNull()
+    expect(panes[1]!.querySelector('.bg-diff-add\\/\\[0\\.36\\]')).toBeNull()
   })
 
   it('split view gives each column its own horizontal scroll pane', () => {
@@ -652,18 +652,23 @@ describe('DiffDisplay class polish', () => {
         onToggleCollapse={() => {}}
       />,
     )
+    // 代码区容器：diff 主色变量按代码块明度切到深档（原型深色板 #4caf50/#ff5252）
+    const area = screen.getByTestId('diff-code-area')
+    expect(area.getAttribute('style')).toContain('--diff-add-rgb: 76 175 80')
+    expect(area.getAttribute('style')).toContain('--diff-del-rgb: 255 82 82')
     const rows = rowsOf()
     const del = rows[0]!
     const add = rows[1]!
-    // 色条：GitHub dark 主题 diff 红/绿，而非应用主题色
-    expect(del.style.borderLeftColor).toBe('#f85149')
-    expect(add.style.borderLeftColor).toBe('#238636')
-    // 块描边：主题 diff 色 30%（hex alpha 4d）
-    expect(del.style.boxShadow).toBe('inset 0 0 0 1px #f851494d')
-    expect(add.style.boxShadow).toBe('inset 0 0 0 1px #2386364d')
-    // 行号列：底纹 = 主题 headerBackground（不再用应用 bg-subtle 白灰），分隔线 = 主题 border
-    const lns = del.querySelectorAll<HTMLElement>('.bg-surface-subtle\\/40')
+    // 色条/描边：引用 diff 变量（随容器覆盖解析为深档）
+    expect(del.style.borderLeftColor).toBe('rgb(var(--diff-del-rgb))')
+    expect(add.style.borderLeftColor).toBe('rgb(var(--diff-add-rgb))')
+    expect(del.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--diff-del-rgb) / 0.24)')
+    expect(add.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--diff-add-rgb) / 0.24)')
+    // 行号列：底纹 = 主题 headerBackground（不再用应用 bg-subtle 白灰），分隔线 = 主题 border；
+    // add/del 行号文字 = 主色（对齐原型），ctx 行号 = headerText
+    const lns = del.querySelectorAll<HTMLElement>('.bg-surface-subtle\\/\\[0\\.62\\]')
     expect(lns[0]!.style.backgroundColor).toBe('#161b22')
+    expect(lns[0]!.style.color).toBe('rgb(var(--diff-del-rgb))')
     expect(lns[1]!.style.borderRightColor).toBe('#30363d')
   })
 
@@ -699,21 +704,22 @@ describe('DiffDisplay class polish', () => {
     const rows = rowsOf()
     expect(rows).toHaveLength(4)
     // 上下文行：无色条、无底色、无描边 shadow；border 透明占位保持行号列对齐
-    expect(rows[0]!.className).toContain('border-l-2 border-transparent')
-    expect(rows[0]!.className).not.toMatch(/bg-(success|danger)/)
+    expect(rows[0]!.className).toContain('border-l-[3px] border-transparent')
+    expect(rows[0]!.className).not.toMatch(/bg-(success|danger|diff)/)
     expect(rows[0]!.style.boxShadow).toBe('')
-    // del 行：12% 底色 + 左侧 2px 主色色条（border，不被行号列遮挡）+ 块首圆角/间距
-    expect(rows[1]!.className).toContain('bg-danger/[0.12]')
-    expect(rows[1]!.className).toContain('border-l-2 border-danger')
-    expect(rows[1]!.className).toContain('rounded-t-[4px]')
-    expect(rows[1]!.className).toContain('mt-px')
-    expect(rows[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--danger-rgb) / 0.3)')
+    // del 行：13% 底色 + 左侧 3px 主色色条（border，不被行号列遮挡）+ 块首圆角/间距
+    expect(rows[1]!.className).toContain('bg-diff-del/[0.13]')
+    expect(rows[1]!.className).toContain('border-l-[3px]')
+    expect(rows[1]!.style.borderLeftColor).toBe('rgb(var(--diff-del-rgb))')
+    expect(rows[1]!.className).toContain('rounded-t-[6px]')
+    expect(rows[1]!.className).toContain('mt-[3px]')
+    expect(rows[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--diff-del-rgb) / 0.24)')
     // add 行：success 侧 + 块末圆角/间距
-    expect(rows[2]!.className).toContain('bg-success/[0.12]')
-    expect(rows[2]!.className).toContain('border-l-2 border-success')
-    expect(rows[2]!.className).toContain('rounded-b-[4px]')
-    expect(rows[2]!.className).toContain('mb-px')
-    expect(rows[2]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--success-rgb) / 0.3)')
+    expect(rows[2]!.className).toContain('bg-diff-add/[0.13]')
+    expect(rows[2]!.style.borderLeftColor).toBe('rgb(var(--diff-add-rgb))')
+    expect(rows[2]!.className).toContain('rounded-b-[6px]')
+    expect(rows[2]!.className).toContain('mb-[3px]')
+    expect(rows[2]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--diff-add-rgb) / 0.24)')
     expect(rows[3]!.style.boxShadow).toBe('')
   })
 
@@ -732,10 +738,10 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     const rows = rowsOf()
-    expect(rows[0]!.className).toContain('rounded-t-[4px]')
+    expect(rows[0]!.className).toContain('rounded-t-[6px]')
     expect(rows[1]!.className).not.toMatch(/rounded-/)
     expect(rows[2]!.className).not.toMatch(/rounded-/)
-    expect(rows[3]!.className).toContain('rounded-b-[4px]')
+    expect(rows[3]!.className).toContain('rounded-b-[6px]')
     // 单行块（del,ctx,add）首末同圆角
     cleanup()
     render(
@@ -751,8 +757,8 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     const single = rowsOf()
-    expect(single[0]!.className).toContain('rounded-[4px]')
-    expect(single[2]!.className).toContain('rounded-[4px]')
+    expect(single[0]!.className).toContain('rounded-[6px]')
+    expect(single[2]!.className).toContain('rounded-[6px]')
   })
 
   it('T3: line-number column gets its own tint, separator, and type coloring', () => {
@@ -770,18 +776,18 @@ describe('DiffDisplay class polish', () => {
     )
     const rows = rowsOf()
     const lnSpans = (row: HTMLElement) =>
-      Array.from(row.querySelectorAll('span')).filter((s) => s.className.includes('bg-surface-subtle/40'))
+      Array.from(row.querySelectorAll('span')).filter((s) => s.className.includes('bg-surface-subtle/[0.62]'))
     const ctxLn = lnSpans(rows[0]!)
     expect(ctxLn).toHaveLength(2)
     expect(ctxLn[0]!.className).toContain('text-ink-tertiary/80')
-    // 第二行号列带右侧分隔线
-    expect(ctxLn[1]!.className).toContain('border-r border-border/70')
+    // 第二行号列带右侧分隔线（100% 边框，对齐原型）
+    expect(ctxLn[1]!.className).toContain('border-r border-border')
     expect(ctxLn[0]!.className).not.toMatch(/border-r/)
-    // 变更行行号随行类型着色
+    // 变更行行号随行类型着色（全强度，对齐原型）
     const delLn = lnSpans(rows[1]!)
-    expect(delLn[0]!.className).toContain('text-danger/80')
+    expect(delLn[0]!.className).toContain('text-diff-del')
     const addLn = lnSpans(rows[2]!)
-    expect(addLn[0]!.className).toContain('text-success/80')
+    expect(addLn[0]!.className).toContain('text-diff-add')
   })
 
   it('T2/T3 split: blocks get neutral ring, per-side rail, and gutter separator', () => {
@@ -808,22 +814,23 @@ describe('DiffDisplay class polish', () => {
     const left = cells(panes[0]!)
     const right = cells(panes[1]!)
     expect(left).toHaveLength(4) // ctx, del, del, ctx
-    // 左栏：del 行 = danger 色条（border）+ 中性描边；首行块首圆角/间距、末行块末圆角/间距
-    expect(left[1]!.className).toContain('border-l-2 border-danger')
-    expect(left[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
-    expect(left[1]!.className).toContain('rounded-t-[4px]')
-    expect(left[1]!.className).toContain('mt-px')
-    expect(left[2]!.className).toContain('rounded-b-[4px]')
-    expect(left[2]!.className).toContain('mb-px')
+    // 左栏：del 行 = danger 色条（border 内联）+ 中性描边 100%；首行块首圆角/间距、末行块末圆角/间距
+    expect(left[1]!.className).toContain('border-l-[3px]')
+    expect(left[1]!.style.borderLeftColor).toBe('rgb(var(--diff-del-rgb))')
+    expect(left[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb))')
+    expect(left[1]!.className).toContain('rounded-t-[6px]')
+    expect(left[1]!.className).toContain('mt-[3px]')
+    expect(left[2]!.className).toContain('rounded-b-[6px]')
+    expect(left[2]!.className).toContain('mb-[3px]')
     expect(left[0]!.style.boxShadow).toBe('')
     // 右栏：add 行 = success 色条 + 中性描边
-    expect(right[1]!.className).toContain('border-l-2 border-success')
-    expect(right[2]!.className).toContain('border-l-2 border-success')
-    expect(right[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
+    expect(right[1]!.style.borderLeftColor).toBe('rgb(var(--diff-add-rgb))')
+    expect(right[2]!.style.borderLeftColor).toBe('rgb(var(--diff-add-rgb))')
+    expect(right[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb))')
     // 单行号列带分隔线；del 行号着色
-    const ln = Array.from(left[1]!.querySelectorAll('span')).find((s) => s.className.includes('bg-surface-subtle/40'))!
-    expect(ln.className).toContain('border-r border-border/70')
-    expect(ln.className).toContain('text-danger/80')
+    const ln = Array.from(left[1]!.querySelectorAll('span')).find((s) => s.className.includes('bg-surface-subtle/[0.62]'))!
+    expect(ln.className).toContain('border-r border-border')
+    expect(ln.className).toContain('text-diff-del')
     // 不等长配对 del / add,add → 左栏空单元格仍属块（中性描边 + 块末圆角）
     cleanup()
     render(
@@ -839,9 +846,9 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     const l2 = cells(document.querySelectorAll('div.overflow-x-auto')[0]!)
-    expect(l2[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
-    expect(l2[1]!.className).toContain('rounded-b-[4px]')
-    expect(l2[1]!.className).toContain('border-l-2 border-transparent')
-    expect(l2[0]!.className).toContain('rounded-t-[4px]')
+    expect(l2[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb))')
+    expect(l2[1]!.className).toContain('rounded-b-[6px]')
+    expect(l2[1]!.className).toContain('border-l-[3px] border-transparent')
+    expect(l2[0]!.className).toContain('rounded-t-[6px]')
   })
 })

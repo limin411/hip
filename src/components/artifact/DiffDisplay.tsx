@@ -28,9 +28,9 @@ import {
 } from '@/components/ui/DropdownMenu'
 
 export const STATUS_CHIP = {
-  added: { cls: 'bg-success/10 text-success', key: 'artifact.diffView.statusAdded', letter: 'A' },
+  added: { cls: 'bg-diff-add/[0.13] text-diff-add', key: 'artifact.diffView.statusAdded', letter: 'A' },
   modified: { cls: 'bg-warning/10 text-warning', key: 'artifact.diffView.statusModified', letter: 'M' },
-  deleted: { cls: 'bg-danger/10 text-danger', key: 'artifact.diffView.statusDeleted', letter: 'D' },
+  deleted: { cls: 'bg-diff-del/[0.13] text-diff-del', key: 'artifact.diffView.statusDeleted', letter: 'D' },
   renamed: { cls: 'bg-surface-muted text-ink-secondary', key: 'artifact.diffView.statusRenamed', letter: 'R' },
 } as const satisfies Record<DiffFileStatus, { cls: string; key: string; letter: string }>
 
@@ -49,37 +49,36 @@ function DiffFileTypeIcon({ path, size = 14 }: { path: string; size?: number }) 
 /** 变更块内位置：first/mid/last/single（单行块），null = 上下文行。 */
 type BlockPos = 'first' | 'mid' | 'last' | 'single' | null
 
-/** 行级视觉：12% 底色 + hover 加深（T1）。色条用 border-left（T1）：
- *  inset shadow 绘制在子元素背景之下，会被行号列底纹遮挡 70%——border 在内容之外不受影响。
- *  所有行（含 ctx）保留 border-l-2 占位，行号列对齐。 */
+/** 行级视觉：13% 底色 + hover 19%（T1，对齐预览原型）。色条用 border-left 3px（T1）：
+ *  inset shadow 绘制在子元素背景之下，会被行号列底纹遮挡——border 在内容之外不受影响。
+ *  所有行（含 ctx）保留 border-l-[3px] 占位，行号列对齐；颜色走内联（--diff-* 变量，随主题/代码块明度覆盖）。 */
 function lineStyle(t: DiffLineType, pos: BlockPos = null): string {
-  if (t === 'ctx') return 'border-l-2 border-transparent'
+  if (t === 'ctx') return 'border-l-[3px] border-transparent'
   const tint =
-    t === 'add' ? 'bg-success/[0.12] hover:bg-success/[0.18]' : 'bg-danger/[0.12] hover:bg-danger/[0.18]'
-  const rail = t === 'add' ? 'border-l-2 border-success' : 'border-l-2 border-danger'
-  return cn(tint, rail, blockPosCls(pos))
+    t === 'add'
+      ? 'bg-diff-add/[0.13] hover:bg-diff-add/[0.19]'
+      : 'bg-diff-del/[0.13] hover:bg-diff-del/[0.19]'
+  return cn(tint, 'border-l-[3px]', blockPosCls(pos))
 }
 
-/** T2 块描边（inset 1px）。split 块用中性边框，unified 块用主色 30%；chrome 模式用代码块主题色。 */
+/** T1 色条颜色（行 div 内联；--diff-* 变量随主题/代码块明度覆盖）。 */
+function railColor(t: DiffLineType): string {
+  return t === 'add' ? 'rgb(var(--diff-add-rgb))' : 'rgb(var(--diff-del-rgb))'
+}
+
+/** T2 块描边（inset 1px，24% 主色，对齐原型）。split 块用中性边框 100%（原型 var(--border)）。 */
 function lineShadow(t: DiffLineType, split: boolean, chrome: CodeBlockChromePalette | null): string | undefined {
   if (t === 'ctx') return undefined
-  if (chrome) {
-    const c = t === 'add' ? chrome.diffAdd : chrome.diffDel
-    return split
-      ? `inset 0 0 0 1px ${chrome.border}`
-      : `inset 0 0 0 1px ${c}4d` // 30% alpha（hex）
-  }
-  const c = t === 'add' ? 'var(--success-rgb)' : 'var(--danger-rgb)'
-  return split
-    ? 'inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)'
-    : `inset 0 0 0 1px rgb(${c} / 0.3)`
+  if (split) return `inset 0 0 0 1px ${chrome?.border ?? 'rgb(var(--border-rgb))'}`
+  const c = t === 'add' ? 'var(--diff-add-rgb)' : 'var(--diff-del-rgb)'
+  return `inset 0 0 0 1px rgb(${c} / 0.24)`
 }
 
 /** 块位置类：首/末行圆角 + 与相邻上下文行留 1px 间距。 */
 function blockPosCls(pos: BlockPos): string {
-  if (pos === 'first') return 'mt-px rounded-t-[4px]'
-  if (pos === 'last') return 'mb-px rounded-b-[4px]'
-  if (pos === 'single') return 'mt-px mb-px rounded-[4px]'
+  if (pos === 'first') return 'mt-[3px] rounded-t-[6px]'
+  if (pos === 'last') return 'mb-[3px] rounded-b-[6px]'
+  if (pos === 'single') return 'mt-[3px] mb-[3px] rounded-[6px]'
   return ''
 }
 
@@ -101,12 +100,11 @@ function changeRunPositions<T>(lines: T[], isChange: (l: T) => boolean): BlockPo
   return pos
 }
 
-/** 行号列（T3）：独立底纹 + 行类型着色；unified 第二列（split 单列）带右侧分隔线。
- *  底纹 /40（原 /70 会盖住块描边左边缘与色条残留）。 */
+/** 行号列（T3）：独立底纹 62%（对齐原型）+ 行类型着色全强度；unified 第二列（split 单列）带右侧分隔线。 */
 function lnCls(line: DiffLine): string {
   return cn(
-    'w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption bg-surface-subtle/40',
-    line.type === 'add' ? 'text-success/80' : line.type === 'del' ? 'text-danger/80' : 'text-ink-tertiary/80',
+    'w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption bg-surface-subtle/[0.62]',
+    line.type === 'add' ? 'text-diff-add' : line.type === 'del' ? 'text-diff-del' : 'text-ink-tertiary/80',
   )
 }
 
@@ -135,13 +133,8 @@ function LineContent({
               key={k}
               className={cn(
                 sp.changed &&
-                  (type === 'add' ? 'bg-success/35 rounded-[2px]' : 'bg-danger/35 rounded-[2px]'),
+                  (type === 'add' ? 'bg-diff-add/[0.36] rounded-[2px]' : 'bg-diff-del/[0.36] rounded-[2px]'),
               )}
-              style={
-                chrome && sp.changed
-                  ? { backgroundColor: `${type === 'add' ? chrome.diffAdd : chrome.diffDel}59` } // 35% alpha
-                  : undefined
-              }
             >
               {sp.text}
             </span>
@@ -228,8 +221,8 @@ function HunkHeader({
           data-testid="diff-hunk-badge"
           style={chrome ? { backgroundColor: chrome.headerBackground, color: chrome.headerText } : undefined}
         >
-          <span className="text-success">+{adds}</span>{' '}
-          <span className="text-danger">−{dels}</span>
+          <span className="text-diff-add">+{adds}</span>{' '}
+          <span className="text-diff-del">−{dels}</span>
         </span>
         {hunk.header && (
           <span
@@ -350,26 +343,39 @@ function HunkLines({
             line.type !== 'ctx'
               ? {
                   boxShadow: lineShadow(line.type, false, chrome),
-                  ...(chrome
-                    ? { borderLeftColor: line.type === 'add' ? chrome.diffAdd : chrome.diffDel }
-                    : {}),
+                  borderLeftColor: railColor(line.type),
                 }
               : undefined
           }
         >
           <span
             className={lnCls(line)}
-            style={chrome ? { color: chrome.headerText, backgroundColor: chrome.headerBackground } : undefined}
+            style={
+              chrome
+                ? {
+                    color: line.type === 'ctx' ? chrome.headerText : railColor(line.type),
+                    backgroundColor: chrome.headerBackground,
+                  }
+                : undefined
+            }
           >
             {line.oldNo ?? ''}
           </span>
           <span
-            className={cn(lnCls(line), 'border-r border-border/70')}
-            style={chrome ? { color: chrome.headerText, backgroundColor: chrome.headerBackground, borderRightColor: chrome.border } : undefined}
+            className={cn(lnCls(line), 'border-r border-border')}
+            style={
+              chrome
+                ? {
+                    color: line.type === 'ctx' ? chrome.headerText : railColor(line.type),
+                    backgroundColor: chrome.headerBackground,
+                    borderRightColor: chrome.border,
+                  }
+                : undefined
+            }
           >
             {line.newNo ?? ''}
           </span>
-          <span className={cn('w-3.5 shrink-0 select-none text-center text-caption', line.type === 'add' && 'text-success', line.type === 'del' && 'text-danger')}>{sign(line.type)}</span>
+          <span className={cn('w-3.5 shrink-0 select-none text-center text-caption', line.type === 'add' && 'text-diff-add', line.type === 'del' && 'text-diff-del')}>{sign(line.type)}</span>
           <LineContent spans={spans[i] ?? null} text={line.content} type={line.type} chrome={chrome} />
           {line.type !== 'ctx' && (
             <span className="invisible flex shrink-0 items-center gap-0.5 pr-1 group-hover:visible">
@@ -435,7 +441,7 @@ function SplitCell({
         role="row"
         aria-label={t('artifact.diffView.rowContext')}
         className={cn(
-          'flex w-max min-w-full border-l-2 border-transparent leading-[1.55] bg-surface-subtle/50',
+          'flex w-max min-w-full border-l-[3px] border-transparent leading-[1.55]',
           blockPos && blockPosCls(blockPos),
         )}
         style={
@@ -443,7 +449,7 @@ function SplitCell({
             ? {
                 boxShadow: chrome
                   ? `inset 0 0 0 1px ${chrome.border}`
-                  : 'inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)',
+                  : 'inset 0 0 0 1px rgb(var(--border-rgb))',
                 ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}),
               }
             : chrome
@@ -467,18 +473,21 @@ function SplitCell({
       )}
       className={cn('flex w-max min-w-full leading-[1.55]', lineStyle(line.type, blockPos))}
       style={{
-        ...(line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, true, chrome) } : {}),
-        ...(line.type !== 'ctx' && chrome
-          ? { borderLeftColor: line.type === 'add' ? chrome.diffAdd : chrome.diffDel }
+        ...(line.type !== 'ctx'
+          ? { boxShadow: lineShadow(line.type, true, chrome), borderLeftColor: railColor(line.type) }
           : {}),
         ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}),
       }}
     >
       <span
-        className={cn(lnCls(line), 'border-r border-border/70')}
+        className={cn(lnCls(line), 'border-r border-border')}
         style={
           chrome
-            ? { color: chrome.headerText, backgroundColor: chrome.headerBackground, borderRightColor: chrome.border }
+            ? {
+                color: line.type === 'ctx' ? chrome.headerText : railColor(line.type),
+                backgroundColor: chrome.headerBackground,
+                borderRightColor: chrome.border,
+              }
             : undefined
         }
       >
@@ -486,8 +495,8 @@ function SplitCell({
       </span>
       <span className={cn(
         'w-3.5 shrink-0 select-none text-center text-caption',
-        side === 'left' && line.type === 'del' && 'text-danger',
-        side === 'right' && line.type === 'add' && 'text-success',
+        side === 'left' && line.type === 'del' && 'text-diff-del',
+        side === 'right' && line.type === 'add' && 'text-diff-add',
       )}>
         {sign(line.type)}
       </span>
@@ -534,7 +543,7 @@ function SplitHunks({
                   <SplitCell key={j} line={row.left} side="left" chrome={chrome} blockPos={runPos[j]} wdSpans={wdSpans[j]?.del ?? null} />
                 ))}
               </div>
-              <div className="w-px shrink-0 bg-border/70" style={chrome ? { backgroundColor: chrome.border } : undefined} />
+              <div className="w-px shrink-0 bg-border" style={chrome ? { backgroundColor: chrome.border } : undefined} />
               <div className="min-w-0 flex-1 overflow-x-auto">
                 {rows.map((row, j) => (
                   <SplitCell key={j} line={row.right} side="right" chrome={chrome} blockPos={runPos[j]} wdSpans={wdSpans[j]?.add ?? null} />
@@ -691,8 +700,8 @@ function FileDiff({
         </span>
         <span className="flex shrink-0 items-center gap-2 font-mono text-caption leading-none tabular-nums">
           {file.truncated && <span className="text-ink-tertiary">{t('artifact.truncated')}</span>}
-          <span className="text-success">+{file.additions}</span>
-          <span className="text-danger">−{file.deletions}</span>
+          <span className="text-diff-add">+{file.additions}</span>
+          <span className="text-diff-del">−{file.deletions}</span>
           <span className="flex items-center gap-0.5">
             <Popover
               open={discardOpenPath === file.path}
@@ -778,7 +787,16 @@ function FileDiff({
             data-testid="diff-code-area"
             style={
               chrome
-                ? { backgroundColor: chrome.background, borderColor: chrome.border, color: chrome.text }
+                ? {
+                    backgroundColor: chrome.background,
+                    borderColor: chrome.border,
+                    color: chrome.text,
+                    // diff 主色按代码块明度选档（原型深浅色板），覆盖应用主题档
+                    ...({
+                      '--diff-add-rgb': chrome === CODE_BLOCK_CHROME.dark ? '76 175 80' : '47 125 64',
+                      '--diff-del-rgb': chrome === CODE_BLOCK_CHROME.dark ? '255 82 82' : '198 59 59',
+                    } as React.CSSProperties),
+                  }
                 : undefined
             }
           >
@@ -859,8 +877,8 @@ function SummaryBar({
       </span>
       {!narrow && (
         <span className="shrink-0 font-mono text-caption tabular-nums">
-          <span className="text-success">+{adds}</span>
-          <span className="text-danger"> −{dels}</span>
+          <span className="text-diff-add">+{adds}</span>
+          <span className="text-diff-del"> −{dels}</span>
         </span>
       )}
       <span className="ml-auto flex shrink-0 items-center gap-0.5">

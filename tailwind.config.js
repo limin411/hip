@@ -35,6 +35,9 @@ export default {
         'on-btn-primary': 'rgb(var(--on-btn-primary-rgb) / <alpha-value>)',
         success: 'rgb(var(--success-rgb) / <alpha-value>)',
         danger: 'rgb(var(--danger-rgb) / <alpha-value>)',
+        // diff 专用主色（原型深浅档，可被 chrome 容器覆盖变量）
+        'diff-add': 'rgb(var(--diff-add-rgb) / <alpha-value>)',
+        'diff-del': 'rgb(var(--diff-del-rgb) / <alpha-value>)',
         warning: 'rgb(var(--warning-rgb) / <alpha-value>)',
         state: {
           hover: 'rgb(var(--state-hover-rgb) / <alpha-value>)',

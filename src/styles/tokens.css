@@ -130,6 +130,10 @@
   --success-rgb: 47 125 64;
   --danger-rgb: 198 59 59;
   --warning-rgb: 154 93 16;
+  /* diff 专用主色（changes-diff-clarity 原型规格）：浅色档与 success/danger 同值，
+     深色档用原型深色板（更亮更饱和的绿/红），不随全局 success/danger 走。 */
+  --diff-add-rgb: 47 125 64;
+  --diff-del-rgb: 198 59 59;
   --on-btn-primary-rgb: 250 250 250;
   --effort-max-rgb: 124 58 237;
   /*
@@ -265,6 +269,9 @@ html[data-platform="linux"] {
   --success-rgb: 90 173 94;
   --danger-rgb: 232 90 90;
   --warning-rgb: 230 162 60;
+  /* diff 专用主色：原型深色板 #4caf50 / #ff5252（changes-diff-clarity spec） */
+  --diff-add-rgb: 76 175 80;
+  --diff-del-rgb: 255 82 82;
   --on-btn-primary-rgb: 20 20 20;
   --effort-max-rgb: 167 139 250;
 }

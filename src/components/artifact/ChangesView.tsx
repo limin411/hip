@@ -143,6 +143,26 @@ export function ChangesView() {
         }
         return
       }
+      // T10: ⌥⌘↓/↑ 在当前展开文件内 hunk 间跳转 + flash 高亮 + 滚动跟随
+      if (e.altKey && e.metaKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault()
+        const flashed = document.querySelector('.hunk-flash')
+        const scopeFile =
+          flashed?.closest('[data-testid="diff-file"]') ??
+          document.querySelector('[data-testid="diff-file"] [data-testid="diff-hunk-header"]')?.closest('[data-testid="diff-file"]')
+        const headers = scopeFile
+          ? Array.from(scopeFile.querySelectorAll<HTMLElement>('[data-testid="diff-hunk-header"]'))
+          : []
+        if (headers.length === 0) return
+        const dir = e.key === 'ArrowDown' ? 1 : -1
+        const cur = flashed ? headers.indexOf(flashed as HTMLElement) : -1
+        const next = Math.min(headers.length - 1, Math.max(0, cur + dir))
+        const el = headers[next]!
+        document.querySelectorAll('.hunk-flash').forEach((n) => n.classList.remove('hunk-flash'))
+        el.classList.add('hunk-flash')
+        el.scrollIntoView({ block: 'nearest' })
+        return
+      }
       if (e.key === 'Escape') {
         if (discardPath) setDiscardPath(null)
         else if (filterQuery) setFilterQuery('')

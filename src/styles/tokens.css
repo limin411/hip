@@ -656,3 +656,10 @@ a:hover {
     box-shadow: 0 0 16px 2px color-mix(in srgb, var(--danger) 16%, transparent);
   }
 }
+
+/* changes-diff-clarity T10: hunk 键盘导航高亮 —— accent 淡入 + 移除后 1.2s 淡出。
+   !important 需盖过 chrome 主题的内联 backgroundColor。 */
+.hunk-flash {
+  background-color: color-mix(in srgb, var(--accent) 20%, transparent) !important;
+  transition: background-color 1.2s ease-out !important;
+}

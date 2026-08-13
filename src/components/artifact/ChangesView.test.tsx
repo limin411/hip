@@ -376,6 +376,43 @@ describe('ChangesView v2', () => {
     expect(item.querySelector('.animate-spin')).toBeTruthy()
   })
 
+  it('T10: ⌥⌘↓/↑ navigate hunks within the open file with flash highlight', () => {
+    const twoHunks: DiffFile = {
+      ...hunkFile,
+      hunks: [
+        hunkFile.hunks[0],
+        { ...hunkFile.hunks[0], oldStart: 10, oldLines: 1, newStart: 9, newLines: 1, header: 'bar' },
+      ],
+    }
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          files: [twoHunks],
+          expanded: { 'src/b.ts': twoHunks },
+        },
+      },
+    })
+    renderChanges()
+    const headers = screen.getAllByTestId('diff-hunk-header')
+    expect(headers).toHaveLength(2)
+    const go = (key: string) =>
+      fireEvent.keyDown(window, { key, altKey: true, metaKey: true })
+    go('ArrowDown')
+    expect(headers[0]).toHaveClass('hunk-flash')
+    go('ArrowDown')
+    expect(headers[0]).not.toHaveClass('hunk-flash')
+    expect(headers[1]).toHaveClass('hunk-flash')
+    // 已到末尾，再按不动（clamp）
+    go('ArrowDown')
+    expect(headers[1]).toHaveClass('hunk-flash')
+    go('ArrowUp')
+    expect(headers[0]).toHaveClass('hunk-flash')
+  })
+
   it('review CTA injects a prompt with the file list into the composer', () => {
     useDiffStore.setState({
       bySession: {

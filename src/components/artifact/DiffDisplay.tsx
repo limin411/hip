@@ -49,23 +49,24 @@ function DiffFileTypeIcon({ path, size = 14 }: { path: string; size?: number }) 
 /** 变更块内位置：first/mid/last/single（单行块），null = 上下文行。 */
 type BlockPos = 'first' | 'mid' | 'last' | 'single' | null
 
-/** 行级视觉：12% 底色 + hover 加深（T1）。分格：色条+描边用内联 boxShadow，避免 Tailwind 扫描器要求全字面量类名。 */
+/** 行级视觉：12% 底色 + hover 加深（T1）。色条用 border-left（T1）：
+ *  inset shadow 绘制在子元素背景之下，会被行号列底纹遮挡 70%——border 在内容之外不受影响。
+ *  所有行（含 ctx）保留 border-l-2 占位，行号列对齐。 */
 function lineStyle(t: DiffLineType, pos: BlockPos = null): string {
-  if (t === 'ctx') return ''
+  if (t === 'ctx') return 'border-l-2 border-transparent'
   const tint =
     t === 'add' ? 'bg-success/[0.12] hover:bg-success/[0.18]' : 'bg-danger/[0.12] hover:bg-danger/[0.18]'
-  return cn(tint, blockPosCls(pos))
+  const rail = t === 'add' ? 'border-l-2 border-success' : 'border-l-2 border-danger'
+  return cn(tint, rail, blockPosCls(pos))
 }
 
-/** T1 色条（inset 2px 主色）+ T2 块描边（inset 1px）。split 块用中性边框，unified 块用主色 30%。 */
+/** T2 块描边（inset 1px）。split 块用中性边框，unified 块用主色 30%。 */
 function lineShadow(t: DiffLineType, split: boolean): string | undefined {
   if (t === 'ctx') return undefined
   const c = t === 'add' ? 'var(--success-rgb)' : 'var(--danger-rgb)'
-  const rail = `inset 2px 0 0 0 rgb(${c})`
-  const ring = split
+  return split
     ? 'inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)'
     : `inset 0 0 0 1px rgb(${c} / 0.3)`
-  return `${rail}, ${ring}`
 }
 
 /** 块位置类：首/末行圆角 + 与相邻上下文行留 1px 间距。 */
@@ -94,10 +95,11 @@ function changeRunPositions<T>(lines: T[], isChange: (l: T) => boolean): BlockPo
   return pos
 }
 
-/** 行号列（T3）：独立底纹 + 行类型着色；unified 第二列（split 单列）带右侧分隔线。 */
+/** 行号列（T3）：独立底纹 + 行类型着色；unified 第二列（split 单列）带右侧分隔线。
+ *  底纹 /40（原 /70 会盖住块描边左边缘与色条残留）。 */
 function lnCls(line: DiffLine): string {
   return cn(
-    'w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption bg-surface-subtle/70',
+    'w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption bg-surface-subtle/40',
     line.type === 'add' ? 'text-success/80' : line.type === 'del' ? 'text-danger/80' : 'text-ink-tertiary/80',
   )
 }
@@ -410,7 +412,7 @@ function SplitCell({
         role="row"
         aria-label={t('artifact.diffView.rowContext')}
         className={cn(
-          'flex w-max min-w-full leading-[1.55] bg-surface-subtle/50',
+          'flex w-max min-w-full border-l-2 border-transparent leading-[1.55] bg-surface-subtle/50',
           blockPos && blockPosCls(blockPos),
         )}
         style={

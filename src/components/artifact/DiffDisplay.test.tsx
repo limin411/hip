@@ -655,7 +655,7 @@ describe('DiffDisplay class polish', () => {
       d.className.includes('leading-[1.55]'),
     )
 
-  it('T1/T2 unified: change rows get rail+ring shadow and block rounding; ctx rows stay plain', () => {
+  it('T1/T2 unified: change rows get rail border + ring shadow and block rounding; ctx rows stay plain', () => {
     render(
       <DiffDisplay
         files={[fWith([
@@ -671,20 +671,22 @@ describe('DiffDisplay class polish', () => {
     )
     const rows = rowsOf()
     expect(rows).toHaveLength(4)
-    // 上下文行：无底色、无色条/描边 shadow
+    // 上下文行：无色条、无底色、无描边 shadow；border 透明占位保持行号列对齐
+    expect(rows[0]!.className).toContain('border-l-2 border-transparent')
     expect(rows[0]!.className).not.toMatch(/bg-(success|danger)/)
     expect(rows[0]!.style.boxShadow).toBe('')
-    // del 行：12% 底色 + 色条 + 主色描边 + 块首圆角/间距
+    // del 行：12% 底色 + 左侧 2px 主色色条（border，不被行号列遮挡）+ 块首圆角/间距
     expect(rows[1]!.className).toContain('bg-danger/[0.12]')
+    expect(rows[1]!.className).toContain('border-l-2 border-danger')
     expect(rows[1]!.className).toContain('rounded-t-[4px]')
     expect(rows[1]!.className).toContain('mt-px')
-    expect(rows[1]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--danger-rgb))')
-    expect(rows[1]!.style.boxShadow).toContain('inset 0 0 0 1px rgb(var(--danger-rgb) / 0.3)')
+    expect(rows[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--danger-rgb) / 0.3)')
     // add 行：success 侧 + 块末圆角/间距
     expect(rows[2]!.className).toContain('bg-success/[0.12]')
+    expect(rows[2]!.className).toContain('border-l-2 border-success')
     expect(rows[2]!.className).toContain('rounded-b-[4px]')
     expect(rows[2]!.className).toContain('mb-px')
-    expect(rows[2]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--success-rgb))')
+    expect(rows[2]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--success-rgb) / 0.3)')
     expect(rows[3]!.style.boxShadow).toBe('')
   })
 
@@ -741,7 +743,7 @@ describe('DiffDisplay class polish', () => {
     )
     const rows = rowsOf()
     const lnSpans = (row: HTMLElement) =>
-      Array.from(row.querySelectorAll('span')).filter((s) => s.className.includes('bg-surface-subtle/70'))
+      Array.from(row.querySelectorAll('span')).filter((s) => s.className.includes('bg-surface-subtle/40'))
     const ctxLn = lnSpans(rows[0]!)
     expect(ctxLn).toHaveLength(2)
     expect(ctxLn[0]!.className).toContain('text-ink-tertiary/80')
@@ -779,19 +781,20 @@ describe('DiffDisplay class polish', () => {
     const left = cells(panes[0]!)
     const right = cells(panes[1]!)
     expect(left).toHaveLength(4) // ctx, del, del, ctx
-    // 左栏：del 行 = danger 色条 + 中性描边；首行块首圆角/间距、末行块末圆角/间距
-    expect(left[1]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--danger-rgb))')
-    expect(left[1]!.style.boxShadow).toContain('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
+    // 左栏：del 行 = danger 色条（border）+ 中性描边；首行块首圆角/间距、末行块末圆角/间距
+    expect(left[1]!.className).toContain('border-l-2 border-danger')
+    expect(left[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
     expect(left[1]!.className).toContain('rounded-t-[4px]')
     expect(left[1]!.className).toContain('mt-px')
     expect(left[2]!.className).toContain('rounded-b-[4px]')
     expect(left[2]!.className).toContain('mb-px')
     expect(left[0]!.style.boxShadow).toBe('')
     // 右栏：add 行 = success 色条 + 中性描边
-    expect(right[1]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--success-rgb))')
-    expect(right[2]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--success-rgb))')
+    expect(right[1]!.className).toContain('border-l-2 border-success')
+    expect(right[2]!.className).toContain('border-l-2 border-success')
+    expect(right[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
     // 单行号列带分隔线；del 行号着色
-    const ln = Array.from(left[1]!.querySelectorAll('span')).find((s) => s.className.includes('bg-surface-subtle/70'))!
+    const ln = Array.from(left[1]!.querySelectorAll('span')).find((s) => s.className.includes('bg-surface-subtle/40'))!
     expect(ln.className).toContain('border-r border-border/70')
     expect(ln.className).toContain('text-danger/80')
     // 不等长配对 del / add,add → 左栏空单元格仍属块（中性描边 + 块末圆角）
@@ -811,6 +814,7 @@ describe('DiffDisplay class polish', () => {
     const l2 = cells(document.querySelectorAll('div.overflow-x-auto')[0]!)
     expect(l2[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
     expect(l2[1]!.className).toContain('rounded-b-[4px]')
+    expect(l2[1]!.className).toContain('border-l-2 border-transparent')
     expect(l2[0]!.className).toContain('rounded-t-[4px]')
   })
 })

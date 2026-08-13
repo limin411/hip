@@ -48,7 +48,7 @@
 
 #### T1 变更行强化：色条 rail + 强度提升（P0）
 
-- add 行：`box-shadow: inset 2px 0 0 0 var(--success)`（**inset 阴影而非 border**，不挤占内容宽度，长行滚动不破）；底色 `bg-success/[0.07]` → `success/12`；hover 加深到 `success/18`。
+- add 行：色条用 `border-left: 2px solid var(--success)`（**不用 inset shadow**——inset 阴影绘制在子元素背景之下，会被行号列底纹遮挡 70%，浅色下几乎不可见；border 位于内容之外不受遮挡，且圆角跟随）；底色 `bg-success/[0.07]` → `success/12`；hover 加深到 `success/18`。所有行（含 ctx）保留 `border-l-2` 透明占位，保证行号列对齐。
 - del 行同规则用 `--danger`。
 - unified / split 共用同一套行样式（`lineStyle()` 内统一修改，SplitCell 同步受益）。
 - 实现点：`lineStyle(t, hover)` 改为返回 `bg + inset shadow` 组合类；`SplitCell` 行沿用。
@@ -56,7 +56,7 @@
 #### T2 变更块分组：连续变更成"块"（P0）
 
 - 连续 add/del 行（无 ctx 隔断）构成一个变更块：首行 `rounded-t-[4px]`、末行 `rounded-b-[4px]`，块内每行带 1px 内描边 `inset 0 0 0 1px color-mix(success 20%)`（相邻行描边自然连续成完整轮廓）；块与相邻 ctx 行之间留 1px 空隙（`margin: 1px 0`）。
-- 块首行内描边**不盖掉**色条：`inset 3px 0 0 0 var(--success), inset 0 0 0 1px mix(...)` 顺序组合。
+- 块首行内描边**不盖掉**色条：色条为 border-left（内容之外），描边 `inset 0 0 0 1px mix(...)` 与 border 无重叠冲突。
 - 视觉结果：一行行浅底 → **一块块矩形**，变更密度一眼可数。
 - 实现点：`HunkLines` 渲染时按 `line.type` 连续段分组，首/末行追加圆角与边距类。
 

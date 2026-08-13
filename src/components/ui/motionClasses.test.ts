@@ -5,6 +5,7 @@ import {
   modalMotion,
   overlayMotion,
   panelEnterMotion,
+  panelExitMotion,
   viewEnterMotion,
 } from './motionClasses'
 
@@ -29,5 +30,10 @@ describe('motionClasses', () => {
     expect(floatInMotion).toBe('animate-menu-in')
     expect(viewEnterMotion).toBe('animate-view-enter')
     expect(panelEnterMotion).toBe('animate-panel-in')
+  })
+
+  it('pairs drawer enter/exit for the right rail', () => {
+    expect(panelEnterMotion).toBe('animate-panel-in')
+    expect(panelExitMotion).toBe('animate-panel-out')
   })
 })

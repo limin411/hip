@@ -487,9 +487,10 @@ a:hover {
 }
 
 /* ── ui-enhancement-bui 动效资产（S1）──────────────────────────────
-   两个明示例外之外全部维持纯 opacity / 背景色过渡纪律：
+   三个明示例外之外全部维持纯 opacity / 背景色过渡纪律：
    ① .clip-expand —— grid-rows 高度展开（无位移的布局动画）
    ② .stream-chunk —— 词块级 opacity 浮现（≤ --duration-stream）
+   ③ .rail-animating —— 右侧抽屉轨道 flex-grow 宽度过渡（开关动画）
    prefers-reduced-motion 全局兑底（上方 @media）自动冻结全部。 */
 
 /* ① 展开容器：grid-template-rows 0fr↔1fr + opacity，双向过渡 */
@@ -517,6 +518,14 @@ a:hover {
 }
 .stream-chunk {
   animation: stream-chunk-in var(--duration-stream, 240ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+/* ③ 右侧抽屉轨道：flex-grow 宽度过渡。仅在程序化开/关时由 AppLayout 挂
+   .rail-animating（用户拖拽时不挂，避免拖拽跟手被打断）。主栏与右栏的
+   flex-grow 同帧变更、同步过渡，宽度始终互补不重叠。抽屉内容在过渡期间
+   由 AppLayout 以固定像素宽度钉住，只被裁剪不回流 —— 呈现抽屉式滑入/滑出。 */
+[data-main-content-group].rail-animating [data-panel] {
+  transition: flex-grow var(--duration-expand, 300ms) var(--ease-out, cubic-bezier(0.2, 0, 0, 1));
 }
 
 /* 状态图标替换（spinner→✓/✗/⚠）：挂载即淡入 120ms，与图标自身 spin 动画互不干扰 */

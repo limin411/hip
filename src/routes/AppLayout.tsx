@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject, type TransitionEvent } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useProvidersStore } from '@/store/providersStore'
 import { sessionService, useActiveSession, useDomainStore } from '@/domain'
@@ -46,12 +46,19 @@ import { useFocusStore } from '@/store/focusStore'
 import { seedNavHistoryIfEmpty } from '@/components/layout/navHistory'
 import { WindowLifecycleHost } from '@/components/window/WindowLifecycleHost'
 import { widenWindowForRightPanel } from '@/lib/rightPanelWidth'
+import { panelEnterMotion, panelExitMotion } from '@/components/ui/motionClasses'
 
 /** Right rail must stay wide enough that the titlebar chrome + content breathe (~350px).
  *  react-resizable-panels minSize is group-relative %, so convert the pixel floor against the
  *  measured group width (clamped so tiny windows still leave room for the main pane).
  *  See docs/design/window-min-size-spec.md. */
 const RIGHT_RAIL_MIN_PX = 350
+
+/** Width transition duration for programmatic rail open/close. Must match
+ *  --duration-expand (300ms) in the .rail-animating rule in tokens.css. */
+const RAIL_TRANSITION_MS = 300
+/** Extra grace before settle cleanup (covers reduced-motion + lost transitionend). */
+const RAIL_TRANSITION_SLACK_MS = 80
 
 function useRailMinPct(groupRef: RefObject<HTMLDivElement | null>): number {
   const [minPct, setMinPct] = useState(18)
@@ -161,14 +168,79 @@ export function AppLayout() {
     terminalPanelOpen
   const rightOpen = codeOpen || chatOpen || knowledgeOpen || terminalsOpen
 
+  // —— Right rail open/close animation state ——
+  type DrawerKind = 'code' | 'knowledge' | 'terminals' | 'chat'
+  // Which rail kind renders right now (all four flags are false while closed).
+  const liveDrawerKind: DrawerKind = codeOpen
+    ? 'code'
+    : knowledgeOpen
+      ? 'knowledge'
+      : terminalsOpen
+        ? 'terminals'
+        : 'chat'
+  // Last open kind, kept so the exit animation renders the same content.
+  const lastDrawerKindRef = useRef<DrawerKind>('chat')
+  useEffect(() => {
+    if (rightOpen) lastDrawerKindRef.current = liveDrawerKind
+  }, [rightOpen, liveDrawerKind])
+  const drawerKind = rightOpen ? liveDrawerKind : lastDrawerKindRef.current
+
+  // Drawer content stays mounted through the exit animation (mounted ≠ open).
+  const [drawerMounted, setDrawerMounted] = useState(rightOpen)
+  // True while the programmatic width transition runs (gates .rail-animating).
+  const [railAnimating, setRailAnimating] = useState(false)
+  // Pins the drawer to a fixed px width during the width transition so content
+  // is clipped (drawer slide) instead of reflowing (squeeze).
+  const [pinnedPx, setPinnedPx] = useState<number | null>(null)
+  const rightOpenRef = useRef(rightOpen)
+  rightOpenRef.current = rightOpen
+  // Rail size in % of the group width, captured before collapse — restores the
+  // same pixel width on the next open even if the window was resized meanwhile.
+  const lastRailSizeRef = useRef(26)
+  const railTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const railSettledRef = useRef(true)
+
+  /** End of a programmatic open/close transition: drop the pin + transition class,
+   *  and unmount the drawer once the closing width animation finished. */
+  const settleRail = useCallback(() => {
+    if (railTimerRef.current != null) {
+      clearTimeout(railTimerRef.current)
+      railTimerRef.current = null
+    }
+    if (railSettledRef.current) return
+    railSettledRef.current = true
+    setRailAnimating(false)
+    setPinnedPx(null)
+    if (!rightOpenRef.current) setDrawerMounted(false)
+  }, [])
+
+  /** Arm the flex-grow transition before p.expand()/p.collapse() so the class and
+   *  the new inline flex-grow land in the same commit (React 18 auto-batching). */
+  const beginRailAnim = useCallback(() => {
+    railSettledRef.current = false
+    setRailAnimating(true)
+    railTimerRef.current = setTimeout(settleRail, RAIL_TRANSITION_MS + RAIL_TRANSITION_SLACK_MS)
+  }, [settleRail])
+
+  /** Both panels animate flex-grow in lockstep; the first transitionend settles.
+   *  The timer above is the fallback (reduced-motion / missed events). */
+  const handleRailTransitionEnd = (e: TransitionEvent<HTMLDivElement>) => {
+    if (e.propertyName !== 'flex-grow') return
+    if (!(e.target as HTMLElement).hasAttribute('data-panel')) return
+    settleRail()
+  }
+
   // P2: restore persisted disconnected `tm_*` records after the host catalog loads.
   useEffect(() => {
     if (!hostCatalogLoaded || persistedTerminalRecords.length === 0) return
     useManagedTerminalStore.getState().restorePersisted(persistedTerminalRecords)
   }, [hostCatalogLoaded, persistedTerminalRecords])
 
-  // Sync the collapsible rail with rightOpen. When opening, widen the window first
-  // so the main content area can host the rail (falls back when the screen is too small).
+  // Sync the collapsible rail with rightOpen, animated.
+  // Opening: widen the window first (best effort), pin the drawer content to its
+  // target px width, then expand — the flex-grow transition slides the rail open.
+  // Closing: pin the current px width and collapse — the rail slides shut while
+  // the content fades out; the drawer unmounts once the transition settles.
   useEffect(() => {
     const p = rightPanelRef.current
     if (!p) return
@@ -178,16 +250,40 @@ export function AppLayout() {
         const { sidebarOpen, sidebarWidth } = useUiStore.getState()
         await widenWindowForRightPanel(sidebarOpen, sidebarWidth)
         if (cancelled) return
-        if (p.isCollapsed()) p.expand()
-      } else if (!p.isCollapsed()) {
+        if (!p.isCollapsed()) {
+          setDrawerMounted(true)
+          return
+        }
+        const groupW = groupRef.current?.clientWidth ?? 0
+        if (groupW > 0) {
+          setPinnedPx(Math.round((groupW * lastRailSizeRef.current) / 100))
+        }
+        setDrawerMounted(true)
+        beginRailAnim()
+        p.expand()
+      } else {
+        if (p.isCollapsed()) {
+          setDrawerMounted(false)
+          return
+        }
+        lastRailSizeRef.current = p.getSize() ?? lastRailSizeRef.current
+        const groupW = groupRef.current?.clientWidth ?? 0
+        if (groupW > 0) {
+          setPinnedPx(Math.round((groupW * lastRailSizeRef.current) / 100))
+        }
+        beginRailAnim()
         p.collapse()
       }
     }
     void run()
     return () => {
       cancelled = true
+      if (railTimerRef.current != null) {
+        clearTimeout(railTimerRef.current)
+        railTimerRef.current = null
+      }
     }
-  }, [rightOpen])
+  }, [rightOpen, beginRailAnim])
 
   const handleCollapse = () => {
     if (activeView === 'knowledge') {
@@ -287,7 +383,12 @@ export function AppLayout() {
       {sidebarOpen ? <AppSidebar /> : null}
       {/* Measure the group width via a plain div — PanelGroup's own ref is an
           ImperativePanelGroupHandle, not the DOM node. */}
-      <div ref={groupRef} data-main-content-group className="flex min-w-0 flex-1 flex-col bg-surface">
+      <div
+        ref={groupRef}
+        data-main-content-group
+        onTransitionEnd={handleRailTransitionEnd}
+        className={`flex min-w-0 flex-1 flex-col bg-surface${railAnimating ? ' rail-animating' : ''}`}
+      >
         <PanelGroup direction="horizontal" className="min-h-0 min-w-0 flex-1">
           {/* Main column only: warm paper; left AppSidebar + right drawer stay neutral surface. */}
           <Panel minSize={34} className="flex min-w-0 flex-col bg-surface-content">
@@ -303,13 +404,13 @@ export function AppLayout() {
           {/* Overlap neighbors (w-2 -mx-1) so the divider is only a 1px line — no layout gap. */}
           <PanelResizeHandle
             className={
-              rightOpen
+              drawerMounted
                 ? 'group relative z-10 w-2 -mx-1 bg-transparent outline-none focus-visible:ring-1 focus-visible:ring-ink/20'
                 : 'w-0'
             }
-            disabled={!rightOpen}
+            disabled={!rightOpen || railAnimating}
           >
-            {rightOpen ? (
+            {drawerMounted ? (
               <div
                 className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent group-focus-visible:bg-accent"
                 aria-hidden
@@ -329,16 +430,17 @@ export function AppLayout() {
             onExpand={handleExpand}
             className="min-w-0"
           >
-            {rightOpen ? (
+            {drawerMounted ? (
               <div
-                className="flex h-full min-h-0 flex-col bg-surface-subtle animate-panel-in"
+                style={pinnedPx != null ? { width: `${pinnedPx}px` } : undefined}
+                className={`flex h-full min-h-0 flex-col bg-surface-subtle ${rightOpen ? panelEnterMotion : panelExitMotion}`}
                 data-testid="right-panel-drawer"
               >
-                {codeOpen ? (
+                {drawerKind === 'code' ? (
                   <ArtifactPanel />
-                ) : knowledgeOpen ? (
+                ) : drawerKind === 'knowledge' ? (
                   <KnowledgeOutlinePanel />
-                ) : terminalsOpen && focusedManaged ? (
+                ) : drawerKind === 'terminals' && focusedManaged ? (
                   <TerminalRightPanel
                     terminalId={focusedManaged.id}
                     backend={focusedManaged.kind === 'local' ? 'local' : 'sftp'}

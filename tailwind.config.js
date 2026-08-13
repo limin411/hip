@@ -148,9 +148,14 @@ export default {
           from: { opacity: '1' },
           to: { opacity: '0' },
         },
+        // 右侧抽屉内容：淡入 + 轻微右→左滑入（12px，与轨道宽度过渡叠加）。
         'panel-in': {
-          from: { opacity: '0' },
-          to: { opacity: '1' },
+          from: { opacity: '0', transform: 'translateX(12px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        'panel-out': {
+          from: { opacity: '1', transform: 'translateX(0)' },
+          to: { opacity: '0', transform: 'translateX(12px)' },
         },
         'view-enter': {
           from: { opacity: '0' },
@@ -189,6 +194,8 @@ export default {
           'overlay-out 160ms var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)) both',
         'panel-in':
           'panel-in var(--duration-content, 240ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both',
+        'panel-out':
+          'panel-out 160ms var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)) both',
         'view-enter':
           'view-enter var(--duration-content, 240ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both',
         'dot-bounce': 'dot-bounce 1.2s ease-in-out infinite',

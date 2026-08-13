@@ -55,6 +55,15 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - Fixed pre-existing issues blocking `yarn tsc`: duplicated whiteboard export keys
   in en/ja/ko/zh-CN i18n, unused `emptySel` in knowledgeStore tests, and a `never`
   type in boardOps tests.
+- **Right rail open/close animation** (`src/routes/AppLayout.tsx`, `src/styles/tokens.css`,
+  `tailwind.config.js`): the edge drawer now slides open/shut instead of snapping.
+  Programmatic toggles animate the rail width via a `flex-grow` transition
+  (`.rail-animating`, 300ms `--duration-expand`) on both panels in lockstep; drawer
+  content is pinned to a fixed pixel width during the transition so it is clipped
+  (drawer slide) instead of reflowing, stays mounted through the exit (fade+slide
+  `animate-panel-out`), and unmounts when the transition settles. Drag-resize and
+  drag-to-close keep their live (un-animated) behavior; `prefers-reduced-motion`
+  collapses the animation via the global motion freeze.
 
 ### Added
 

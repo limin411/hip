@@ -30,3 +30,6 @@ export const viewEnterMotion = 'animate-view-enter'
 
 /** Right edge drawer content enter. */
 export const panelEnterMotion = 'animate-panel-in'
+
+/** Right edge drawer content exit (kept mounted while the rail width animates). */
+export const panelExitMotion = 'animate-panel-out'

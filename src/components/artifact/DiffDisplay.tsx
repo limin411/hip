@@ -60,9 +60,15 @@ function lineStyle(t: DiffLineType, pos: BlockPos = null): string {
   return cn(tint, rail, blockPosCls(pos))
 }
 
-/** T2 块描边（inset 1px）。split 块用中性边框，unified 块用主色 30%。 */
-function lineShadow(t: DiffLineType, split: boolean): string | undefined {
+/** T2 块描边（inset 1px）。split 块用中性边框，unified 块用主色 30%；chrome 模式用代码块主题色。 */
+function lineShadow(t: DiffLineType, split: boolean, chrome: CodeBlockChromePalette | null): string | undefined {
   if (t === 'ctx') return undefined
+  if (chrome) {
+    const c = t === 'add' ? chrome.diffAdd : chrome.diffDel
+    return split
+      ? `inset 0 0 0 1px ${chrome.border}`
+      : `inset 0 0 0 1px ${c}4d` // 30% alpha（hex）
+  }
   const c = t === 'add' ? 'var(--success-rgb)' : 'var(--danger-rgb)'
   return split
     ? 'inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)'
@@ -131,6 +137,11 @@ function LineContent({
                 sp.changed &&
                   (type === 'add' ? 'bg-success/35 rounded-[2px]' : 'bg-danger/35 rounded-[2px]'),
               )}
+              style={
+                chrome && sp.changed
+                  ? { backgroundColor: `${type === 'add' ? chrome.diffAdd : chrome.diffDel}59` } // 35% alpha
+                  : undefined
+              }
             >
               {sp.text}
             </span>
@@ -335,14 +346,26 @@ function HunkLines({
                 : 'artifact.diffView.rowContext',
           )}
           className={cn('flex leading-[1.55]', line.type !== 'ctx' && 'group', lineStyle(line.type, runPos[i]))}
-          style={line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, false) } : undefined}
+          style={
+            line.type !== 'ctx'
+              ? {
+                  boxShadow: lineShadow(line.type, false, chrome),
+                  ...(chrome
+                    ? { borderLeftColor: line.type === 'add' ? chrome.diffAdd : chrome.diffDel }
+                    : {}),
+                }
+              : undefined
+          }
         >
-          <span className={lnCls(line)} style={chrome ? { color: chrome.headerText } : undefined}>
+          <span
+            className={lnCls(line)}
+            style={chrome ? { color: chrome.headerText, backgroundColor: chrome.headerBackground } : undefined}
+          >
             {line.oldNo ?? ''}
           </span>
           <span
             className={cn(lnCls(line), 'border-r border-border/70')}
-            style={chrome ? { color: chrome.headerText } : undefined}
+            style={chrome ? { color: chrome.headerText, backgroundColor: chrome.headerBackground, borderRightColor: chrome.border } : undefined}
           >
             {line.newNo ?? ''}
           </span>
@@ -417,7 +440,12 @@ function SplitCell({
         )}
         style={
           blockPos
-            ? { boxShadow: 'inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)', ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}) }
+            ? {
+                boxShadow: chrome
+                  ? `inset 0 0 0 1px ${chrome.border}`
+                  : 'inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)',
+                ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}),
+              }
             : chrome
               ? { backgroundColor: chrome.background, color: chrome.text }
               : undefined
@@ -439,13 +467,20 @@ function SplitCell({
       )}
       className={cn('flex w-max min-w-full leading-[1.55]', lineStyle(line.type, blockPos))}
       style={{
-        ...(line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, true) } : {}),
+        ...(line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, true, chrome) } : {}),
+        ...(line.type !== 'ctx' && chrome
+          ? { borderLeftColor: line.type === 'add' ? chrome.diffAdd : chrome.diffDel }
+          : {}),
         ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}),
       }}
     >
       <span
         className={cn(lnCls(line), 'border-r border-border/70')}
-        style={chrome ? { color: chrome.headerText } : undefined}
+        style={
+          chrome
+            ? { color: chrome.headerText, backgroundColor: chrome.headerBackground, borderRightColor: chrome.border }
+            : undefined
+        }
       >
         {side === 'left' ? line.oldNo ?? '' : line.newNo ?? ''}
       </span>
@@ -499,7 +534,7 @@ function SplitHunks({
                   <SplitCell key={j} line={row.left} side="left" chrome={chrome} blockPos={runPos[j]} wdSpans={wdSpans[j]?.del ?? null} />
                 ))}
               </div>
-              <div className="w-px shrink-0 bg-border/70" />
+              <div className="w-px shrink-0 bg-border/70" style={chrome ? { backgroundColor: chrome.border } : undefined} />
               <div className="min-w-0 flex-1 overflow-x-auto">
                 {rows.map((row, j) => (
                   <SplitCell key={j} line={row.right} side="right" chrome={chrome} blockPos={runPos[j]} wdSpans={wdSpans[j]?.add ?? null} />

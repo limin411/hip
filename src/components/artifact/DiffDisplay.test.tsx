@@ -640,6 +640,33 @@ describe('DiffDisplay class polish', () => {
     expect(area.querySelector('span[style*="#e6edf3"]')).toBeTruthy()
   })
 
+  it('chrome dark: line decorations follow the code-block palette, not app tokens', () => {
+    useHipConfigStore.setState({
+      config: { version: 1, codeBlock: { colorTheme: 'dark' } },
+    })
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const rows = rowsOf()
+    const del = rows[0]!
+    const add = rows[1]!
+    // 色条：GitHub dark 主题 diff 红/绿，而非应用主题色
+    expect(del.style.borderLeftColor).toBe('#f85149')
+    expect(add.style.borderLeftColor).toBe('#238636')
+    // 块描边：主题 diff 色 30%（hex alpha 4d）
+    expect(del.style.boxShadow).toBe('inset 0 0 0 1px #f851494d')
+    expect(add.style.boxShadow).toBe('inset 0 0 0 1px #2386364d')
+    // 行号列：底纹 = 主题 headerBackground（不再用应用 bg-subtle 白灰），分隔线 = 主题 border
+    const lns = del.querySelectorAll<HTMLElement>('.bg-surface-subtle\\/40')
+    expect(lns[0]!.style.backgroundColor).toBe('#161b22')
+    expect(lns[1]!.style.borderRightColor).toBe('#30363d')
+  })
+
   // ---- PR-1: 行级可见性（T1 色条 / T2 块分组 / T3 行号列） ----
 
   const fWith = (lines: Array<{ type: 'ctx' | 'del' | 'add'; content: string; oldNo: number | null; newNo: number | null }>): DiffFile => ({

@@ -53,6 +53,9 @@ export const CODE_BLOCK_CHROME = {
     headerBackground: '#f6f8fa',
     text: '#1f2328',
     headerText: '#57606a',
+    /** GitHub Light diff 主色（色条/描边/word diff 用，跟随代码块主题）。 */
+    diffAdd: '#1a7f37',
+    diffDel: '#cf222e',
   },
   dark: {
     background: '#0d1117',
@@ -60,6 +63,8 @@ export const CODE_BLOCK_CHROME = {
     headerBackground: '#161b22',
     text: '#e6edf3',
     headerText: '#8b949e',
+    diffAdd: '#238636',
+    diffDel: '#f85149',
   },
   paper: {
     background: '#f7f6f3',
@@ -67,6 +72,8 @@ export const CODE_BLOCK_CHROME = {
     headerBackground: '#f0efec',
     text: '#2f2c28',
     headerText: '#6f6a63',
+    diffAdd: '#1a7f37',
+    diffDel: '#cf222e',
   },
 } as const
 

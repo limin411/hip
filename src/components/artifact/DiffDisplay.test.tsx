@@ -391,6 +391,68 @@ describe('DiffDisplay class polish', () => {
     expect(screen.getByTestId('diff-filter-input')).toBeInTheDocument()
   })
 
+  it('T12: add/del rows expose copy-line and quote-line actions; ctx rows do not', () => {
+    render(
+      <DiffDisplay
+        files={[fWith([
+          { type: 'ctx', content: 'keep', oldNo: 1, newNo: 1 },
+          { type: 'del', content: 'old line', oldNo: 2, newNo: null },
+          { type: 'add', content: 'new line', oldNo: null, newNo: 2 },
+        ])]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const rows = rowsOf()
+    const btns = (row: HTMLElement, id: string) => row.querySelectorAll(`[data-testid="${id}"]`)
+    // 上下文行无操作按钮
+    expect(btns(rows[0]!, 'diff-line-copy')).toHaveLength(0)
+    // 变更行有复制/引用
+    expect(btns(rows[1]!, 'diff-line-copy')).toHaveLength(1)
+    expect(btns(rows[1]!, 'diff-line-quote')).toHaveLength(1)
+    expect(btns(rows[2]!, 'diff-line-copy')).toHaveLength(1)
+    fireEvent.click(btns(rows[1]!, 'diff-line-copy')[0]!)
+    expect(copyText).toHaveBeenCalledWith('old line')
+    fireEvent.click(btns(rows[2]!, 'diff-line-quote')[0]!)
+    expect(setComposerQuote).toHaveBeenCalledWith('src/b.ts\nnew line')
+  })
+
+  it('T13: formatFileDiff renders git-style headers per status', async () => {
+    const { formatFileDiff } = await import('./DiffDisplay')
+    const base = { additions: 0, deletions: 0, hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [] }] }
+    const mod = formatFileDiff({ ...base, path: 'x.ts', status: 'modified' })
+    expect(mod).toContain('diff --git a/x.ts b/x.ts')
+    expect(mod).toContain('--- a/x.ts')
+    expect(mod).toContain('+++ b/x.ts')
+    expect(mod).toContain('@@ -1,1 +1,1 @@')
+    const added = formatFileDiff({ ...base, path: 'y.ts', status: 'added' })
+    expect(added).toContain('new file mode 100644')
+    const renamed = formatFileDiff({ ...base, path: 'y.ts', oldPath: 'z.ts', status: 'renamed' })
+    expect(renamed).toContain('rename from z.ts')
+    expect(renamed).toContain('rename to y.ts')
+    const deleted = formatFileDiff({ ...base, path: 'y.ts', status: 'deleted' })
+    expect(deleted).toContain('deleted file mode 100644')
+  })
+
+  it('T9: summary refresh button spins and disables while refreshing', () => {
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+        showSummary
+        filterQuery=""
+        onFilterChange={() => {}}
+        refreshing
+      />,
+    )
+    const btn = screen.getByTestId('diff-summary-refresh')
+    expect(btn).toBeDisabled()
+    expect(btn.querySelector('.animate-spin')).toBeTruthy()
+  })
+
   it('T8: filter input reports changes, Escape clears, empty state shows label', () => {
     const onFilter = vi.fn()
     render(

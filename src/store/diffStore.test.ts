@@ -35,6 +35,15 @@ describe('diffStore', () => {
     useDiffStore.getState().setInitPending('s1', true)
     expect(useDiffStore.getState().bySession['s1']).toMatchObject({ initPending: true })
   })
+  it('setRefreshing toggles the flag and resetTransient clears it', () => {
+    useDiffStore.getState().setRefreshing('s1', true)
+    expect(useDiffStore.getState().bySession['s1']).toMatchObject({ refreshing: true })
+    useDiffStore.getState().setRefreshing('s1', false)
+    expect(useDiffStore.getState().bySession['s1'].refreshing).toBe(false)
+    useDiffStore.getState().setRefreshing('s1', true)
+    useDiffStore.getState().resetTransient()
+    expect(useDiffStore.getState().bySession['s1'].refreshing).toBe(false)
+  })
   it('clearSession resets to EMPTY_DIFF', () => {
     useDiffStore.getState().setResult('s1', { state: 'ok', files: [], base: 'head', hasSessionStart: false })
     useDiffStore.getState().clearSession('s1')

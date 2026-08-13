@@ -16,6 +16,7 @@ export class FsActions {
     const b = base ?? cur?.base ?? 'session-start'
     const ig = ignoreWhitespace ?? useUiStore.getState().ignoreWhitespace
     useDiffStore.getState().setLoading(sessionId)
+    useDiffStore.getState().setRefreshing(sessionId, true)
     this.transport.send({ type: 'fs:diff', sessionId, base: b, ...(ig ? { ignoreWhitespace: true } : {}) })
     return 'sent'
   }

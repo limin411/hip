@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUpFromLine, Check, GitCommitHorizontal, MoreHorizontal, Sparkles } from 'lucide-react'
+import { ArrowUpFromLine, Check, GitCommitHorizontal, Loader2, MoreHorizontal, Sparkles } from 'lucide-react'
 import type { DiffBase } from '@hip/protocol'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
 import { useUiStore } from '@/store/uiStore'
 import { insertComposerText } from '@/components/command-palette/composerBridge'
+import { copyText } from '@/ipc/clipboard'
+import { formatFileDiff } from './DiffDisplay'
 import { Button } from '@/components/ui/Button'
 import {
   DropdownMenu,
@@ -99,6 +101,12 @@ export function ChangesTitlebarActions() {
   const refresh = () => {
     if (!sessionId) return
     sessionService.requestDiff(sessionId)
+  }
+
+  const copyAllDiff = async () => {
+    if (diff.files.length === 0) return
+    const ok = await copyText(diff.files.map(formatFileDiff).join('\n\n'))
+    if (ok) toast.success(t('artifact.changesView.copyDiffCopied'))
   }
 
   const openCommit = () => {
@@ -334,7 +342,12 @@ export function ChangesTitlebarActions() {
             {t('artifact.changesView.expandAll')}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={refresh} data-testid="changes-menu-refresh">
+          <DropdownMenuItem onClick={() => void copyAllDiff()} data-testid="changes-menu-copy-all-diff" disabled={diff.files.length === 0}>
+            {t('artifact.changesView.copyAllDiff')}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={refresh} disabled={diff.refreshing} data-testid="changes-menu-refresh">
+            {diff.refreshing && <Loader2 size={13} strokeWidth={1.75} className="mr-1.5 animate-spin" />}
             {t('artifact.changesView.refresh')}
           </DropdownMenuItem>
         </DropdownMenuContent>

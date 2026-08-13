@@ -1,6 +1,6 @@
 import { Fragment, useLayoutEffect, useRef, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderOpen, MoreHorizontal, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, FolderOpen, MessageSquarePlus, MoreHorizontal, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSummary } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { fileIconForName } from '@/lib/fileIcon'
@@ -144,6 +144,20 @@ function formatHunkText(hunk: DiffHunk): string {
   const header = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@${hunk.header ? ` ${hunk.header}` : ''}`
   const body = hunk.lines.map((line) => `${sign(line.type)}${line.content}`).join('\n')
   return `${header}\n${body}`
+}
+
+/** 完整 git diff 文本（含 diff --git 头），供文件级/全局复制（T13）。 */
+export function formatFileDiff(file: DiffFile): string {
+  const head = `diff --git a/${file.oldPath ?? file.path} b/${file.path}`
+  const header =
+    file.status === 'added'
+      ? 'new file mode 100644'
+      : file.status === 'deleted'
+        ? 'deleted file mode 100644'
+        : file.status === 'renamed'
+          ? `similarity index 100%\nrename from ${file.oldPath}\nrename to ${file.path}`
+          : ''
+  return [head, header, `--- a/${file.oldPath ?? file.path}`, `+++ b/${file.path}`, ...file.hunks.map(formatHunkText)].filter(Boolean).join('\n')
 }
 
 /** Hunk 标题行：始终整行横贯，split 模式下位于左右两栏上方。 */
@@ -291,7 +305,7 @@ function HunkLines({
       {hunk.lines.map((line: DiffLine, i) => (
         <div
           key={i}
-          className={cn('flex leading-[1.55]', lineStyle(line.type, runPos[i]))}
+          className={cn('flex leading-[1.55]', line.type !== 'ctx' && 'group', lineStyle(line.type, runPos[i]))}
           style={line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, false) } : undefined}
         >
           <span className={lnCls(line)} style={chrome ? { color: chrome.headerText } : undefined}>
@@ -305,6 +319,34 @@ function HunkLines({
           </span>
           <span className={cn('w-3.5 shrink-0 select-none text-center text-caption', line.type === 'add' && 'text-success', line.type === 'del' && 'text-danger')}>{sign(line.type)}</span>
           <LineContent spans={spans[i] ?? null} text={line.content} type={line.type} chrome={chrome} />
+          {line.type !== 'ctx' && (
+            <span className="invisible flex shrink-0 items-center gap-0.5 pr-1 group-hover:visible">
+              <button
+                type="button"
+                title={t('artifact.changesView.copyLine')}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void copyText(line.content)
+                }}
+                className="rounded-sm p-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+                data-testid="diff-line-copy"
+              >
+                <Copy size={11} strokeWidth={1.75} />
+              </button>
+              <button
+                type="button"
+                title={t('artifact.changesView.quoteLine')}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setComposerQuote(`${path}\n${line.content}`)
+                }}
+                className="rounded-sm p-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+                data-testid="diff-line-quote"
+              >
+                <MessageSquarePlus size={11} strokeWidth={1.75} />
+              </button>
+            </span>
+          )}
           {line.noNewline && (
             <span
               className="select-none px-1 text-ink-tertiary"
@@ -594,6 +636,9 @@ function FileDiff({
                 <DropdownMenuItem onClick={() => onReviewFile(file.path)} data-testid="diff-file-menu-review">
                   {t('artifact.changesView.reviewFile')}
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void copyText(formatFileDiff(file))} data-testid="diff-file-copy-diff">
+                  {t('artifact.changesView.copyFileDiff')}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </span>
@@ -665,6 +710,7 @@ function SummaryBar({
   onCollapseAll,
   onExpandAll,
   onRefresh,
+  refreshing = false,
 }: {
   total: number
   adds: number
@@ -676,6 +722,7 @@ function SummaryBar({
   onCollapseAll: () => void
   onExpandAll: () => void
   onRefresh: () => void
+  refreshing?: boolean
 }) {
   const { t } = useTranslation()
   const placeholder = t('artifact.changesView.filterPlaceholder')
@@ -716,10 +763,15 @@ function SummaryBar({
           type="button"
           title={t('artifact.changesView.refresh')}
           onClick={onRefresh}
-          className="inline-flex size-6 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+          disabled={refreshing}
+          className="inline-flex size-6 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-60"
           data-testid="diff-summary-refresh"
         >
-          <RefreshCw size={12} strokeWidth={1.75} />
+          {refreshing ? (
+            <RefreshCw size={12} strokeWidth={1.75} className="animate-spin" />
+          ) : (
+            <RefreshCw size={12} strokeWidth={1.75} />
+          )}
         </button>
       </span>
       <span className="relative flex shrink-0 items-center">
@@ -829,6 +881,7 @@ export function DiffDisplay({
   onSummaryCollapseAll,
   onSummaryExpandAll,
   onSummaryRefresh,
+  refreshing = false,
 }: {
   files: DiffFile[]
   summary?: DiffSummary
@@ -863,6 +916,8 @@ export function DiffDisplay({
   filterEmptyLabel?: string
   filterInputRef?: Ref<HTMLInputElement>
   narrow?: boolean
+  /** T9：刷新在途 → 汇总条刷新按钮转圈。 */
+  refreshing?: boolean
   onSummaryCollapseAll?: () => void
   onSummaryExpandAll?: () => void
   onSummaryRefresh?: () => void
@@ -911,6 +966,7 @@ export function DiffDisplay({
           onCollapseAll={onSummaryCollapseAll ?? (() => {})}
           onExpandAll={onSummaryExpandAll ?? (() => {})}
           onRefresh={onSummaryRefresh ?? (() => {})}
+          refreshing={refreshing}
         />
       )}
       {files.map((file, i) => (

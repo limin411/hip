@@ -9,6 +9,7 @@ import { ChangesTitlebarActions } from './ChangesTitlebarActions'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
 import { useUiStore } from '@/store/uiStore'
+import { copyText } from '@/ipc/clipboard'
 import { sessionService } from '@/domain/sessionService'
 import { insertComposerText } from '@/components/command-palette/composerBridge'
 import '@/i18n'
@@ -22,6 +23,8 @@ function renderChanges() {
     </>,
   )
 }
+
+vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn(async () => true) }))
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
@@ -93,8 +96,20 @@ vi.mock('@/components/ui/DropdownMenu', () => {
     DropdownMenuContent: ({ children }: { children: ReactNode }) => (
       <div data-testid="changes-toolbar-menu-content">{children}</div>
     ),
-    DropdownMenuItem: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => (
-      <button type="button" onClick={onClick} data-testid="changes-menu-item">{children}</button>
+    DropdownMenuItem: ({
+      children,
+      onClick,
+      disabled,
+      'data-testid': tid,
+    }: {
+      children: ReactNode
+      onClick?: () => void
+      disabled?: boolean
+      'data-testid'?: string
+    }) => (
+      <button type="button" onClick={onClick} disabled={disabled} data-testid={tid ?? 'changes-menu-item'}>
+        {children}
+      </button>
     ),
     DropdownMenuRadioGroup: ({
       children,
@@ -325,6 +340,40 @@ describe('ChangesView v2', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.getAllByTestId('diff-file')).toHaveLength(8)
     expect(screen.queryByTestId('diff-filter-empty')).toBeNull()
+  })
+
+  it('T13: file menu and toolbar copy git-style diff text', async () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          files: [hunkFile, { ...hunkFile, path: 'src/c.ts' }],
+        },
+      },
+    })
+    renderChanges()
+    // 文件菜单「复制此文件 diff」（每文件一个菜单项）
+    fireEvent.click(screen.getAllByText('artifact.changesView.copyFileDiff')[0]!)
+    expect(copyText).toHaveBeenCalledWith(expect.stringContaining('diff --git a/src/b.ts b/src/b.ts'))
+    // 工具栏「复制全部 diff」→ 两个文件都在
+    fireEvent.click(screen.getByText('artifact.changesView.copyAllDiff'))
+    expect(copyText).toHaveBeenLastCalledWith(expect.stringContaining('diff --git a/src/b.ts b/src/b.ts'))
+    expect(copyText).toHaveBeenLastCalledWith(expect.stringContaining('diff --git a/src/c.ts b/src/c.ts'))
+  })
+
+  it('T9: refresh menu item is disabled with a spinner while refreshing', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [file], refreshing: true },
+      },
+    })
+    renderChanges()
+    const item = screen.getByTestId('changes-menu-refresh')
+    expect(item).toBeDisabled()
+    expect(item.querySelector('.animate-spin')).toBeTruthy()
   })
 
   it('review CTA injects a prompt with the file list into the composer', () => {

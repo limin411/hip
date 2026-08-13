@@ -267,6 +267,7 @@ export function ChangesView() {
             onFilterChange={setFilterQuery}
             filterInputRef={filterInputRef}
             narrow={narrow}
+            refreshing={diff.refreshing}
             onSummaryCollapseAll={() => setAllCollapsed(true)}
             onSummaryExpandAll={() => setAllCollapsed(false)}
             onSummaryRefresh={() => sessionService.requestDiff(sessionId)}

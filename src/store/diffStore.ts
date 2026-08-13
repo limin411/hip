@@ -10,6 +10,8 @@ export interface SessionDiff {
   summary?: DiffSummary
   error?: string
   initPending: boolean
+  /** T9：手动刷新在途（requestDiff 置位，diff/diffFile result 清除）。 */
+  refreshing: boolean
   expanded: Record<string, DiffFile>
   collapsed: Record<string, boolean>
   // --- git-panel additions (A1) ---
@@ -28,7 +30,7 @@ export interface SessionDiff {
 }
 
 export const EMPTY_DIFF: SessionDiff = {
-  status: 'idle', base: 'session-start', hasSessionStart: false, files: [], initPending: false, expanded: {}, collapsed: {},
+  status: 'idle', base: 'session-start', hasSessionStart: false, files: [], initPending: false, refreshing: false, expanded: {}, collapsed: {},
   isGitRepo: false, currentBranch: null, branches: [], switchError: null, commitLog: { status: 'idle', commits: [] },
   viewingCommitSha: null, commitDiff: { status: 'idle', files: [] }, discardPending: {},
 }
@@ -41,6 +43,7 @@ interface DiffStore {
   setResult: (sessionId: string, r: SetResultArg) => void
   setSummary: (sessionId: string, summary: DiffSummary, base: DiffBase, hasSessionStart: boolean) => void
   setInitPending: (sessionId: string, pending: boolean) => void
+  setRefreshing: (sessionId: string, refreshing: boolean) => void
   setBase: (sessionId: string, base: DiffBase) => void
   setFileExpanded: (sessionId: string, path: string, file: DiffFile) => void
   collapseFile: (sessionId: string, path: string) => void
@@ -71,6 +74,7 @@ export const useDiffStore = create<DiffStore>((set) => ({
   })) })),
   setSummary: (id, summary, base, hasSessionStart) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, summary, base, hasSessionStart })) })),
   setInitPending: (id, pending) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, initPending: pending })) })),
+  setRefreshing: (id, refreshing) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, refreshing })) })),
   setBase: (id, base) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, base })) })),
   setFileExpanded: (id, p, file) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, expanded: { ...s.expanded, [p]: file } })) })),
   collapseFile: (id, p) => set((st) => ({ bySession: patch(st.bySession, id, (s) => { const e = { ...s.expanded }; delete e[p]; return { ...s, expanded: e } }) })),
@@ -87,6 +91,6 @@ export const useDiffStore = create<DiffStore>((set) => ({
   setCommitDiffResult: (id, r) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, commitDiff: { status: 'ready', state: r.state, files: r.files ?? [], error: r.error } })) })),
   setDiscardPending: (id, p, pending) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, discardPending: { ...s.discardPending, [p]: pending } })) })),
   resetTransient: () => set((st) => ({
-    bySession: Object.fromEntries(Object.entries(st.bySession).map(([id, s]) => [id, { ...s, status: s.status === 'loading' ? 'idle' : s.status, initPending: false }])),
+    bySession: Object.fromEntries(Object.entries(st.bySession).map(([id, s]) => [id, { ...s, status: s.status === 'loading' ? 'idle' : s.status, initPending: false, refreshing: false }])),
   })),
 }))

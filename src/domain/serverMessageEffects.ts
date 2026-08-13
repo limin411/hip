@@ -178,6 +178,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'fs:diff:result': {
+      useDiffStore.getState().setRefreshing(msg.sessionId, false)
       useDiffStore.getState().setResult(msg.sessionId, {
         state: msg.state,
         files: msg.files,
@@ -202,7 +203,10 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'fs:diffFile:result':
-      if (msg.file) useDiffStore.getState().setFileExpanded(msg.sessionId, msg.path, msg.file)
+      if (msg.file) {
+        useDiffStore.getState().setRefreshing(msg.sessionId, false)
+        useDiffStore.getState().setFileExpanded(msg.sessionId, msg.path, msg.file)
+      }
       return
 
     case 'fs:gitInit:result':

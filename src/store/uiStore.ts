@@ -92,7 +92,7 @@ export type SettingsPageId =
   | 'voice'
   | 'window'
   | 'model'
-  | 'connectors'
+  | 'keyManagement'
   | 'memory'
   | 'agents'
   | 'mcp'
@@ -106,7 +106,7 @@ const SETTINGS_PAGE_IDS: readonly SettingsPageId[] = [
   'voice',
   'window',
   'model',
-  'connectors',
+  'keyManagement',
   'memory',
   'agents',
   'mcp',

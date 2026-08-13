@@ -1109,7 +1109,7 @@ export const zhTW = {
       },
     },
     "mcpLabel": "MCPs",
-    "connectorsLabel": "連接器",
+    "keyManagementLabel": "金鑰管理",
     "mcp": {
       "title": "MCPs",
       "intro": "瀏覽 MCP Registry 市場源（官方源內建 GitHub MCP）、安裝伺服器，或管理本地自訂設定。已安裝服務的工具會合並進 hip 主智慧體（以及你授權的內部智慧體）。外部（ACP/CLI）智慧體不使用它們。",
@@ -3171,7 +3171,7 @@ export const zhTW = {
       "model": "設定：模型",
       "agents": "設定：智慧體",
       "mcp": "設定：MCPs",
-      "connectors": "設定：連接器",
+      "keyManagement": "設定：金鑰管理",
       "skill": "設定：Skills",
       "plugins": "設定：外掛市集",
       "hooks": "設定：Hooks",

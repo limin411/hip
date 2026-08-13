@@ -174,7 +174,7 @@ export function GlobalCommandPalette() {
         model: t('commandPalette.settings.model'),
         agents: t('commandPalette.settings.agents'),
         mcp: t('commandPalette.settings.mcp'),
-        connectors: t('commandPalette.settings.connectors'),
+        keyManagement: t('commandPalette.settings.keyManagement'),
         skill: t('commandPalette.settings.skill'),
         plugins: t('commandPalette.settings.plugins'),
         hooks: t('commandPalette.settings.hooks'),

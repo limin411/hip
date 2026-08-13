@@ -1105,7 +1105,7 @@ export const ko = {
       },
     },
     "mcpLabel": "MCPs",
-    "connectorsLabel": "커넥터",
+    "keyManagementLabel": "키 관리",
     "mcp": {
       "title": "MCPs",
       "intro": "MCP Registry 소스를 탐색(공식 소스에 GitHub MCP 포함), 서버를 설치하거나 로컬 설정을 관리하세요. 설치된 서비스의 도구는 hip 에이전트(및 허용한 내부 에이전트)에 병합됩니다. 외부(ACP/CLI) 에이전트는 이를 사용하지 않습니다.",
@@ -3169,7 +3169,7 @@ export const ko = {
       "model": "설정: 모델",
       "agents": "설정: 에이전트",
       "mcp": "설정: MCPs",
-      "connectors": "설정: 커넥터",
+      "keyManagement": "설정: 키 관리",
       "skill": "설정: Skills",
       "plugins": "설정: 플러그인 마켓",
       "hooks": "설정: Hooks",

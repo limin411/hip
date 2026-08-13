@@ -61,7 +61,7 @@ export type GlobalCommandLabels = {
     model: string
     agents: string
     mcp: string
-    connectors: string
+    keyManagement: string
     skill: string
     plugins: string
     hooks: string
@@ -180,7 +180,7 @@ const ALL_SETTINGS_PAGES: SettingsPageId[] = [
   'voice',
   'window',
   'model',
-  'connectors',
+  'keyManagement',
   'memory',
   'agents',
   'mcp',
@@ -199,7 +199,7 @@ const SETTINGS_ICON: Record<SettingsPageId, GlobalCommand['icon']> = {
   model: 'cpu',
   agents: 'bot',
   mcp: 'wrench',
-  connectors: 'link-2',
+  keyManagement: 'key-round',
   skill: 'sparkles',
   plugins: 'puzzle',
   hooks: 'link-2',

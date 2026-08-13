@@ -24,7 +24,7 @@ function settingsPageTitleKey(
   | 'settings.model'
   | 'settings.agentsLabel'
   | 'settings.mcpLabel'
-  | 'settings.connectorsLabel'
+  | 'settings.keyManagementLabel'
   | 'settings.skillLabel'
   | 'settings.pluginsLabel'
   | 'settings.hooksLabel'
@@ -43,8 +43,8 @@ function settingsPageTitleKey(
       return 'settings.agentsLabel'
     case 'mcp':
       return 'settings.mcpLabel'
-    case 'connectors':
-      return 'settings.connectorsLabel'
+    case 'keyManagement':
+      return 'settings.keyManagementLabel'
     case 'skill':
       return 'settings.skillLabel'
     case 'plugins':

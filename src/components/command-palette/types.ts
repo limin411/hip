@@ -47,6 +47,7 @@ export type PaletteIconName =
   | 'bot'
   | 'puzzle'
   | 'link-2'
+  | 'key-round'
   | 'book-open'
   | 'terminal'
   | 'check-square'

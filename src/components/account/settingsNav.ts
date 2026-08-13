@@ -6,8 +6,8 @@ import {
   AppWindow,
   Bot,
   Brain,
-  Cable,
   Cpu,
+  KeyRound,
   Link2,
   Mic,
   Package,
@@ -25,7 +25,7 @@ import { WindowSettings } from './WindowSettings'
 import { ModelConfig } from './ModelConfig'
 import { AgentManagement } from './AgentManagement'
 import { McpConfig } from './McpConfig'
-import { ConnectorsSettings } from './ConnectorsSettings'
+import { KeyManagementSettings } from './KeyManagementSettings'
 import { SkillConfig } from './SkillConfig'
 import { PluginConfig } from './PluginConfig'
 import { HookConfig } from './HookConfig'
@@ -41,7 +41,7 @@ export type SettingsPageDef = {
     | 'settings.model'
     | 'settings.agentsLabel'
     | 'settings.mcpLabel'
-    | 'settings.connectorsLabel'
+    | 'settings.keyManagementLabel'
     | 'settings.skillLabel'
     | 'settings.pluginsLabel'
     | 'settings.hooksLabel'
@@ -74,7 +74,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
         : []),
       { id: 'window', icon: AppWindow, labelKey: 'settings.window', Component: WindowSettings },
       { id: 'model', icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
-      { id: 'connectors', icon: Cable, labelKey: 'settings.connectorsLabel', Component: ConnectorsSettings },
+      { id: 'keyManagement', icon: KeyRound, labelKey: 'settings.keyManagementLabel', Component: KeyManagementSettings },
       { id: 'memory', icon: Brain, labelKey: 'settings.memoryLabel', Component: MemoryConfig },
     ],
   },

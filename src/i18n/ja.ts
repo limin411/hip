@@ -1105,7 +1105,7 @@ export const ja = {
       },
     },
     "mcpLabel": "MCPs",
-    "connectorsLabel": "コネクター",
+    "keyManagementLabel": "キー管理",
     "mcp": {
       "title": "MCPs",
       "intro": "MCP Registry ソースを閲覧（公式ソースに GitHub MCP を同梱）、サーバーをインストール、またはローカル設定を管理します。インストール済みサービスのツールは hip エージェント（および許可した内部エージェント）に統合されます。外部（ACP/CLI）エージェントはこれらを使用しません。",
@@ -3169,7 +3169,7 @@ export const ja = {
       "model": "設定：モデル",
       "agents": "設定：エージェント",
       "mcp": "設定：MCPs",
-      "connectors": "設定：コネクター",
+      "keyManagement": "設定：キー管理",
       "skill": "設定：Skills",
       "plugins": "設定：プラグインマーケット",
       "hooks": "設定：Hooks",

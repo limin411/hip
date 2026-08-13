@@ -1100,7 +1100,7 @@ export const en = {
         },
       },
       mcpLabel: 'MCPs',
-      connectorsLabel: 'Connectors',
+      keyManagementLabel: 'Key Management',
       mcp: {
         title: 'MCPs',
         intro:
@@ -3274,7 +3274,7 @@ export const en = {
         model: 'Settings: Model',
         agents: 'Settings: Agents',
         mcp: 'Settings: MCPs',
-        connectors: 'Settings: Connectors',
+        keyManagement: 'Settings: Key Management',
         skill: 'Settings: Skills',
         plugins: 'Settings: Plugin Market',
         hooks: 'Settings: Hooks',

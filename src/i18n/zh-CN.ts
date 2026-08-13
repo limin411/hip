@@ -1079,7 +1079,7 @@ export const zhCN = {
         },
       },
       mcpLabel: 'MCPs',
-      connectorsLabel: '连接器',
+      keyManagementLabel: '密钥管理',
       mcp: {
         title: 'MCPs',
         intro:
@@ -3208,7 +3208,7 @@ export const zhCN = {
         model: '设置：模型',
         agents: '设置：智能体',
         mcp: '设置：MCPs',
-        connectors: '设置：连接器',
+        keyManagement: '设置：密钥管理',
         skill: '设置：Skills',
         plugins: '设置：插件市场',
         hooks: '设置：Hooks',

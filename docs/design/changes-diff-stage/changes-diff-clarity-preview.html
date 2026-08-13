@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>更改面板 · Diff 可见性优化 — 高保真预览</title>
+<style>
+/* ═══════════════ 设计令牌（对齐 src/styles/tokens.css + DESIGN.md）═══════════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F6F5F3; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --text-primary:#111111; --text-secondary:#5e5e5e; --text-tertiary:#757575;
+  --accent:#c2410c; --accent-hover:#9a3412; --accent-strong:#7c2d12;
+  --accent-subtle:#f0f0f0; --accent-active:#e6e6e6; --on-accent:#ffffff;
+  --btn-primary:#3a3a3a; --btn-primary-hover:#2e2e2e; --on-btn-primary:#fafafa;
+  --success:#2f7d40; --danger:#c63b3b; --warning:#9a5d10;
+  --state-hover:rgba(17,17,17,.055); --overlay-scrim:rgba(17,17,17,.28);
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+}
+[data-theme="dark"]{
+  --bg-app:#121212; --bg-subtle:#181818; --bg-muted:#1f1f1f; --bg-content:#121212;
+  --border:#2e2e2e; --border-strong:#3e3e3e;
+  --text-primary:#f0f0f0; --text-secondary:#a3a3a3; --text-tertiary:#7a7a7a;
+  --accent:#ffb300; --accent-hover:#ffcc80; --accent-strong:#ffcc80;
+  --accent-subtle:#222222; --accent-active:#2e2e2e; --on-accent:#141414;
+  --btn-primary:#d4d4d4; --btn-primary-hover:#e2e2e2; --on-btn-primary:#141414;
+  --success:#4caf50; --danger:#ff5252; --warning:#ffb74d;
+  --state-hover:rgba(255,255,255,.065); --overlay-scrim:rgba(0,0,0,.48);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-app);color:var(--text-primary)}
+body{font-family:var(--sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit;font-size:inherit}
+input{font-family:inherit;color:inherit}
+svg{display:block;flex:none}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:5px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ═══════════════ 顶部控制条 ═══════════════ */
+.topbar{position:sticky;top:0;z-index:90;display:flex;align-items:center;gap:10px;height:48px;padding:0 16px;background:var(--bg-app);border-bottom:1px solid var(--border)}
+.topbar h1{font-size:13.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+.topbar .sub{color:var(--text-tertiary);font-size:11px;white-space:nowrap}
+.spacer{flex:1}
+.seg{display:flex;align-items:center;border:1px solid var(--border);border-radius:7px;overflow:hidden;background:var(--bg-subtle)}
+.seg button{padding:4px 11px;font-size:11.5px;color:var(--text-secondary);border-right:1px solid var(--border);white-space:nowrap;transition:background .12s,color .12s}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--state-hover)}
+.seg button.on{background:var(--bg-app);color:var(--text-primary);font-weight:550;box-shadow:inset 0 -1.5px 0 var(--accent)}
+.kbd{font-family:var(--mono);font-size:10.5px;color:var(--text-tertiary);background:var(--bg-subtle);border:1px solid var(--border);border-radius:4px;padding:1px 5px;white-space:nowrap}
+.hint{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-tertiary);white-space:nowrap}
+
+/* ═══════════════ App 布局：左侧对话 mock + 右侧更改面板 ═══════════════ */
+#app{display:flex;height:calc(100vh - 48px);min-height:600px;overflow:hidden}
+.chatcol{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--bg-content)}
+.app-title{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-bottom:1px solid var(--border);flex:none}
+.lights{display:flex;gap:6px}
+.lights i{width:10px;height:10px;border-radius:50%;display:block}
+.lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.app-title .t{font-size:11.5px;color:var(--text-tertiary);font-family:var(--mono)}
+.chat-body{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.bubble{max-width:78%;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.6}
+.bubble.user{align-self:flex-end;background:var(--btn-primary);color:var(--on-btn-primary);border-bottom-right-radius:3px}
+.bubble.agent{align-self:flex-start;background:var(--bg-subtle);border:1px solid var(--border);border-bottom-left-radius:3px}
+.bubble.agent .file{font-family:var(--mono);font-size:11px;color:var(--accent-strong)}
+.bubble.agent code{font-family:var(--mono);font-size:11px;background:var(--bg-muted);border:1px solid var(--border);border-radius:4px;padding:0 4px}
+.toolchip{align-self:flex-start;font-family:var(--mono);font-size:10.5px;color:var(--text-tertiary);background:var(--bg-app);border:1px solid var(--border);border-radius:6px;padding:3px 8px}
+.composer{flex:none;border-top:1px solid var(--border);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.composer textarea{width:100%;min-height:54px;resize:none;border:1px solid var(--border-strong);border-radius:8px;background:var(--bg-app);padding:8px 10px;font-size:12.5px;color:var(--text-primary);line-height:1.5;outline:none;transition:border-color .12s}
+.composer textarea:focus{border-color:var(--accent)}
+.composer .row{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.composer .btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:6px;padding:4px 10px;font-size:11.5px;color:var(--text-secondary);transition:background .12s}
+.composer .btn:hover{background:var(--state-hover);color:var(--text-primary)}
+.composer .btn.primary{background:var(--btn-primary);color:var(--on-btn-primary);border-color:var(--btn-primary)}
+.composer .btn.primary:hover{background:var(--btn-primary-hover)}
+
+/* ═══════════════ 右侧面板 ═══════════════ */
+#panel{width:472px;flex:none;display:flex;flex-direction:column;background:var(--bg-app);transition:width .18s}
+body.narrow #panel{width:352px}
+/* 标题栏 */
+.p-title{display:flex;align-items:center;gap:3px;height:40px;padding:0 8px 0 12px;flex:none}
+.p-title .ident{display:flex;align-items:center;gap:5px;min-width:0;max-width:8.5rem;font-size:12px;color:var(--text-secondary);white-space:nowrap}
+.p-title .ident b{font-weight:550;overflow:hidden;text-overflow:ellipsis}
+.p-title .stat{font-family:var(--mono);font-size:10.5px;color:var(--text-tertiary);white-space:nowrap}
+.p-title .stat .add{color:var(--success)}.p-title .stat .del{color:var(--danger)}
+body.narrow .p-title .stat{display:none}
+.base-toggle{display:flex;align-items:center;border:1px solid var(--border);border-radius:6px;padding:1px;flex:none;margin-left:6px}
+.base-toggle button{padding:2px 7px;font-size:11px;border-radius:4px;color:var(--text-tertiary);font-weight:550;transition:background .12s,color .12s}
+.base-toggle button:hover{color:var(--text-secondary)}
+.base-toggle button.on{background:var(--bg-subtle);color:var(--text-primary)}
+.tbtn{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 8px;border-radius:5px;font-size:11.5px;font-weight:550;flex:none;transition:background .12s}
+.tbtn svg{width:12px;height:12px}
+.tbtn.primary{background:var(--btn-primary);color:var(--on-btn-primary)}
+.tbtn.primary:hover{background:var(--btn-primary-hover)}
+.tbtn.ghost{border:1px solid var(--border);color:var(--text-primary)}
+.tbtn.ghost:hover{background:var(--state-hover)}
+.tbtn.plain{color:var(--text-tertiary)}
+.tbtn.plain:hover{background:var(--state-hover);color:var(--text-primary)}
+.tbtn .lbl{white-space:nowrap}
+body.narrow .tbtn .lbl{display:none}
+body.narrow .tbtn{padding:0;width:26px;justify-content:center}
+.p-drag{flex:1;min-width:6px;min-height:100%}
+/* 标签页 */
+.p-tabs{display:flex;align-items:center;gap:2px;height:33px;padding:0 10px;border-bottom:1px solid var(--border);flex:none}
+.p-tabs button{position:relative;padding:5px 10px;font-size:11.5px;color:var(--text-tertiary);border-radius:5px;transition:color .12s}
+.p-tabs button:hover{color:var(--text-primary)}
+.p-tabs button.on{color:var(--text-primary);font-weight:600}
+.p-tabs button.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--accent);border-radius:1px}
+/* 主体滚动区 */
+.p-scroll{flex:1;min-height:0;overflow-y:auto;position:relative}
+/* 汇总条（T7/T8） */
+.summarybar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;background:var(--bg-subtle);border-bottom:1px solid var(--border)}
+.summarybar .count{font-size:11.5px;color:var(--text-secondary);white-space:nowrap}
+.summarybar .count b{font-weight:650}
+.summarybar .count .add{color:var(--success);font-family:var(--mono);font-size:10.5px}
+.summarybar .count .del{color:var(--danger);font-family:var(--mono);font-size:10.5px}
+.summarybar .grow{flex:1}
+.sbtn{display:inline-flex;align-items:center;gap:3px;height:22px;padding:0 6px;border-radius:4px;color:var(--text-tertiary);font-size:11px;transition:background .12s,color .12s}
+.sbtn:hover{background:var(--state-hover);color:var(--text-primary)}
+.sbtn svg{width:11px;height:11px}
+.sbtn.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.filter{display:flex;align-items:center;gap:4px;height:24px;padding:0 6px;border:1px solid var(--border);border-radius:5px;background:var(--bg-app);color:var(--text-tertiary);width:150px;transition:width .15s,border-color .12s}
+.filter:focus-within{border-color:var(--accent);width:190px}
+.filter svg{width:11px;height:11px}
+.filter input{flex:1;min-width:0;border:0;outline:none;background:none;font-size:11px;color:var(--text-primary)}
+.filter input::placeholder{color:var(--text-tertiary)}
+.filter .clear{display:none;color:var(--text-tertiary)}
+.filter.has .clear{display:block}
+body.narrow .filter{width:26px;padding:0;justify-content:center;border-color:transparent}
+body.narrow .filter input{display:none}
+body.narrow .filter:focus-within{width:150px;border-color:var(--accent)}
+body.narrow .filter:focus-within input{display:block}
+/* 文件行 */
+.file{border-bottom:1px solid var(--border)}
+.f-head{position:relative;display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;background:var(--bg-subtle);cursor:pointer;user-select:none;transition:background .12s}
+.f-head:hover{background:var(--accent-subtle)}
+.f-head.focused::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:1px;background:var(--accent)}
+.f-head .chev{color:var(--text-tertiary);transition:transform .12s}
+.f-head .chev svg{width:13px;height:13px}
+.f-head.open .chev{transform:rotate(90deg)}
+.f-chip{flex:none;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:650;letter-spacing:.02em}
+.f-chip.A{background:color-mix(in srgb,var(--success) 13%,transparent);color:var(--success)}
+.f-chip.M{background:color-mix(in srgb,var(--warning) 14%,transparent);color:var(--warning)}
+.f-chip.D{background:color-mix(in srgb,var(--danger) 13%,transparent);color:var(--danger)}
+.f-chip.R{background:var(--bg-muted);color:var(--text-tertiary)}
+.f-ico{flex:none;color:var(--text-tertiary)}
+.f-ico svg{width:13px;height:13px}
+body.narrow .f-ico{display:none}
+.f-name{flex:1;min-width:0;font-family:var(--mono);font-size:11.5px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f-meta{display:flex;align-items:center;gap:2px;font-family:var(--mono);font-size:10.5px;flex:none}
+.f-meta .add{color:var(--success)}.f-meta .del{color:var(--danger)}
+.f-acts{display:flex;align-items:center;gap:1px;flex:none}
+.f-act{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;color:var(--text-tertiary);transition:background .12s,color .12s}
+.f-act:hover{background:var(--state-hover);color:var(--text-primary)}
+.f-act.danger:hover{background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger)}
+.f-act svg{width:12px;height:12px}
+/* 文件体（diff） */
+.sp-row{display:flex}
+.sp-side{flex:1 1 0;min-width:0;overflow-x:auto}
+.sp-div{flex:none;width:1px;background:var(--border)}
+.f-body{display:none;border-top:1px solid var(--border)}
+.file.open .f-body{display:block}
+.f-scroll{overflow-x:auto}
+.f-inner{width:max-content;min-width:100%}
+/* hunk 头 */
+.h-head{position:relative;display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;background:var(--bg-muted);border-top:1px solid var(--border);border-bottom:1px solid var(--border);transition:background-color .5s}
+.h-head.flash{background:color-mix(in srgb,var(--accent) 18%,var(--bg-muted))}
+.h-head .range{flex:none;font-family:var(--mono);font-size:10.5px;color:var(--text-tertiary);white-space:nowrap}
+.h-head .fn{flex:1;min-width:0;font-size:11px;color:var(--text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9}
+.h-badge{display:none;align-items:center;gap:3px;flex:none;font-family:var(--mono);font-size:10px;font-weight:650}
+.mode-after .h-badge{display:inline-flex}
+.h-badge .b{border-radius:4px;padding:0 4px;line-height:15px}
+.h-badge .b.add{background:color-mix(in srgb,var(--success) 13%,transparent);color:var(--success)}
+.h-badge .b.del{background:color-mix(in srgb,var(--danger) 13%,transparent);color:var(--danger)}
+.h-acts{display:inline-flex;align-items:center;gap:2px;flex:none}
+.mode-after .h-acts{display:none}
+.mode-after .h-head:hover .h-acts{display:inline-flex}
+.h-act{font-size:10.5px;color:var(--text-tertiary);padding:1px 5px;border-radius:4px;white-space:nowrap;transition:background .12s,color .12s}
+.h-act:hover{background:var(--state-hover);color:var(--text-primary)}
+.h-exp{display:none;justify-content:center;padding:2px 0}
+.mode-after .h-exp{display:flex}
+.h-exp button{font-size:10.5px;color:var(--text-tertiary);padding:1px 8px;border-radius:4px;transition:background .12s,color .12s}
+.h-exp button:hover{background:var(--state-hover);color:var(--text-primary)}
+/* diff 行 */
+.drow{position:relative;display:flex;align-items:stretch;font-family:var(--mono);font-size:11.5px;line-height:1.55;transition:background .1s}
+.drow .ln{flex:none;width:36px;padding:0 6px;text-align:right;font-size:10.5px;line-height:inherit;color:var(--text-tertiary);opacity:.85;user-select:none;white-space:nowrap;overflow:hidden}
+.drow .ln:last-of-type{border-right:1px solid transparent}
+.mode-after .drow .ln{background:color-mix(in srgb,var(--bg-subtle) 62%,transparent)}
+.mode-after .drow .ln + .ln{border-right:1px solid var(--border)}
+.mode-after .sp-side .drow .ln{border-right:1px solid var(--border)}
+.mode-after .drow.add .ln{color:var(--success)}
+.mode-after .drow.del .ln{color:var(--danger)}
+.drow .sg{flex:none;width:18px;text-align:center;font-size:10.5px;line-height:inherit;user-select:none;color:var(--text-tertiary);opacity:.8}
+.drow.add .sg{color:var(--success)}
+.drow.del .sg{color:var(--danger)}
+.drow .ct{flex:none;padding:0 8px;white-space:pre;line-height:inherit;color:var(--text-primary)}
+.drow .wd{border-radius:2px}
+.drow.add .wd{background:color-mix(in srgb,var(--success) var(--wd-a),transparent)}
+.drow.del .wd{background:color-mix(in srgb,var(--danger) var(--wd-a),transparent)}
+/* 现状（before）vs 方案（after）行视觉 */
+#panel.mode-before{--add-bg:7%;--del-bg:7%;--wd-a:24%}
+#panel.mode-before .summarybar{display:none}
+#panel.mode-after{--add-bg:13%;--del-bg:13%;--wd-a:36%}
+.drow.add{background:color-mix(in srgb,var(--success) var(--add-bg),transparent)}
+.drow.del{background:color-mix(in srgb,var(--danger) var(--del-bg),transparent)}
+#panel.mode-before .drow.add,#panel.mode-before .drow.del{box-shadow:none}
+#panel.mode-after .drow.add{box-shadow:inset 3px 0 0 0 var(--success)}
+#panel.mode-after .drow.del{box-shadow:inset 3px 0 0 0 var(--danger)}
+#panel.mode-after .drow.add:hover{background:color-mix(in srgb,var(--success) 19%,transparent)}
+#panel.mode-after .drow.del:hover{background:color-mix(in srgb,var(--danger) 19%,transparent)}
+/* 变更块（T2） */
+.chg{display:block;border-radius:0;margin:0}
+#panel.mode-after .chg{border-radius:6px;margin:3px 0;overflow:hidden}
+#panel.mode-after .chg.add{outline:1px solid color-mix(in srgb,var(--success) 24%,transparent);outline-offset:-1px}
+#panel.mode-after .chg.del{outline:1px solid color-mix(in srgb,var(--danger) 24%,transparent);outline-offset:-1px}
+#panel.mode-after .chg.split{outline:1px solid var(--border);outline-offset:-1px}
+/* 行级操作（T12） */
+.row-act{display:none;position:absolute;right:4px;top:50%;transform:translateY(-50%);align-items:center;gap:2px;padding:1px;background:var(--bg-app);border:1px solid var(--border);border-radius:5px;z-index:2}
+#panel.mode-after .drow.add:hover .row-act,#panel.mode-after .drow.del:hover .row-act{display:inline-flex}
+.row-act button{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;color:var(--text-secondary);transition:background .1s,color .1s}
+.row-act button:hover{background:var(--state-hover);color:var(--text-primary)}
+.row-act svg{width:10px;height:10px}
+/* 空态 / 列表尾注 */
+.filter-empty{display:none;padding:18px;text-align:center;font-size:12px;color:var(--text-tertiary)}
+.filter-empty.on{display:block}
+.list-foot{padding:8px 12px;font-size:11px;color:var(--text-tertiary)}
+
+/* 下拉菜单 */
+.menu{position:fixed;z-index:120;min-width:170px;background:var(--bg-app);border:1px solid var(--border-strong);border-radius:9px;box-shadow:0 8px 24px var(--overlay-scrim);padding:4px;display:none}
+.menu.on{display:block}
+.menu .mi{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:5px 9px;font-size:12px;color:var(--text-primary);border-radius:5px;text-align:left;transition:background .1s}
+.menu .mi:hover{background:var(--state-hover)}
+.menu .mi.disabled{opacity:.4;pointer-events:none}
+.menu .mi .ck{color:var(--accent-strong)}
+.menu .mi .rad{color:var(--text-tertiary)}
+.menu .mi.on .rad{color:var(--accent-strong)}
+.menu .sep{height:1px;background:var(--border);margin:4px 6px}
+.menu .cap{padding:4px 9px 2px;font-size:10px;color:var(--text-tertiary);letter-spacing:.03em}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(6px);background:var(--btn-primary);color:var(--on-btn-primary);font-size:12px;padding:7px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;z-index:200;max-width:70vw}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* 设计说明 */
+.notes{margin:18px auto 40px;max-width:1100px;padding:0 20px}
+.notes summary{cursor:pointer;font-size:12.5px;color:var(--text-secondary);padding:8px 0;user-select:none}
+.notes .box{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;border:1px solid var(--border);border-radius:10px;padding:16px}
+.notes h3{font-size:12.5px;font-weight:650;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.notes h3 .tag{font-size:10px;font-weight:650;padding:1px 6px;border-radius:4px}
+.notes h3 .tag.p0{background:color-mix(in srgb,var(--danger) 13%,transparent);color:var(--danger)}
+.notes h3 .tag.p1{background:color-mix(in srgb,var(--warning) 14%,transparent);color:var(--warning)}
+.notes h3 .tag.p2{background:color-mix(in srgb,var(--success) 13%,transparent);color:var(--success)}
+.notes ul{list-style:none;display:flex;flex-direction:column;gap:5px}
+.notes li{font-size:11.5px;color:var(--text-secondary);padding-left:16px;position:relative}
+.notes li::before{content:"✓";position:absolute;left:0;top:0;color:var(--success);font-weight:650}
+.notes .diffnote{font-size:11px;color:var(--text-tertiary);margin-top:10px;line-height:1.7}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>更改面板 · Diff 可见性优化</h1>
+  <span class="sub">高保真交互预览</span>
+  <div class="spacer"></div>
+  <div class="seg" id="modeSeg">
+    <button data-mode="before">现状</button>
+    <button data-mode="after" class="on">方案</button>
+  </div>
+  <div class="seg" id="themeSeg">
+    <button data-theme-set="light" class="on">亮</button>
+    <button data-theme-set="dark">暗</button>
+  </div>
+  <div class="seg" id="narrowSeg">
+    <button data-narrow="0" class="on">宽面板</button>
+    <button data-narrow="1">窄面板</button>
+  </div>
+  <div class="seg" id="viewSeg">
+    <button data-view="unified" class="on">统一</button>
+    <button data-view="split">并排</button>
+  </div>
+  <span class="hint"><span class="kbd">⌘F</span> 筛选 · <span class="kbd">⌥⌘↑↓</span> hunk · <span class="kbd">j/k</span> 文件 · <span class="kbd">␣</span> 展开 · <span class="kbd">⌘↵</span> 审查</span>
+</header>
+
+<div id="app">
+  <!-- 左侧：对话 mock（衬托右侧面板） -->
+  <aside class="chatcol">
+    <div class="app-title">
+      <span class="lights"><i></i><i></i><i></i></span>
+      <span class="t">hip — make-stock-money</span>
+    </div>
+    <div class="chat-body">
+      <div class="bubble agent">收到，我先看一下当前未提交的改动。<span class="mono">git diff --stat</span></div>
+      <div class="toolchip">git diff --stat → 6 files changed, 48 insertions(+), 23 deletions(-)</div>
+      <div class="bubble agent">已完成：<br>· <code>Composer.tsx</code> 提交逻辑改为 <code>useCallback</code> + 空输入守卫<br>· <code>prompt.ts</code> 空值合并改为 <code>??</code><br>· 新增 <code>prompt.test.ts</code>（2 个用例）</div>
+      <div class="bubble user">改得不错，把 zh-CN 的文案也顺手修一下吧。</div>
+    </div>
+    <div class="composer">
+      <textarea id="composerInput" placeholder="输入消息，或使用「审查 / 提交 / 推送」…"></textarea>
+      <div class="row">
+        <button class="btn" id="composerReview">✦ 审查当前改动</button>
+        <button class="btn primary">发送</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 右侧：更改面板（主角） -->
+  <section id="panel" class="mode-after">
+    <!-- 标题栏 -->
+    <div class="p-title">
+      <span class="ident"><b id="identLabel">6 个文件有改动</b></span>
+      <span class="stat" id="identStat">+48 <span class="del">−23</span></span>
+      <div class="base-toggle" id="baseToggle" title="对比基线">
+        <button data-base="session" id="baseSession">会话起点</button>
+        <button data-base="head" class="on" id="baseHead">HEAD</button>
+      </div>
+      <button class="tbtn primary" id="btnReview" title="请 agent 审查全部改动（⌘↵）">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.7 5.7 1.9-5.7 1.9L12 18.2l-1.9-5.7-5.7-1.9 5.7-1.9L12 3z"/></svg>
+        <span class="lbl">审查</span>
+      </button>
+      <button class="tbtn ghost" id="btnCommit" title="让智能体提交">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 12h6M15 12h6"/></svg>
+        <span class="lbl">提交</span>
+      </button>
+      <button class="tbtn ghost" id="btnPush" title="推送">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        <span class="lbl">推送</span>
+      </button>
+      <button class="tbtn plain" id="btnMore" title="更改工具栏菜单">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+      </button>
+      <div class="p-drag"></div>
+    </div>
+    <!-- 标签页 -->
+    <div class="p-tabs">
+      <button>文件</button>
+      <button>大纲</button>
+      <button class="on">更改</button>
+      <button>终端</button>
+    </div>
+    <!-- 内容 -->
+    <div class="p-scroll" id="pScroll">
+      <div class="summarybar" id="summarybar">
+        <span class="count"><b id="sumFiles">6 个文件</b> · <span class="add">+48</span> <span class="del">−23</span></span>
+        <div class="grow"></div>
+        <button class="sbtn" id="sumCollapse" title="全部折叠"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M6 6h12M6 18h12"/></svg></button>
+        <button class="sbtn" id="sumExpand" title="全部展开"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v8M8 12h8M6 6h12M6 18h12"/></svg></button>
+        <button class="sbtn" id="sumRefresh" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg></button>
+        <label class="filter" id="filterBox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="filterInput" placeholder="筛选文件…" spellcheck="false">
+          <button class="clear" id="filterClear" title="清除（Esc）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </label>
+      </div>
+      <div id="filelist"></div>
+      <div class="filter-empty" id="filterEmpty">没有匹配的文件</div>
+      <div class="list-foot">还有更多文件未显示——请收窄改动范围，或在终端用 git 查看全部</div>
+    </div>
+  </section>
+</div>
+
+<div class="menu" id="menu"></div>
+<div id="toast"></div>
+
+<details class="notes">
+  <summary>设计说明 — P0/P1/P2 速览 · 快捷键 · 与真实实现的差异</summary>
+  <div class="box">
+    <div><h3><span class="tag p0">P0</span> Diff 可见性（核心）</h3><ul>
+      <li>T1 变更行 7% → 13% 底色 + 2px 色条 rail，hover 加深</li>
+      <li>T2 连续变更成「块」：圆角 + 连续内描边，块间留隙</li>
+      <li>T3 行号列加分隔/底纹，add/del 行号随行变色</li>
+      <li>T4 word diff 强度提升，并排视图补齐行内高亮</li>
+      <li>T5 hunk 头新增 +N −M 量化徽标</li>
+      <li>T6 上下文行数档位（全部 / 5 行 / 2 行）</li>
+    </ul></div>
+    <div><h3><span class="tag p1">P1</span> 面板体验</h3><ul>
+      <li>T7 顶部 sticky 汇总条：文件数 + 总增删 + 折叠/展开/刷新</li>
+      <li>T8 ⌘F 文件筛选，Esc 还原，无匹配空态</li>
+      <li>T9 刷新进行中 spinner 反馈</li>
+      <li>T10 ⌥⌘↑↓ hunk 键盘导航 + 目标高亮淡出</li>
+      <li>T11 上下文展开/收起（复用 sidecar context 参数）</li>
+      <li>T12 变更行 hover 行级操作：复制行 / 引用到对话</li>
+      <li>T13 文件级 / 全局「复制 diff」（git diff 文本）</li>
+    </ul></div>
+    <div><h3><span class="tag p2">P2</span> 语义与无障碍</h3><ul>
+      <li>T14 审查三级粒度：全部 / 单文件 / 单 hunk「解释此改动」</li>
+      <li>T15 色盲安全（+/− 符号、字母 chip）+ aria 行语义</li>
+      <li>T16 长文件 diff minimap（>400 行可选）</li>
+      <li>T17 文件按状态分组排序（A/M/D/R）</li>
+    </ul></div>
+  </div>
+  <p class="diffnote">与实现差异：本预览的变更块用「外层 wrapper 描边」近似实现，落地时为每行 inset box-shadow 组合（不挤占内容宽度）；上下文展开在本预览中为单键整体切换，落地时拆为「展开 ↑N / ↓N」两侧按钮；为便于演示，预览默认开启「5 行」紧凑上下文，落地默认保持现状「全部」（T6 为可选档位）；其余交互（筛选、汇总条、hunk 导航、行级操作、审查注入、toast）与 spec 一致。方案细节见 <code>docs/design/changes-diff-stage/changes-diff-clarity-spec.md</code>。</p>
+</details>
+
+<script>
+/* ═══════════════ 数据：6 个文件的 mock diff ═══════════════ */
+const C = (s) => ({ type: 'ctx', content: s })
+const D = (s) => ({ type: 'del', content: s })
+const A = (s) => ({ type: 'add', content: s })
+
+function build(hunk) {
+  let o = hunk.oldStart, n = hunk.newStart
+  const lines = []
+  for (const l of hunk.lines) {
+    const t = l.type, content = l.content
+    if (t === 'ctx') { lines.push({ type: 'ctx', oldNo: o, newNo: n, content }); o++; n++ }
+    else if (t === 'del') { lines.push({ type: 'del', oldNo: o, newNo: null, content }); o++ }
+    else { lines.push({ type: 'add', oldNo: null, newNo: n, content }); n++ }
+  }
+  const oldLines = lines.filter(l => l.type !== 'add').length
+  const newLines = lines.filter(l => l.type !== 'del').length
+  return { header: hunk.header, oldStart: hunk.oldStart, oldLines, newStart: hunk.newStart, newLines, lines }
+}
+
+const FILES = [
+  { path: 'src/components/chat/Composer.tsx', status: 'M', icon: 'tsx', hunks: [
+    build({ oldStart: 40, newStart: 40, header: 'function Composer()', lines: [
+      C("  const [draft, setDraft] = useState('')"),
+      C('  const { t } = useTranslation()'),
+      D('  const submit = () => {'),
+      D('    sendMessage(draft.trim())'),
+      A('  const submit = useCallback(() => {'),
+      A('    const text = draft.trim()'),
+      C("    setDraft('')"),
+      C('  }, [draft])'),
+    ]}),
+    build({ oldStart: 61, newStart: 65, header: 'function sendOnEnter(e)', lines: [
+      C("  if (e.key !== 'Enter') return"),
+      C('  if (e.shiftKey) return'),
+      D('  submit(draft)'),
+      A('  submitRef.current()'),
+      C('  e.preventDefault()'),
+      C('}'),
+    ]}),
+  ]},
+  { path: 'src/lib/prompt.ts', status: 'M', icon: 'ts', hunks: [
+    build({ oldStart: 12, newStart: 12, header: 'export function buildPrompt(opts)', lines: [
+      C('  const lines: string[] = []'),
+      C('  lines.push(`# 任务`)'),
+      D("  lines.push(`当前分支：${opts.branch || 'unknown'}`)"),
+      A("  lines.push(`当前分支：${opts.branch ?? 'unknown'}`)"),
+      C("  return lines.join('\\n')"),
+      C('}'),
+    ]}),
+  ]},
+  { path: 'src/i18n/zh-CN.ts', status: 'M', icon: 'ts', hunks: [
+    build({ oldStart: 601, newStart: 601, header: '', lines: [
+      C("      changes: '更改',"),
+      D("        summary: '将更改此对话的主智能体',"),
+      A("        summary: '将更换此对话的主智能体',"),
+      C('      branch: {'),
+    ]}),
+  ]},
+  { path: 'src/lib/prompt.test.ts', status: 'A', icon: 'ts', hunks: [
+    build({ oldStart: 0, newStart: 1, header: '', lines: [
+      A("import { buildPrompt } from './prompt'"),
+      A(''),
+      A("describe('buildPrompt', () => {"),
+      A("  it('includes branch', () => {"),
+      A("    const out = buildPrompt({ branch: 'main' })"),
+      A("    expect(out).toContain('main')"),
+      A('  })'),
+      A('})'),
+    ]}),
+  ]},
+  { path: 'src/store/uiStore.ts', status: 'M', icon: 'ts', hunks: [
+    build({ oldStart: 181, newStart: 181, header: 'export interface UiState', lines: [
+      C('  /** Ignore whitespace-only changes (git -w). */'),
+      D('  ignoreWhitespace: boolean'),
+      A('  ignoreWhitespace?: boolean'),
+      C("  diffViewMode: 'unified' | 'split'"),
+      A('  diffContext?: number'),
+    ]}),
+  ]},
+  { path: 'src/components/chat/MessageList.tsx', status: 'M', icon: 'tsx', hunks: [
+    build({ oldStart: 88, newStart: 88, header: 'function MessageList()', lines: [
+      C('      {messages.map((m) => ('),
+      C('        <MessageBubble'),
+      C('          key={m.id}'),
+      C('          message={m}'),
+      C('          onRetry={handleRetry}'),
+      D('          onCopy={() => copyText(m.text)}'),
+      D('          showMeta={index === messages.length - 1}'),
+      A('          onCopy={handleCopy}'),
+      A('          showMeta={isLast}'),
+      C('        />'),
+      A('          onQuote={() => setComposerQuote(m.text)}'),
+      C('      ))}'),
+      C('      {pending && <TypingIndicator />}'),
+      C('      {!messages.length && <EmptyHint />}'),
+      C('    </div>'),
+      C('  )'),
+      C('}'),
+    ]}),
+  ]},
+]
+
+for (const f of FILES) {
+  f.adds = f.hunks.reduce((s, h) => s + h.lines.filter(l => l.type === 'add').length, 0)
+  f.dels = f.hunks.reduce((s, h) => s + h.lines.filter(l => l.type === 'del').length, 0)
+}
+const TOT = { files: FILES.length, adds: FILES.reduce((s, f) => s + f.adds, 0), dels: FILES.reduce((s, f) => s + f.dels, 0) }
+
+/* ═══════════════ 工具 ═══════════════ */
+const $ = (s) => document.querySelector(s)
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+let toastTimer
+function toast(msg) {
+  const el = $('#toast')
+  el.textContent = msg
+  el.classList.add('on')
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => el.classList.remove('on'), 1800)
+}
+async function copyText(s) {
+  try { await navigator.clipboard.writeText(s); toast('已复制') }
+  catch { toast('复制失败') }
+}
+/* word diff（移植 src/lib/wordDiff.ts） */
+function wordDiff(a, b) {
+  const max = Math.min(a.length, b.length)
+  let p = 0
+  while (p < max && a[p] === b[p]) p++
+  let s = 0
+  while (s < max - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++
+  const span = (pre, mid, suf) => {
+    const out = []
+    if (pre) out.push({ text: pre, changed: false })
+    if (mid) out.push({ text: mid, changed: true })
+    if (suf) out.push({ text: suf, changed: false })
+    return out.length ? out : [{ text: '', changed: false }]
+  }
+  return { del: span(a.slice(0, p), a.slice(p, a.length - s), a.slice(a.length - s)), add: span(b.slice(0, p), b.slice(p, b.length - s), b.slice(b.length - s)) }
+}
+/* unified：等长 del→add run 配对（同 computeHunkWordDiffs） */
+function hunkWordDiffs(lines) {
+  const out = lines.map(() => null)
+  let i = 0
+  while (i < lines.length) {
+    if (lines[i].type === 'del') {
+      let j = i; while (j < lines.length && lines[j].type === 'del') j++
+      let k = j; while (k < lines.length && lines[k].type === 'add') k++
+      const dels = j - i, adds = k - j
+      if (dels > 0 && dels === adds) {
+        for (let n = 0; n < dels; n++) {
+          const wd = wordDiff(lines[i + n].content, lines[j + n].content)
+          out[i + n] = wd.del; out[j + n] = wd.add
+        }
+      }
+      i = k
+    } else i++
+  }
+  return out
+}
+/* split：行配对（同 buildSplitRows） */
+function splitRows(lines) {
+  const rows = []
+  let i = 0
+  while (i < lines.length) {
+    if (lines[i].type === 'del') {
+      let j = i; while (j < lines.length && lines[j].type === 'del') j++
+      let k = j; while (k < lines.length && lines[k].type === 'add') k++
+      const dels = j - i, adds = k - j
+      const n = Math.max(dels, adds)
+      for (let r = 0; r < n; r++) rows.push({ left: r < dels ? lines[i + r] : null, right: r < adds ? lines[j + r] : null })
+      i = k
+    } else { rows.push({ left: lines[i], right: lines[i] }); i++ }
+  }
+  return rows
+}
+const wdContent = (spans, cls, text) => spans
+  ? spans.map(sp => `<span class="${sp.changed ? 'wd ' + cls : ''}">${esc(sp.text)}</span>`).join('')
+  : esc(text)
+
+/* ═══════════════ 状态 ═══════════════ */
+const state = {
+  mode: 'after',          // before | after
+  view: 'unified',        // unified | split
+  base: 'head',
+  expandedFile: null,     // 当前展开的文件（单选手风琴）
+  filter: '',
+  ctxLimit: 5,            // 上下文行数：Infinity | 5 | 2
+  hunkOpen: new Set(),    // 已展开隐藏上下文（整 hunk 键）
+  ignoreWs: false,
+  focusIdx: -1,
+  narrow: false,
+}
+const menu = { el: $('#menu'), kind: null, anchor: null, filePath: null, items: [] }
+
+/* ═══════════════ 渲染 ═══════════════ */
+function visibleFiles() {
+  const q = state.filter.toLowerCase()
+  return FILES.filter(f => !q || f.path.toLowerCase().includes(q))
+}
+const FILES_hunkLines = new Map()
+let hunkSeq = 0
+FILES.forEach((f, fi) => f.hunks.forEach(h => {
+  const id = `${fi}-${hunkSeq++}`
+  h.id = id
+  FILES_hunkLines.set(id, h.lines)
+  h.lines.forEach((l, li) => { l.gid = `${id}:${li}` })
+}))
+
+/* 每行全局索引（行级操作查找用） */
+const GID_INDEX = new Map()
+FILES.forEach(f => f.hunks.forEach(h => h.lines.forEach((l, li) => GID_INDEX.set(`${h.id}:${li}`, l))))
+
+function visibleCtxLine(l) {
+  if (state.mode === 'before') return true
+  const hunkId = l.gid.slice(0, l.gid.lastIndexOf(':'))
+  if (state.ctxLimit === Infinity || state.hunkOpen.has(hunkId)) return true
+  if (l.type !== 'ctx') return true
+  const lines = FILES_hunkLines.get(hunkId)
+  const li = +l.gid.slice(l.gid.lastIndexOf(':') + 1)
+  for (let d = 1; d <= state.ctxLimit; d++) {
+    if (lines[li - d] && lines[li - d].type !== 'ctx') return true
+    if (lines[li + d] && lines[li + d].type !== 'ctx') return true
+  }
+  return false
+}
+function hiddenCtxCount(h) {
+  if (state.ctxLimit === Infinity || state.hunkOpen.has(h.id)) return 0
+  return h.lines.filter(l => l.type === 'ctx' && !visibleCtxLine(l)).length
+}
+
+function lineHTML(line, spans) {
+  const sg = line.type === 'add' ? '+' : line.type === 'del' ? '-' : ''
+  const act = (state.mode === 'after' && line.type !== 'ctx') ? `
+    <span class="row-act">
+      <button title="复制行" data-act="copy-line" data-gid="${line.gid}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      <button title="引用到对话" data-act="quote-line" data-gid="${line.gid}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg></button>
+    </span>` : ''
+  return `<div class="drow ${line.type}" data-gid="${line.gid}">
+    <span class="ln">${line.oldNo ?? ''}</span>
+    <span class="ln">${line.newNo ?? ''}</span>
+    <span class="sg">${sg}</span>
+    <span class="ct">${wdContent(spans, line.type === 'add' ? 'add' : 'del', line.content)}</span>
+    ${act}
+  </div>`
+}
+function splitCellHTML(line, side, wdPair) {
+  if (!line) return `<div class="drow"><span class="ln"></span><span class="sg"></span><span class="ct"></span></div>`
+  const sg = line.type === 'add' ? '+' : line.type === 'del' ? '-' : ''
+  const spans = (state.mode === 'after' && wdPair)
+    ? (side === 'left' ? wdPair.del : wdPair.add)
+    : null
+  const act = (state.mode === 'after' && line.type !== 'ctx') ? `
+    <span class="row-act">
+      <button title="复制行" data-act="copy-line" data-gid="${line.gid}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+      <button title="引用到对话" data-act="quote-line" data-gid="${line.gid}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg></button>
+    </span>` : ''
+  return `<div class="drow ${line.type}" data-gid="${line.gid}">
+    <span class="ln">${line.oldNo ?? line.newNo ?? ''}</span>
+    <span class="sg">${sg}</span>
+    <span class="ct">${wdContent(spans, line.type === 'add' ? 'add' : 'del', line.content)}</span>
+    ${act}
+  </div>`
+}
+
+function hunkHTML(file, h) {
+  const badge = `<span class="h-badge"><span class="b add">+${h.lines.filter(l => l.type === 'add').length}</span><span class="b del">−${h.lines.filter(l => l.type === 'del').length}</span></span>`
+  const hidden = hiddenCtxCount(h)
+  const expBtn = hidden > 0
+    ? `<div class="h-exp"><button data-act="hunk-expand" data-hid="${h.id}">展开已隐藏的 ${hidden} 行上下文</button></div>`
+    : (state.hunkOpen.has(h.id) ? `<div class="h-exp"><button data-act="hunk-collapse" data-hid="${h.id}">收起上下文</button></div>` : '')
+  const header = `@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@`
+  const body = state.view === 'unified'
+    ? (() => {
+        const spans = hunkWordDiffs(h.lines)
+        let html = '', run = [], runType = null
+        const flush = () => {
+          if (!run.length) return
+          if (runType) html += `<div class="chg ${runType}">${run.join('')}</div>`
+          else html += run.join('')
+          run = []
+        }
+        h.lines.forEach((l, i) => {
+          if (!visibleCtxLine(l)) return
+          if (l.type !== 'ctx') {
+            if (runType !== l.type) { flush(); runType = l.type }
+            run.push(lineHTML(l, spans[i]))
+          } else {
+            flush(); runType = null
+            run.push(lineHTML(l, null))
+          }
+        })
+        flush()
+        return html
+      })()
+    : (() => {
+        const rows = splitRows(h.lines).filter(r => visibleCtxLine(r.left ?? r.right))
+        let html = '', run = [], runType = null
+        const flush = () => {
+          if (!run.length) return
+          if (runType) html += `<div class="chg ${runType}">${run.join('')}</div>`
+          else html += run.join('')
+          run = []
+        }
+        rows.forEach((row) => {
+          const changed = row.left?.type === 'del' || row.right?.type === 'add'
+          const pair = row.left && row.right && row.left.type === 'del' && row.right.type === 'add'
+            ? wordDiff(row.left.content, row.right.content) : null
+          const cell = `<div class="sp-row"><div class="sp-side">${splitCellHTML(row.left, 'left', pair)}</div><div class="sp-div"></div><div class="sp-side">${splitCellHTML(row.right, 'right', pair)}</div></div>`
+          if (changed) {
+            if (runType !== 'split') { flush(); runType = 'split' }
+            run.push(cell)
+          } else {
+            flush(); runType = null
+            run.push(cell)
+          }
+        })
+        flush()
+        return html
+      })()
+  return `<div class="hunk" data-hid="${h.id}">
+    <div class="h-head" data-hid="${h.id}">
+      <span class="range">${header}</span>
+      ${h.header ? `<span class="fn">${esc(h.header)}</span>` : '<span class="fn"></span>'}
+      ${badge}
+      <span class="h-acts">
+        <button class="h-act" data-act="hunk-copy" data-hid="${h.id}">复制</button>
+        <button class="h-act" data-act="hunk-quote" data-hid="${h.id}">引用到对话</button>
+        <button class="h-act" data-act="hunk-explain" data-hid="${h.id}">请 agent 解释</button>
+      </span>
+    </div>
+    <div class="f-scroll"><div class="f-inner">${body}</div></div>
+    ${expBtn}
+  </div>`
+}
+
+function fileHTML(f, idx) {
+  const chip = { A: 'A', M: 'M', D: 'D', R: 'R' }[f.status]
+  const open = state.expandedFile === f.path
+  const ico = f.icon === 'tsx' ? `<svg viewBox="0 0 24 24" fill="none" stroke="#1a8cd8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9.5 13l-1.5 2 1.5 2M13 13l1.5 2-1.5 2"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="#1a8cd8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`
+  return `<div class="file ${open ? 'open' : ''}" data-path="${esc(f.path)}">
+    <div class="f-head ${idx === state.focusIdx ? 'focused' : ''}" data-path="${esc(f.path)}">
+      <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      <span class="f-chip ${f.status}">${chip}</span>
+      <span class="f-ico">${ico}</span>
+      <span class="f-name">${esc(f.path)}</span>
+      <span class="f-meta"><span class="add">+${f.adds}</span><span class="del">−${f.dels}</span></span>
+      <span class="f-acts">
+        <button class="f-act danger" data-act="discard" data-path="${esc(f.path)}" title="丢弃更改"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+        <button class="f-act" data-act="open-files" data-path="${esc(f.path)}" title="在文件 tab 打开"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
+        <button class="f-act" data-act="file-menu" data-path="${esc(f.path)}" title="更多操作"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+      </span>
+    </div>
+    ${open ? `<div class="f-body">${f.hunks.map(h => hunkHTML(f, h)).join('')}</div>` : ''}
+  </div>`
+}
+
+function render() {
+  const list = $('#filelist')
+  const files = visibleFiles()
+  if (state.focusIdx >= files.length) state.focusIdx = -1
+  list.innerHTML = files.map(fileHTML).join('')
+  $('#filterEmpty').classList.toggle('on', files.length === 0)
+  $('#sumFiles').innerHTML = `${TOT.files} 个文件 · <span class="add">+${TOT.adds}</span> <span class="del">−${TOT.dels}</span>`
+  $('#identStat').innerHTML = `+${TOT.adds} <span class="del">−${TOT.dels}</span>`
+  $('#filterBox').classList.toggle('has', !!state.filter)
+  $('#filterInput').value = state.filter
+}
+
+/* ═══════════════ 交互 ═══════════════ */
+/* 顶部开关 */
+$('#modeSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return
+  state.mode = b.dataset.mode
+  $('#panel').classList.remove('mode-before', 'mode-after')
+  $('#panel').classList.add('mode-' + state.mode)
+  $('#modeSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b))
+  closeMenu(); render()
+  toast(state.mode === 'after' ? '方案模式：变更块 / 色条 / 徽标 / 汇总条 / 筛选' : '现状模式：当前线上视觉')
+})
+$('#themeSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return
+  document.documentElement.dataset.theme = b.dataset.themeSet
+  $('#themeSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b))
+})
+$('#narrowSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return
+  state.narrow = b.dataset.narrow === '1'
+  document.body.classList.toggle('narrow', state.narrow)
+  $('#narrowSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b))
+})
+$('#viewSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return
+  state.view = b.dataset.view
+  $('#viewSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b))
+  closeMenu(); render()
+})
+$('#baseToggle').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return
+  state.base = b.dataset.base
+  $('#baseToggle').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b))
+  toast(state.base === 'head' ? '对比基线：HEAD' : '对比基线：会话起点快照')
+})
+
+/* 手风琴（单开；⌘+点击同单开，预览从简） */
+function toggleFile(path) {
+  state.expandedFile = state.expandedFile === path ? null : path
+  closeMenu(); render()
+}
+$('#filelist').addEventListener('click', (e) => {
+  const act = e.target.closest('[data-act]')
+  if (act) {
+    const { act: a, path } = act.dataset
+    const file = FILES.find(f => f.path === path)
+    if (a === 'discard') { toast(`已将 ${path} 恢复到 HEAD（副本已放入回收站）`); return }
+    if (a === 'open-files') { toast(`已在「文件」tab 打开 ${path}`); return }
+    if (a === 'file-menu') { e.stopPropagation(); openFileMenu(act, file); return }
+    if (a === 'copy-line') { const l = lineByGid(act.dataset.gid); copyText(l.content); return }
+    if (a === 'quote-line') { const l = lineByGid(act.dataset.gid); quoteToComposer(act.closest('.file')?.dataset.path ?? '', l.content); return }
+    if (a === 'hunk-copy') { const h = hunkById(act.dataset.hid); copyText(formatHunk(h)); return }
+    if (a === 'hunk-quote') { const h = hunkById(act.dataset.hid); quoteToComposer(act.closest('.file')?.dataset.path ?? '', formatHunk(h)); return }
+    if (a === 'hunk-explain') { const h = hunkById(act.dataset.hid); reviewHunk(act.closest('.file')?.dataset.path ?? '', h); return }
+    if (a === 'hunk-expand' || a === 'hunk-collapse') {
+      const id = act.dataset.hid
+      state.hunkOpen.has(id) ? state.hunkOpen.delete(id) : state.hunkOpen.add(id)
+      render(); return
+    }
+    return
+  }
+  const head = e.target.closest('.f-head')
+  if (head) toggleFile(head.dataset.path)
+})
+const lineByGid = (gid) => GID_INDEX.get(gid) ?? { content: '' }
+function hunkById(id) {
+  for (const f of FILES) for (const h of f.hunks) if (h.id === id) return h
+  return null
+}
+function formatHunk(h) {
+  const sign = (t) => t === 'add' ? '+' : t === 'del' ? '-' : ' '
+  const header = `@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@${h.header ? ' ' + h.header : ''}`
+  return header + '\n' + h.lines.map(l => `${sign(l.type)}${l.content}`).join('\n')
+}
+
+/* 审查注入（三级粒度） */
+function reviewPrompt(paths, base) {
+  return `请审查以下未提交改动（对比 ${base === 'head' ? 'HEAD' : '会话起点'}）：\n\n${paths.join('\n')}\n\n请给出逐项意见。`
+}
+function injectComposer(text) {
+  const ta = $('#composerInput')
+  ta.value = text
+  ta.focus()
+  toast('审查提示已填入输入框')
+}
+function reviewAll() { injectComposer(reviewPrompt(FILES.map(f => f.path), state.base)) }
+function reviewFile(path) { injectComposer(reviewPrompt([path], state.base)) }
+function reviewHunk(path, h) {
+  injectComposer(`请解释以下改动（${path}）：\n\n${formatHunk(h)}\n\n它解决了什么问题？有什么风险？`)
+}
+function quoteToComposer(path, text) {
+  const ta = $('#composerInput')
+  const short = text.length > 160 ? text.slice(0, 160) + '…' : text
+  ta.value = (ta.value ? ta.value + '\n\n' : '') + `> ${path}\n> ${short.split('\n').join('\n> ')}`
+  toast('已引用到对话')
+}
+$('#btnReview').addEventListener('click', reviewAll)
+$('#composerReview').addEventListener('click', reviewAll)
+$('#btnCommit').addEventListener('click', () => { if (state.mode === 'before') { toast('「提交」为现状已有功能'); return } toast('智能体正在创建提交…') })
+$('#btnPush').addEventListener('click', () => { if (state.mode === 'before') { toast('「推送」为现状已有功能'); return } toast('已请求推送当前分支') })
+
+/* 标题栏 ⋯ 菜单 */
+function titleMenuItems() {
+  const items = []
+  items.push({ cap: '视图' })
+  items.push({ label: '忽略空白', check: state.ignoreWs, fn: () => { state.ignoreWs = !state.ignoreWs; toast(state.ignoreWs ? '已忽略空白（git -w）' : '已显示空白差异') } })
+  items.push({ label: '统一视图', radio: 'view', val: 'unified', fn: () => { state.view = 'unified'; render() } })
+  items.push({ label: '并排视图', radio: 'view', val: 'split', disabled: state.narrow, fn: () => { state.view = 'split'; render() } })
+  if (state.mode === 'after') {
+    items.push({ sep: true })
+    items.push({ cap: '上下文行数' })
+    items.push({ label: '全部', radio: 'ctx', val: 'inf', fn: () => { state.ctxLimit = Infinity; render() } })
+    items.push({ label: '5 行', radio: 'ctx', val: '5', fn: () => { state.ctxLimit = 5; render() } })
+    items.push({ label: '2 行', radio: 'ctx', val: '2', fn: () => { state.ctxLimit = 2; render() } })
+  }
+  items.push({ sep: true })
+  items.push({ label: '全部折叠', fn: () => { state.expandedFile = null; render() } })
+  items.push({ label: '全部展开', fn: () => { state.expandedFile = FILES[0].path; render() } })
+  if (state.mode === 'after') {
+    items.push({ label: '复制全部 diff', fn: () => copyText(FILES.map(f => `diff --git a/${f.path} b/${f.path}\n` + f.hunks.map(formatHunk).join('\n\n')).join('\n\n')) })
+  }
+  items.push({ sep: true })
+  items.push({ label: '刷新', fn: refresh })
+  return items
+}
+function fileMenuItems(path) {
+  const f = FILES.find(x => x.path === path)
+  return [
+    { label: '复制路径', fn: () => copyText(path) },
+    { label: '在文件 tab 打开', fn: () => toast(`已在「文件」tab 打开 ${path}`) },
+    { label: '审查此文件', fn: () => reviewFile(path) },
+    { label: '复制此文件 diff', fn: () => copyText(`diff --git a/${path} b/${path}\n` + f.hunks.map(formatHunk).join('\n\n')) },
+  ]
+}
+function openMenuAt(items, anchorRect) {
+  const el = menu.el
+  el.innerHTML = ''
+  for (const it of items) {
+    if (it.sep) { el.appendChild(document.createElement('div')).className = 'sep'; continue }
+    if (it.cap) { const c = document.createElement('div'); c.className = 'cap'; c.textContent = it.cap; el.appendChild(c); continue }
+    const b = document.createElement('button')
+    b.className = 'mi' + (it.disabled ? ' disabled' : '')
+    b.innerHTML = `<span>${esc(it.label)}</span>${it.check ? '<span class="ck">✓</span>' : it.radio ? `<span class="rad">${radioVal(it.radio) === it.val ? '●' : '○'}</span>` : ''}`
+    b.addEventListener('click', () => { closeMenu(); it.fn() })
+    el.appendChild(b)
+  }
+  el.classList.add('on')
+  const pw = 250
+  let left = anchorRect.right - pw
+  if (left < 8) left = 8
+  let top = anchorRect.bottom + 4
+  if (top + el.offsetHeight > window.innerHeight - 8) top = anchorRect.top - el.offsetHeight - 4
+  el.style.left = left + 'px'; el.style.top = top + 'px'
+  menu.items = items
+}
+function radioVal(k) {
+  if (k === 'view') return state.view
+  if (k === 'ctx') return state.ctxLimit === Infinity ? 'inf' : String(state.ctxLimit)
+  return ''
+}
+function openFileMenu(btn, file) {
+  openMenuAt(fileMenuItems(file.path), btn.getBoundingClientRect())
+}
+$('#btnMore').addEventListener('click', (e) => {
+  if (menu.el.classList.contains('on') && menu.kind === 'title') { closeMenu(); return }
+  openMenuAt(titleMenuItems(), e.currentTarget.getBoundingClientRect())
+  menu.kind = 'title'
+})
+function closeMenu() { menu.el.classList.remove('on'); menu.kind = null }
+document.addEventListener('click', (e) => {
+  if (!menu.el.classList.contains('on')) return
+  if (!menu.el.contains(e.target) && !e.target.closest('[data-act="file-menu"]') && !e.target.closest('#btnMore')) closeMenu()
+})
+
+/* 汇总条 */
+$('#sumCollapse').addEventListener('click', () => { state.expandedFile = null; render() })
+$('#sumExpand').addEventListener('click', () => { state.expandedFile = FILES[0].path; render() })
+function refresh() {
+  const btn = $('#sumRefresh')
+  btn.classList.add('spin')
+  setTimeout(() => { btn.classList.remove('spin'); toast('已刷新（模拟）') }, 900)
+}
+$('#sumRefresh').addEventListener('click', refresh)
+
+/* 筛选 */
+$('#filterInput').addEventListener('input', (e) => { state.filter = e.target.value.trim(); state.focusIdx = -1; render() })
+$('#filterClear').addEventListener('click', () => { state.filter = ''; render(); $('#filterInput').focus() })
+
+/* hunk 键盘导航（T10） */
+let hunkCursor = -1
+function navHunk(dir) {
+  if (state.mode === 'before') return
+  const heads = [...document.querySelectorAll('.h-head')]
+  if (!heads.length) return
+  hunkCursor = (hunkCursor + dir + heads.length) % heads.length
+  const el = heads[hunkCursor]
+  el.scrollIntoView({ block: 'nearest' })
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash')
+  setTimeout(() => { if (el.isConnected) el.classList.remove('flash') }, 1200)
+}
+
+/* 键盘 */
+document.addEventListener('keydown', (e) => {
+  const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); reviewAll(); return }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+    e.preventDefault()
+    const inp = $('#filterInput')
+    if (state.mode === 'after') { inp.focus(); inp.select() }
+    return
+  }
+  if (e.altKey && e.metaKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); navHunk(e.key === 'ArrowDown' ? 1 : -1); return }
+  if (typing) return
+  if (e.key === 'Escape') { closeMenu(); if (state.filter) { state.filter = ''; render() } return }
+  const files = visibleFiles()
+  if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); state.focusIdx = Math.min(files.length - 1, state.focusIdx + 1); render(); return }
+  if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); state.focusIdx = Math.max(-1, state.focusIdx - 1); render(); return }
+  if ((e.key === ' ' || e.key === 'Enter') && state.focusIdx >= 0 && files[state.focusIdx]) {
+    e.preventDefault(); toggleFile(files[state.focusIdx].path)
+  }
+})
+
+/* 初始化 */
+render()
+</script>
+</body>
+</html>

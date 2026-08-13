@@ -4,41 +4,40 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import React from 'react'
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      if (key === 'artifact.panelSlot.uncommitted') return `Uncommitted · ${opts?.count}`
-      if (key === 'artifact.panelSlot.uncommittedEmpty') return 'Uncommitted'
-      if (key === 'artifact.panelSlot.commit') return `Commit · ${opts?.sha}`
-      if (key === 'artifact.outline') return 'Outline'
-      if (key === 'artifact.sources') return 'Sources'
-      if (key === 'artifact.terminal') return 'Terminal'
-      if (key === 'artifact.selectFileToPreview') return 'Select a file'
-      if (key === 'artifact.copyArtifact') return 'Copy'
-      if (key === 'artifact.downloadArtifact') return 'Download'
-      if (key === 'contextMenu.filePreview.copyPath') return 'Copy path'
-      if (key === 'artifact.terminalView.noCwd') return 'No project folder'
-      if (key === 'artifact.terminalView.restart') return 'Restart'
-      if (key === 'artifact.terminalView.close') return 'Close'
-      return key
-    },
-  }),
-}))
+vi.mock('react-i18next', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-i18next')>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, opts?: Record<string, unknown>) => {
+        if (key === 'artifact.panelSlot.uncommitted') return `Uncommitted · ${opts?.count}`
+        if (key === 'artifact.panelSlot.uncommittedEmpty') return 'Uncommitted'
+        if (key === 'artifact.panelSlot.commit') return `Commit · ${opts?.sha}`
+        if (key === 'artifact.outline') return 'Outline'
+        if (key === 'artifact.sources') return 'Sources'
+        if (key === 'artifact.terminal') return 'Terminal'
+        if (key === 'artifact.selectFileToPreview') return 'Select a file'
+        if (key === 'artifact.copyArtifact') return 'Copy'
+        if (key === 'artifact.downloadArtifact') return 'Download'
+        if (key === 'contextMenu.filePreview.copyPath') return 'Copy path'
+        if (key === 'artifact.terminalView.noCwd') return 'No project folder'
+        if (key === 'artifact.terminalView.restart') return 'Restart'
+        if (key === 'artifact.terminalView.close') return 'Close'
+        return key
+      },
+    }),
+  }
+})
 
-vi.mock('lucide-react', () => ({
-  Copy: () => React.createElement('span', { 'data-testid': 'icon-copy' }),
-  Download: () => React.createElement('span', { 'data-testid': 'icon-download' }),
-  Check: () => React.createElement('span'),
-  ChevronDown: () => React.createElement('span'),
-  ExternalLink: () => React.createElement('span', { 'data-testid': 'icon-external-link' }),
-  RotateCcw: () => React.createElement('span'),
-  Power: () => React.createElement('span'),
-  Sparkles: () => React.createElement('span'),
-  GitCommitHorizontal: () => React.createElement('span'),
-  GitBranch: () => React.createElement('span'),
-  ArrowUpFromLine: () => React.createElement('span'),
-  MoreHorizontal: () => React.createElement('span'),
-}))
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('lucide-react')>()
+  return {
+    ...actual,
+    Copy: () => React.createElement('span', { 'data-testid': 'icon-copy' }),
+    Download: () => React.createElement('span', { 'data-testid': 'icon-download' }),
+    ExternalLink: () => React.createElement('span', { 'data-testid': 'icon-external-link' }),
+  }
+})
 
 vi.mock('@/components/ui/DropdownMenu', () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,

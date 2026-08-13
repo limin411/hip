@@ -10,7 +10,8 @@ import {
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
-import { useActiveSession, useActiveSessionId, useActiveSessionStatus, sessionService } from '@/domain'
+import { useDomainStore } from '@/domain/sessionStore'
+import { useActiveSession, useActiveSessionStatus, sessionService } from '@/domain'
 import { activeModelKey } from '@/lib/modelKey'
 import { clampEffortForKey, effortLevelsForKey, resolveEffort } from '@/lib/modelEffort'
 import { cn } from '@/lib/utils'
@@ -98,28 +99,34 @@ export function EffortIntensityMeter({
  * Composer control for reasoning effort / thinking intensity.
  * Compact dropdown list; wheel on the chip steps levels.
  * Hidden when the current model does not advertise effort levels in the catalog.
+ *
+ * When `sessionId` is given (terminal ops composer), the picker binds to that
+ * session instead of the global active session / draft — same contract as
+ * ModelPicker. Switching calls session:setEffort on that session only.
  */
-export function EffortLevelPicker() {
+export function EffortLevelPicker({ sessionId }: { sessionId?: string }) {
   const { t } = useTranslation()
   const draftEffort = useDraftStore((s) => s.draft?.effort)
   const draftModelKey = useDraftStore((s) => s.draft?.modelKey)
   const setDraftEffort = useDraftStore((s) => s.setEffort)
   const catalog = useProvidersStore((s) => s.catalog)
   const config = useProvidersStore((s) => s.config)
-  const activeId = useActiveSessionId()
-  const session = useActiveSession()
+  const activeSession = useActiveSession()
   const status = useActiveSessionStatus()
-  const busy = status === 'running'
+  const boundSession = useDomainStore((s) =>
+    sessionId ? s.sessions.find((x) => x.id === sessionId) : undefined,
+  )
+  const session = sessionId ? boundSession : activeSession
+  const busy = sessionId ? boundSession?.status === 'running' : status === 'running'
 
-  const modelKey =
-    activeId && session
-      ? session.config.model
-        ? `${session.config.llmProvider}/${session.config.model}`
-        : activeModelKey(config)
-      : (draftModelKey ?? activeModelKey(config))
+  const modelKey = session
+    ? session.config.model
+      ? `${session.config.llmProvider}/${session.config.model}`
+      : activeModelKey(config)
+    : (draftModelKey ?? activeModelKey(config))
 
   const levels = effortLevelsForKey(catalog, modelKey)
-  const stored = activeId && session ? session.config.effort : draftEffort
+  const stored = session ? session.config.effort : draftEffort
   const [open, setOpen] = useState(false)
   const chipRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -136,13 +143,13 @@ export function EffortLevelPicker() {
     if (busy) return
     const next = clampEffortForKey(catalog, modelKey, stored)
     if (next === (stored || undefined)) return
-    if (activeId && session) sessionService.setEffort(activeId, next ?? null)
+    if (session) sessionService.setEffort(session.id, next ?? null)
     else setDraftEffort(next)
-  }, [activeId, session, busy, catalog, modelKey, stored, setDraftEffort])
+  }, [session, busy, catalog, modelKey, stored, setDraftEffort])
 
   const choose = (effort: string) => {
     if (busy) return
-    if (activeId && session) sessionService.setEffort(activeId, effort)
+    if (session) sessionService.setEffort(session.id, effort)
     else setDraftEffort(effort)
   }
 

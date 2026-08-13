@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
   ArrowUp,
-  Check,
   ChevronDown,
   ChevronRight,
   Loader2,
@@ -28,8 +27,9 @@ import { formatAbsolute, formatClockTime } from '@/lib/datetime'
 import { formatTokensCompact } from '@/lib/formatTokens'
 import { formatUsdMaybeIncomplete } from '@/lib/usageCost'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
-import { ComposerChip } from '@/components/chat/ComposerChip'
 import { ModelPicker } from '@/components/chat/ModelPicker'
+import { EffortLevelPicker } from '@/components/chat/EffortLevelPicker'
+import { PermissionModePicker } from '@/components/chat/PermissionModePicker'
 import { PlanProgressPanel } from '@/components/chat/PlanProgressPanel'
 import { shouldHideInterruptForPlanApproval } from '@/components/chat/planApproval'
 import { selectLivePlan } from '@/lib/todos'
@@ -38,12 +38,6 @@ import {
   extractSlashQuery,
   SlashCommandPalette,
 } from '@/components/chat/SlashCommandPalette'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/DropdownMenu'
 import { Button } from '@/components/ui/Button'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/Popover'
 import { cn } from '@/lib/utils'
@@ -408,69 +402,12 @@ function PermissionCard({
   )
 }
 
-/** Permission mode picker — chat composer parity: ShieldCheck chip with a
- *  localized label; menu with title and per-mode descriptions. */
-function PermissionModeChip({
-  mode,
-  disabled,
-  onSelect,
-}: {
-  mode: 'chat' | 'edit' | 'full'
-  disabled: boolean
-  onSelect: (m: 'chat' | 'edit' | 'full') => void
-}) {
-  const { t } = useTranslation()
-  return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <ComposerChip
-          active={mode !== 'edit'}
-          disabled={disabled}
-          title={t('chat.permission.label')}
-          aria-label={t('chat.permission.label')}
-          data-testid="terminal-permission-mode"
-        >
-          <ShieldCheck size={13} strokeWidth={1.75} className="shrink-0" aria-hidden />
-          <span className="max-w-[7rem] truncate">{t(`chat.permission.modes.${mode}`)}</span>
-        </ComposerChip>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        side="top"
-        className="min-w-[12rem] bg-surface-subtle"
-        data-testid="terminal-permission-mode-menu"
-      >
-        <div className="px-2 py-1.5 text-meta font-medium text-ink-tertiary">
-          {t('chat.permission.menuTitle')}
-        </div>
-        {(['chat', 'edit', 'full'] as const).map((m) => (
-          <DropdownMenuItem
-            key={m}
-            disabled={disabled}
-            onSelect={() => onSelect(m)}
-            data-testid={`terminal-permission-option-${m}`}
-            data-selected={mode === m ? 'true' : 'false'}
-            className="flex-col items-start gap-0.5"
-          >
-            <div className="flex items-center gap-2">
-              <Check
-                size={14}
-                strokeWidth={1.75}
-                className={cn('shrink-0', mode === m ? 'opacity-100' : 'opacity-0')}
-                aria-hidden
-              />
-              <span>{t(`chat.permission.modes.${m}`)}</span>
-            </div>
-            <span className="pl-6 text-meta text-ink-tertiary">
-              {t(`chat.permission.desc.${m}`)}
-            </span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
+/**
+ * Permission mode picker — chat composer parity: the shared
+ * `PermissionModePicker` bound to the terminal session. The new-chat default
+ * (`pickedMode`) is fed through `onSelect`; the plan-approval gate through
+ * `disabled`.
+ */
 const USAGE_ZONE_CLASS: Record<string, string> = {
   success: 'text-success',
   warning: 'text-warning',
@@ -588,7 +525,9 @@ function SessionUsageChip({ meter, t }: { meter: SessionTokenMeter; t: TFunction
 
 /** Compact card composer mirroring the chat Composer (`variant="card"`).
  *  Terminal ops assistant only runs the built-in hip agent — the left slot carries
- *  a session-bound model switcher (chat/project parity) + permission mode. */
+ *  the shared session-bound composer controls (model / thinking intensity /
+ *  permission mode), each bound to the terminal session via `sessionId`.
+ *  The card's danger border follows the store `permissionMode` (sidecar echo). */
 function CompactComposer({
   sessionId,
   disabled,
@@ -612,10 +551,6 @@ function CompactComposer({
   const { t } = useTranslation()
   const [text, setText] = useState('')
   const meter = useSessionTokenMeterFor(sessionId)
-  // Optimistic local selection: apply immediately, reconcile when the sidecar
-  // echoes the config change (session:permissionMode).
-  const [mode, setMode] = useState(permissionMode)
-  useEffect(() => setMode(permissionMode), [permissionMode])
   const runCompact = (focus?: string) => {
     sessionService.compactSession(sessionId, focus)
     setText('')
@@ -647,7 +582,7 @@ function CompactComposer({
           'relative rounded-lg border bg-surface-subtle p-2.5',
           // Full access — red border, chat composer parity: gradient flow while a
           // turn runs, glow pulse when idle/stopped.
-          mode === 'full'
+          permissionMode === 'full'
             ? running
               ? 'composer-danger-flow'
               : 'composer-danger-glow border-danger-soft'
@@ -695,13 +630,11 @@ function CompactComposer({
         <div className="flex items-center justify-between px-0.5 pt-1.5">
           <div className="flex min-w-0 items-center gap-0.5">
             <ModelPicker sessionId={sessionId} />
-            <PermissionModeChip
-              mode={mode}
+            <EffortLevelPicker sessionId={sessionId} />
+            <PermissionModePicker
+              sessionId={sessionId}
               disabled={disabled}
-              onSelect={(m) => {
-                setMode(m)
-                onSelectPermissionMode(m)
-              }}
+              onSelect={onSelectPermissionMode}
             />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -1111,8 +1044,9 @@ export function TerminalAgentPanel({ terminalId }: { terminalId: string }) {
             }}
             permissionMode={active.config.permissionMode ?? 'edit'}
             onSelectPermissionMode={(m) => {
+              // The shared picker already calls sessionService.setPermissionMode
+              // for the bound session — here we only keep the new-chat default.
               setPickedMode(m)
-              sessionService.setPermissionMode(active.id, m)
             }}
           />
         </>

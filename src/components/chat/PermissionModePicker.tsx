@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
-import { useActiveSession, useActiveSessionId, useActiveSessionStatus, sessionService } from '@/domain'
+import { useDomainStore } from '@/domain/sessionStore'
+import { useActiveSession, useActiveSessionStatus, sessionService } from '@/domain'
 import { cn } from '@/lib/utils'
 
 /** Pure: the three modes in display order. */
@@ -16,20 +17,40 @@ export function resolvePermissionMode(mode: PermissionMode | undefined): Permiss
   return mode === 'chat' || mode === 'edit' || mode === 'full' ? mode : 'edit'
 }
 
-export function PermissionModePicker() {
+/**
+ * Chat/project composer permission-mode switcher. When `sessionId` is given
+ * (terminal ops composer), the picker binds to that session instead of the
+ * global active session / draft — same contract as ModelPicker. Switching
+ * calls session:setPermissionMode on that session only; `onSelect` fires
+ * alongside for caller side-effects (e.g. terminal new-chat default mode).
+ */
+export function PermissionModePicker({
+  sessionId,
+  disabled,
+  onSelect,
+}: {
+  sessionId?: string
+  /** Hard-disable the chip (e.g. plan-approval composer gate). */
+  disabled?: boolean
+  /** Extra callback after a mode is chosen (not fired when busy/no change). */
+  onSelect?: (mode: PermissionMode) => void
+}) {
   const { t } = useTranslation()
   // Separate selectors (matching ModelPicker) avoid a new object each render / useShallow.
   const draftMode = useDraftStore((s) => s.draft?.permissionMode)
   const setDraftMode = useDraftStore((s) => s.setPermissionMode)
-  const activeId = useActiveSessionId()
-  const session = useActiveSession()
+  const activeSession = useActiveSession()
   const status = useActiveSessionStatus()
-  const busy = status === 'running'
+  const boundSession = useDomainStore((s) =>
+    sessionId ? s.sessions.find((x) => x.id === sessionId) : undefined,
+  )
+  const session = sessionId ? boundSession : activeSession
+  const busy = disabled === true || (sessionId ? boundSession?.status === 'running' : status === 'running')
 
   // Committed session reads its config; a new-conversation draft reads the draft.
   // Both are editable here (unlike ModelPicker, which locks the model in a committed session).
   // While a turn is running, mode cannot change (same lock as ExecutionModePicker).
-  const current = activeId && session
+  const current = session
     ? resolvePermissionMode(session.config.permissionMode)
     : resolvePermissionMode(draftMode)
 
@@ -39,7 +60,8 @@ export function PermissionModePicker() {
       return
     }
     if (mode === current) return
-    if (activeId && session) sessionService.setPermissionMode(activeId, mode)
+    onSelect?.(mode)
+    if (session) sessionService.setPermissionMode(session.id, mode)
     else setDraftMode(mode)
   }
 
@@ -51,6 +73,7 @@ export function PermissionModePicker() {
           active={current !== 'edit'}
           title={busy ? t('chat.permission.busyTitle') : t('chat.permission.label')}
           data-testid="permission-chip"
+          disabled={disabled}
           aria-disabled={busy || undefined}
           className={busy ? 'cursor-not-allowed opacity-50' : undefined}
           onClick={(e) => {
@@ -75,6 +98,7 @@ export function PermissionModePicker() {
             onSelect={() => choose(mode)}
             className="flex-col items-start gap-0.5"
             data-testid={`permission-mode-${mode}`}
+            data-selected={current === mode ? 'true' : 'false'}
           >
             <div className="flex items-center gap-2">
               <Check size={14} className={cn('shrink-0', current === mode ? 'opacity-100' : 'opacity-0')} />

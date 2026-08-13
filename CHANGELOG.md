@@ -17,6 +17,14 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
     (`ModelPicker` bound to the terminal session via `sessionId`;
     `sessionService.setSessionModelFor` targets the bound session, never the
     global active session), next to the permission-mode picker.
+  - The ops composer also gained the **thinking intensity (effort) picker**
+    (`EffortLevelPicker` bound via `sessionId`, hidden when the model has no
+    effort options — chat parity). The left-slot controls are now the shared
+    chat components: `ModelPicker` / `EffortLevelPicker` / `PermissionModePicker`
+    all accept an optional `sessionId` (same contract) and the local
+    `PermissionModeChip` copy in `TerminalAgentPanel` was deleted; the composer
+    card's danger border follows the store `permissionMode` echo instead of an
+    optimistic local copy.
 
 - **Terminal embeds a subset of JetBrainsMono Nerd Font Mono** (`docs/design/doc-terminal-nerd-fonts/terminal_nerd_font_spec.md`):
   - p10k / starship / lsd / eza style private-use-area icons now render in the

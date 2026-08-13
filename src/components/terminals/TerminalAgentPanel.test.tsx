@@ -36,13 +36,18 @@ vi.mock('@/components/ui/DropdownMenu', async () => {
       React.createElement(React.Fragment, null, children),
     DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
       React.createElement(React.Fragment, null, children),
-    DropdownMenuContent: ({
-      children,
-      'data-testid': testid,
-    }: {
-      children: React.ReactNode
-      'data-testid'?: string
-    }) => React.createElement('div', { 'data-testid': testid ?? 'dropdown-content' }, children),
+    DropdownMenuContent: React.forwardRef(function DropdownMenuContentMock(
+      {
+        children,
+        'data-testid': testid,
+      }: {
+        children: React.ReactNode
+        'data-testid'?: string
+      },
+      _ref: React.Ref<HTMLDivElement>,
+    ) {
+      return React.createElement('div', { 'data-testid': testid ?? 'dropdown-content' }, children)
+    }),
     DropdownMenuItem: ({
       children,
       onSelect,
@@ -217,11 +222,11 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     fireEvent.click(screen.getByText('gpt-4o-mini'))
     expect(setModelFor).toHaveBeenCalledWith('ta_1', 'openai/gpt-4o-mini')
 
-    // Permission mode: edit default; pick full → label + selection update.
-    // (test t() returns the key; chip shows the localized mode label.)
-    const modeChip = screen.getByTestId('terminal-permission-mode')
+    // Permission mode (shared chat PermissionModePicker bound to the terminal
+    // session): edit default; pick full → session-scoped write + red border.
+    const modeChip = screen.getByTestId('permission-chip')
     expect(modeChip).toHaveTextContent('chat.permission.modes.edit')
-    expect(screen.getByTestId('terminal-permission-option-edit')).toHaveAttribute(
+    expect(screen.getByTestId('permission-mode-edit')).toHaveAttribute(
       'data-selected',
       'true',
     )
@@ -229,21 +234,88 @@ describe('TerminalAgentPanel tool card collapsing', () => {
     expect(screen.getByTestId('terminal-composer-card')).toHaveClass('border-border')
     expect(screen.getByTestId('terminal-composer-card')).not.toHaveClass('border-danger-soft')
     // Menu carries the title + per-mode descriptions (chat picker parity).
-    expect(screen.getByTestId('terminal-permission-mode-menu')).toHaveTextContent(
+    expect(screen.getByTestId('permission-mode-menu')).toHaveTextContent(
       'chat.permission.menuTitle',
     )
-    expect(screen.getByTestId('terminal-permission-option-edit')).toHaveTextContent(
+    expect(screen.getByTestId('permission-mode-edit')).toHaveTextContent(
       'chat.permission.desc.edit',
     )
-    fireEvent.click(screen.getByTestId('terminal-permission-option-full'))
+    const setPermissionMode = vi
+      .spyOn(sessionService, 'setPermissionMode')
+      .mockImplementation(() => {})
+    fireEvent.click(screen.getByTestId('permission-mode-full'))
+    expect(setPermissionMode).toHaveBeenCalledWith('ta_1', 'full')
+    // Sidecar echo (session:permissionMode) reconciles the store → label + red border.
+    act(() => {
+      useDomainStore.setState((s) => ({
+        sessions: s.sessions.map((x) =>
+          x.id === 'ta_1'
+            ? { ...x, config: { ...x.config, permissionMode: 'full' as const } }
+            : x,
+        ),
+      }))
+    })
     expect(modeChip).toHaveTextContent('chat.permission.modes.full')
-    expect(screen.getByTestId('terminal-permission-option-full')).toHaveAttribute(
+    expect(screen.getByTestId('permission-mode-full')).toHaveAttribute(
       'data-selected',
       'true',
     )
     expect(screen.getByTestId('terminal-composer-card')).toHaveClass('border-danger-soft')
     expect(screen.getByTestId('terminal-composer-card')).not.toHaveClass('border-border')
+    setPermissionMode.mockRestore()
     setModelFor.mockRestore()
+    unmount()
+  })
+
+  it('thinking intensity picker (chat parity) binds to the terminal session', () => {
+    // Give the session model effort options in the catalog (EffortLevelPicker is
+    // catalog-driven and hidden otherwise — same as the chat composer).
+    useProvidersStore.setState((s) => ({
+      ...s,
+      catalog: {
+        ...s.catalog,
+        openai: {
+          ...s.catalog.openai,
+          models: {
+            ...s.catalog.openai.models,
+            'gpt-4o': {
+              ...s.catalog.openai.models['gpt-4o'],
+              reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high'] }],
+            },
+          },
+        },
+      },
+    }))
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((x) =>
+        x.id === 'ta_1'
+          ? {
+              ...x,
+              config: {
+                ...x.config,
+                llmProvider: 'openai',
+                model: 'gpt-4o',
+                effort: 'medium',
+              },
+            }
+          : x,
+      ),
+    }))
+    const setEffortSpy = vi.spyOn(sessionService, 'setEffort').mockImplementation(() => {})
+    const { unmount } = render(<TerminalAgentPanel terminalId="tm_1" />)
+
+    // Chip bound to the terminal session shows its current effort level.
+    expect(screen.getByTestId('effort-chip')).toBeInTheDocument()
+    expect(screen.getByTestId('effort-chip-label')).toHaveTextContent(
+      'chat.effort.levels.medium',
+    )
+    expect(screen.getByTestId('effort-level-medium')).toHaveAttribute('data-selected', 'true')
+
+    // Picking a level targets the terminal session — never the global active session.
+    fireEvent.click(screen.getByTestId('effort-level-high'))
+    expect(setEffortSpy).toHaveBeenCalledWith('ta_1', 'high')
+
+    setEffortSpy.mockRestore()
     unmount()
   })
 

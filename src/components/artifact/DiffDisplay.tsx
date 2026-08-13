@@ -1,6 +1,6 @@
-import { Fragment, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { Fragment, useLayoutEffect, useRef, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, FolderOpen, MoreHorizontal, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderOpen, MoreHorizontal, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSummary } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { fileIconForName } from '@/lib/fileIcon'
@@ -653,6 +653,111 @@ function FileDiff({
   )
 }
 
+/** T7 汇总条：文件较多时（>6，由调用方判定）sticky 显示总数 + 折叠/展开/刷新 + 筛选。 */
+function SummaryBar({
+  total,
+  adds,
+  dels,
+  filterQuery,
+  onFilterChange,
+  filterInputRef,
+  narrow,
+  onCollapseAll,
+  onExpandAll,
+  onRefresh,
+}: {
+  total: number
+  adds: number
+  dels: number
+  filterQuery: string
+  onFilterChange: (q: string) => void
+  filterInputRef?: Ref<HTMLInputElement>
+  narrow: boolean
+  onCollapseAll: () => void
+  onExpandAll: () => void
+  onRefresh: () => void
+}) {
+  const { t } = useTranslation()
+  const placeholder = t('artifact.changesView.filterPlaceholder')
+  return (
+    <div
+      className="sticky top-0 z-[2] flex h-9 shrink-0 items-center gap-2 border-b border-border/70 bg-surface-subtle px-2.5"
+      data-testid="diff-summarybar"
+    >
+      <span className="min-w-0 truncate text-caption font-medium text-ink-secondary">
+        {t('artifact.changesView.summaryCount', { count: total })}
+      </span>
+      {!narrow && (
+        <span className="shrink-0 font-mono text-caption tabular-nums">
+          <span className="text-success">+{adds}</span>
+          <span className="text-danger"> −{dels}</span>
+        </span>
+      )}
+      <span className="ml-auto flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          title={t('artifact.changesView.collapseAll')}
+          onClick={onCollapseAll}
+          className="inline-flex size-6 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+          data-testid="diff-summary-collapse-all"
+        >
+          <ChevronsDownUp size={13} strokeWidth={1.75} />
+        </button>
+        <button
+          type="button"
+          title={t('artifact.changesView.expandAll')}
+          onClick={onExpandAll}
+          className="inline-flex size-6 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+          data-testid="diff-summary-expand-all"
+        >
+          <ChevronsUpDown size={13} strokeWidth={1.75} />
+        </button>
+        <button
+          type="button"
+          title={t('artifact.changesView.refresh')}
+          onClick={onRefresh}
+          className="inline-flex size-6 items-center justify-center rounded text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+          data-testid="diff-summary-refresh"
+        >
+          <RefreshCw size={12} strokeWidth={1.75} />
+        </button>
+      </span>
+      <span className="relative flex shrink-0 items-center">
+        <Search size={11} strokeWidth={1.75} className="pointer-events-none absolute left-1.5 text-ink-tertiary" />
+        <input
+          ref={filterInputRef}
+          value={filterQuery}
+          onChange={(e) => onFilterChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.stopPropagation()
+              onFilterChange('')
+            }
+          }}
+          placeholder={narrow ? '' : placeholder}
+          aria-label={placeholder}
+          className={cn(
+            'h-6 rounded-md border border-border/70 bg-surface pl-6 text-caption text-ink outline-none transition-[width] duration-chrome focus:border-ink/30',
+            narrow ? 'w-7 px-0' : 'w-40',
+          )}
+          data-testid="diff-filter-input"
+        />
+        {filterQuery && (
+          <button
+            type="button"
+            aria-label={t('artifact.changesView.filterClear')}
+            onClick={() => onFilterChange('')}
+            className="absolute right-1 inline-flex size-4 items-center justify-center rounded text-ink-tertiary hover:text-ink"
+            data-testid="diff-filter-clear"
+          >
+            <X size={10} strokeWidth={2} />
+          </button>
+        )}
+      </span>
+    </div>
+  )
+}
+
 /** Panel empty — shared visual with ui/EmptyState (artifact panels stay full-height). */
 export function Empty({
   icon,
@@ -715,6 +820,15 @@ export function DiffDisplay({
   onCollapseFull,
   canExpandContext,
   onExpandContext,
+  showSummary = false,
+  filterQuery = '',
+  onFilterChange,
+  filterEmptyLabel,
+  filterInputRef,
+  narrow = false,
+  onSummaryCollapseAll,
+  onSummaryExpandAll,
+  onSummaryRefresh,
 }: {
   files: DiffFile[]
   summary?: DiffSummary
@@ -742,6 +856,16 @@ export function DiffDisplay({
   /** T11：该文件当前上下文为数值档位时可展开上下文（'full' 无更多）。 */
   canExpandContext?: (path: string) => boolean
   onExpandContext?: (path: string, dir: 'up' | 'down') => void
+  /** T7：Changes 场景专属——汇总条 + 筛选（Timeline/Diff 不传）。 */
+  showSummary?: boolean
+  filterQuery?: string
+  onFilterChange?: (q: string) => void
+  filterEmptyLabel?: string
+  filterInputRef?: Ref<HTMLInputElement>
+  narrow?: boolean
+  onSummaryCollapseAll?: () => void
+  onSummaryExpandAll?: () => void
+  onSummaryRefresh?: () => void
 }) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -753,11 +877,13 @@ export function DiffDisplay({
   // Stack sticky headers in expansion order: each expanded header's top offset
   // is the cumulative height of the expanded headers before it. Collapsed rows
   // lose stickiness entirely (no offset, no sticky class).
+  // T7: 汇总条存在时作为基准（headers 在其下方堆叠，offset 从条高起算）。
   useLayoutEffect(() => {
     const root = scrollRef.current
     if (!root) return
     const headers = root.querySelectorAll<HTMLElement>('[data-testid="diff-file-header"]')
-    let acc = 0
+    const bar = root.querySelector<HTMLElement>('[data-testid="diff-summarybar"]')
+    let acc = bar?.offsetHeight ?? 0
     for (const h of headers) {
       const flag = h.querySelector<HTMLElement>('[data-expanded]')
       if (flag?.dataset.expanded === 'true') {
@@ -769,8 +895,24 @@ export function DiffDisplay({
     }
   })
 
+  const summaryShown = showSummary
+  const total = summary?.totalFiles ?? files.length
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      {summaryShown && onFilterChange && (
+        <SummaryBar
+          total={total}
+          adds={summary?.totalAdditions ?? files.reduce((a, f) => a + f.additions, 0)}
+          dels={summary?.totalDeletions ?? files.reduce((a, f) => a + f.deletions, 0)}
+          filterQuery={filterQuery}
+          onFilterChange={onFilterChange}
+          filterInputRef={filterInputRef}
+          narrow={narrow}
+          onCollapseAll={onSummaryCollapseAll ?? (() => {})}
+          onExpandAll={onSummaryExpandAll ?? (() => {})}
+          onRefresh={onSummaryRefresh ?? (() => {})}
+        />
+      )}
       {files.map((file, i) => (
         <FileDiff
           key={`${file.path}-${i}`}
@@ -798,7 +940,12 @@ export function DiffDisplay({
           chrome={chrome}
         />
       ))}
-      {(summary?.totalFiles ?? 0) > files.length && (
+      {filterQuery && files.length === 0 && (
+        <div className="px-3 py-6 text-center text-meta text-ink-tertiary" data-testid="diff-filter-empty">
+          {filterEmptyLabel ?? t('artifact.changesView.filterEmpty')}
+        </div>
+      )}
+      {!filterQuery && (summary?.totalFiles ?? 0) > files.length && (
         <div className="px-3 py-2 text-meta text-ink-tertiary">
           {t('artifact.diffView.moreFiles', { count: (summary!.totalFiles) - files.length })}
         </div>

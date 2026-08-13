@@ -354,6 +354,65 @@ describe('DiffDisplay class polish', () => {
     expect(onExpand).toHaveBeenLastCalledWith('src/a.ts', 'down')
   })
 
+  it('T7: summary bar renders only with showSummary and reports totals', () => {
+    const twoFiles: DiffFile[] = [
+      file,
+      { ...file, path: 'src/b.ts', additions: 3, deletions: 4 },
+    ]
+    const summary = { totalFiles: 2, totalAdditions: 4, totalDeletions: 5 }
+    render(
+      <DiffDisplay
+        files={twoFiles}
+        summary={summary}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    // 默认不渲染（Timeline/Diff 共享组件回归防护）
+    expect(screen.queryByTestId('diff-summarybar')).toBeNull()
+    cleanup()
+    render(
+      <DiffDisplay
+        files={twoFiles}
+        summary={summary}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+        showSummary
+        filterQuery=""
+        onFilterChange={() => {}}
+      />,
+    )
+    const bar = screen.getByTestId('diff-summarybar')
+    expect(bar).toHaveTextContent('artifact.changesView.summaryCount')
+    expect(bar).toHaveTextContent('+4')
+    expect(bar).toHaveTextContent('−5')
+    expect(screen.getByTestId('diff-filter-input')).toBeInTheDocument()
+  })
+
+  it('T8: filter input reports changes, Escape clears, empty state shows label', () => {
+    const onFilter = vi.fn()
+    render(
+      <DiffDisplay
+        files={[]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+        showSummary
+        filterQuery="zzz"
+        onFilterChange={onFilter}
+        filterEmptyLabel="无匹配"
+      />,
+    )
+    const input = screen.getByTestId('diff-filter-input')
+    fireEvent.change(input, { target: { value: 'abc' } })
+    expect(onFilter).toHaveBeenCalledWith('abc')
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(onFilter).toHaveBeenLastCalledWith('')
+    expect(screen.getByTestId('diff-filter-empty')).toHaveTextContent('无匹配')
+  })
+
   it('applies code block color to diff code area', () => {
     useHipConfigStore.setState({
       config: { version: 1, codeBlock: { colorTheme: 'dark' } },

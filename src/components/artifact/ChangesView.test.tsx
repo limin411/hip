@@ -291,6 +291,42 @@ describe('ChangesView v2', () => {
     expect(sessionService.discardFile).toHaveBeenCalledWith('s1', 'src/a.ts', 'modified', undefined)
   })
 
+  it('T8: ⌘F focuses the filter, typing filters files, Esc restores', () => {
+    const files = Array.from({ length: 8 }, (_, i) => ({
+      ...file,
+      path: `src/mod${i % 2 === 0 ? 'a' : 'b'}/f${i}.ts`,
+    }))
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          files,
+          summary: { totalFiles: 8, totalAdditions: 8, totalDeletions: 8 },
+        },
+      },
+    })
+    renderChanges()
+    // >6 文件 → 汇总条显示
+    const bar = screen.getByTestId('diff-summarybar')
+    expect(bar).toBeInTheDocument()
+    // ⌘F 聚焦筛选输入
+    fireEvent.keyDown(window, { key: 'f', metaKey: true })
+    expect(screen.getByTestId('diff-filter-input')).toHaveFocus()
+    // 输入筛选 → 只留匹配文件
+    fireEvent.change(screen.getByTestId('diff-filter-input'), { target: { value: 'moda' } })
+    expect(screen.getAllByTestId('diff-file')).toHaveLength(4)
+    // 无匹配 → 空态
+    fireEvent.change(screen.getByTestId('diff-filter-input'), { target: { value: 'nope' } })
+    expect(screen.getByTestId('diff-filter-empty')).toBeInTheDocument()
+    // Esc 还原全部
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getAllByTestId('diff-file')).toHaveLength(8)
+    expect(screen.queryByTestId('diff-filter-empty')).toBeNull()
+  })
+
   it('review CTA injects a prompt with the file list into the composer', () => {
     useDiffStore.setState({
       bySession: {

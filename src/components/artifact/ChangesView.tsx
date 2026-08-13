@@ -30,6 +30,8 @@ export function ChangesView() {
   const [focusedPath, setFocusedPath] = useState<string | null>(null)
   const [discardPath, setDiscardPath] = useState<string | null>(null)
   const [narrow, setNarrow] = useState(false)
+  const [filterQuery, setFilterQuery] = useState('')
+  const filterInputRef = useRef<HTMLInputElement>(null)
   /** T6/T11：每文件当前上下文行数档位（初始列表 = git 默认 -U3）。 */
   const fileCtx = useRef<Record<string, number | 'full'>>({})
   const ctxOf = (p: string) => fileCtx.current[p] ?? 3
@@ -132,8 +134,18 @@ export function ChangesView() {
         reviewFiles(diff.files.map((f) => f.path))
         return
       }
+      // T8: ⌘F 聚焦文件筛选输入（汇总条显示时）
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        if (filterInputRef.current) {
+          e.preventDefault()
+          filterInputRef.current.focus()
+          filterInputRef.current.select()
+        }
+        return
+      }
       if (e.key === 'Escape') {
         if (discardPath) setDiscardPath(null)
+        else if (filterQuery) setFilterQuery('')
         return
       }
       if (e.key === 'j' || e.key === 'ArrowDown') {
@@ -183,6 +195,17 @@ export function ChangesView() {
     useDiffStore.getState().setCollapsed(sessionId, next)
   }
 
+  const setAllCollapsed = (value: boolean) => {
+    if (!sessionId) return
+    const next: Record<string, boolean> = {}
+    for (const f of diff.files) next[f.path] = value
+    useDiffStore.getState().setCollapsed(sessionId, next)
+  }
+
+  // T8：大小写不敏感路径子串筛选（汇总条输入）
+  const query = filterQuery.trim().toLowerCase()
+  const visibleFiles = query ? diff.files.filter((f) => f.path.toLowerCase().includes(query)) : diff.files
+
   if (!sessionId) return <Empty title={t('artifact.diffView.noSession')} desc={t('artifact.diffView.noSessionDesc')} />
 
   // Reuse the existing not-a-repo / git-missing / no-cwd states for the uncommitted half.
@@ -212,7 +235,7 @@ export function ChangesView() {
           <Empty title={t('artifact.diffView.clean')} desc={t('artifact.diffView.cleanDesc')} />
         ) : (
           <DiffDisplay
-            files={diff.files}
+            files={visibleFiles}
             summary={diff.summary}
             viewMode={diffViewMode}
             expanded={diff.expanded}
@@ -239,6 +262,14 @@ export function ChangesView() {
               const next = Math.max(1, Math.min(50, cur + (dir === 'up' ? 5 : -5)))
               fetchFileCtx(p, next)
             }}
+            showSummary={(diff.summary?.totalFiles ?? diff.files.length) > 6}
+            filterQuery={filterQuery}
+            onFilterChange={setFilterQuery}
+            filterInputRef={filterInputRef}
+            narrow={narrow}
+            onSummaryCollapseAll={() => setAllCollapsed(true)}
+            onSummaryExpandAll={() => setAllCollapsed(false)}
+            onSummaryRefresh={() => sessionService.requestDiff(sessionId)}
           />
         )}
       </div>

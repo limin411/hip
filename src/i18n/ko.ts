@@ -630,7 +630,9 @@ export const ko = {
       "expand": "파일 펼치기",
       "collapse": "파일 접기",
       "viewUnified": "통합",
-      "viewSplit": "분할"
+      "viewSplit": "분할",
+      "expandUpContext": "위쪽 컨텍스트 펼치기",
+      "expandDownContext": "아래쪽 컨텍스트 펼치기"
     },
     "changes": "변경 사항",
     "branch": {
@@ -663,6 +665,9 @@ export const ko = {
       "baseLabel": "비교 기준",
       "noSessionStart": "세션 시작 스냅샷이 아직 없습니다",
       "ignoreWhitespace": "공백 변경 무시",
+      "contextTier": "컨텍스트 줄 수",
+      "contextAll": "전체",
+      "contextLines": "{{count}}줄",
       "panelTooNarrow": "패널이 너무 좁아 분할 보기 불가",
       "backToUncommitted": "커밋되지 않은 변경으로 돌아가기",
       "commitDiffError": "커밋 변경사항을 불러올 수 없음",

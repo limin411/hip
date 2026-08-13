@@ -302,6 +302,58 @@ describe('DiffDisplay class polish', () => {
     expect(screen.getByTestId('diff-hunk-copy')).toBeInTheDocument()
   })
 
+  it('T5: hunk badge counts add/del lines', () => {
+    render(
+      <DiffDisplay
+        files={[{ ...file, additions: 2, deletions: 1, hunks: [{
+          oldStart: 1, oldLines: 1, newStart: 1, newLines: 2, header: '',
+          lines: [
+            { type: 'del', content: 'a', oldNo: 1, newNo: null },
+            { type: 'add', content: 'b', oldNo: null, newNo: 1 },
+            { type: 'add', content: 'c', oldNo: null, newNo: 2 },
+          ],
+        }] }]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const badge = screen.getByTestId('diff-hunk-badge')
+    expect(badge).toHaveTextContent('+2')
+    expect(badge).toHaveTextContent('−1')
+  })
+
+  it('T11: expand-context buttons render only when the file is expandable', () => {
+    const onExpand = vi.fn()
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+        canExpandContext={() => false}
+        onExpandContext={onExpand}
+      />,
+    )
+    expect(screen.queryByTestId('diff-hunk-expand-up')).toBeNull()
+    expect(screen.queryByTestId('diff-hunk-expand-down')).toBeNull()
+    cleanup()
+    render(
+      <DiffDisplay
+        files={[file]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+        canExpandContext={() => true}
+        onExpandContext={onExpand}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('diff-hunk-expand-up'))
+    expect(onExpand).toHaveBeenCalledWith('src/a.ts', 'up')
+    fireEvent.click(screen.getByTestId('diff-hunk-expand-down'))
+    expect(onExpand).toHaveBeenLastCalledWith('src/a.ts', 'down')
+  })
+
   it('applies code block color to diff code area', () => {
     useHipConfigStore.setState({
       config: { version: 1, codeBlock: { colorTheme: 'dark' } },

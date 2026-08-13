@@ -637,7 +637,9 @@ export const zhTW = {
       "expand": "展開檔案",
       "collapse": "摺疊檔案",
       "viewUnified": "統一檢視",
-      "viewSplit": "並排檢視"
+      "viewSplit": "並排檢視",
+      "expandUpContext": "展開上方上下文",
+      "expandDownContext": "展開下方上下文",
     },
     "changes": "更改",
     "branch": {
@@ -670,6 +672,9 @@ export const zhTW = {
       "baseLabel": "對比基線",
       "noSessionStart": "尚無工作階段起點快照",
       "ignoreWhitespace": "忽略空白",
+      "contextTier": "上下文行數",
+      "contextAll": "全部",
+      "contextLines": "{{count}} 行",
       "panelTooNarrow": "面板過窄，無法並排顯示",
       "backToUncommitted": "返回未提交",
       "commitDiffError": "無法載入提交改動",

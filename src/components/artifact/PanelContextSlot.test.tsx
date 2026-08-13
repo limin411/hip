@@ -48,6 +48,7 @@ vi.mock('@/components/ui/DropdownMenu', () => ({
   DropdownMenuRadioGroup: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuRadioItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuSeparator: () => <hr />,
+  DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 let mockUi = {

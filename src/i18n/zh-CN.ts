@@ -597,6 +597,8 @@ export const zhCN = {
         collapse: '折叠文件',
         viewUnified: '统一视图',
         viewSplit: '并排视图',
+        expandUpContext: '展开上方上下文',
+        expandDownContext: '展开下方上下文',
       },
       changes: '更改',
       branch: {
@@ -629,6 +631,9 @@ export const zhCN = {
         baseLabel: '对比基线',
         noSessionStart: '尚无会话起点快照',
         ignoreWhitespace: '忽略空白',
+        contextTier: '上下文行数',
+        contextAll: '全部',
+        contextLines: '{{count}} 行',
         panelTooNarrow: '面板过窄，无法并排显示',
         backToUncommitted: '返回未提交',
         commitDiffError: '无法加载提交改动',

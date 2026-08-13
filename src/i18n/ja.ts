@@ -630,7 +630,9 @@ export const ja = {
       "expand": "ファイルを展開",
       "collapse": "ファイルを折りたたむ",
       "viewUnified": "統合表示",
-      "viewSplit": "分割表示"
+      "viewSplit": "分割表示",
+      "expandUpContext": "上方向にコンテキストを展開",
+      "expandDownContext": "下方向にコンテキストを展開"
     },
     "changes": "変更",
     "branch": {
@@ -663,6 +665,9 @@ export const ja = {
       "baseLabel": "比較ベース",
       "noSessionStart": "セッション開始スナップショットがまだありません",
       "ignoreWhitespace": "空白の変更を無視",
+      "contextTier": "コンテキスト行数",
+      "contextAll": "すべて",
+      "contextLines": "{{count}} 行",
       "panelTooNarrow": "パネルが狭く分割表示できません",
       "backToUncommitted": "未コミットに戻る",
       "commitDiffError": "コミットの差分を読み込めませんでした",

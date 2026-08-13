@@ -152,14 +152,22 @@ function HunkHeader({
   path,
   sessionId,
   chrome,
+  expandable = false,
+  onExpandContext,
 }: {
   hunk: DiffHunk
   path: string
   sessionId: string
   chrome: CodeBlockChromePalette | null
+  /** T11：文件上下文为数值档位时可展开（'full' 无更多可展开）。 */
+  expandable?: boolean
+  onExpandContext?: (path: string, dir: 'up' | 'down') => void
 }) {
   const { t } = useTranslation()
   const hunkText = formatHunkText(hunk)
+  // T5：hunk 徽标 +N −M（行计数派生）
+  const adds = hunk.lines.filter((l) => l.type === 'add').length
+  const dels = hunk.lines.filter((l) => l.type === 'del').length
   return (
     <DeclarativeContextMenu
       kind="diffHunk"
@@ -185,6 +193,14 @@ function HunkHeader({
         >
           @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
         </span>
+        <span
+          className="shrink-0 rounded-md bg-surface-muted px-1.5 py-px font-mono tabular-nums"
+          data-testid="diff-hunk-badge"
+          style={chrome ? { backgroundColor: chrome.headerBackground, color: chrome.headerText } : undefined}
+        >
+          <span className="text-success">+{adds}</span>{' '}
+          <span className="text-danger">−{dels}</span>
+        </span>
         {hunk.header && (
           <span
             className="truncate px-1 text-ink-tertiary/80"
@@ -194,6 +210,30 @@ function HunkHeader({
           </span>
         )}
         <span className="ml-auto flex shrink-0 items-center gap-0.5 pr-1">
+          {expandable && onExpandContext && (
+            <>
+              <button
+                type="button"
+                onClick={() => onExpandContext(path, 'up')}
+                className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+                title={t('artifact.diffView.expandUpContext')}
+                data-testid="diff-hunk-expand-up"
+                style={chrome ? { color: chrome.headerText } : undefined}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => onExpandContext(path, 'down')}
+                className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+                title={t('artifact.diffView.expandDownContext')}
+                data-testid="diff-hunk-expand-down"
+                style={chrome ? { color: chrome.headerText } : undefined}
+              >
+                ↓
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => void copyText(hunkText)}
@@ -232,18 +272,22 @@ function HunkLines({
   path,
   sessionId,
   chrome,
+  expandable,
+  onExpandContext,
 }: {
   hunk: DiffHunk
   path: string
   sessionId: string
   chrome: CodeBlockChromePalette | null
+  expandable?: boolean
+  onExpandContext?: (path: string, dir: 'up' | 'down') => void
 }) {
   const { t } = useTranslation()
   const spans = computeHunkWordDiffs(hunk.lines)
   const runPos = changeRunPositions(hunk.lines, (l) => l.type !== 'ctx')
   return (
     <>
-      <HunkHeader hunk={hunk} path={path} sessionId={sessionId} chrome={chrome} />
+      <HunkHeader hunk={hunk} path={path} sessionId={sessionId} chrome={chrome} expandable={expandable} onExpandContext={onExpandContext} />
       {hunk.lines.map((line: DiffLine, i) => (
         <div
           key={i}
@@ -341,11 +385,15 @@ function SplitHunks({
   path,
   sessionId,
   chrome,
+  expandable,
+  onExpandContext,
 }: {
   hunks: DiffHunk[]
   path: string
   sessionId: string
   chrome: CodeBlockChromePalette | null
+  expandable?: boolean
+  onExpandContext?: (path: string, dir: 'up' | 'down') => void
 }) {
   return (
     <>
@@ -362,7 +410,7 @@ function SplitHunks({
         )
         return (
           <Fragment key={i}>
-            <HunkHeader hunk={h} path={path} sessionId={sessionId} chrome={chrome} />
+            <HunkHeader hunk={h} path={path} sessionId={sessionId} chrome={chrome} expandable={expandable} onExpandContext={onExpandContext} />
             <div className="flex">
               <div className="min-w-0 flex-1 overflow-x-auto">
                 {rows.map((row, j) => (
@@ -403,6 +451,8 @@ function FileDiff({
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
+  expandable,
+  onExpandContext,
   chrome,
 }: {
   file: DiffFile
@@ -424,6 +474,8 @@ function FileDiff({
   onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
+  expandable?: boolean
+  onExpandContext?: (path: string, dir: 'up' | 'down') => void
   chrome: CodeBlockChromePalette | null
 }) {
   const { t } = useTranslation()
@@ -563,10 +615,10 @@ function FileDiff({
             }
           >
             {viewMode === 'split' ? (
-              <SplitHunks hunks={shown.hunks} path={file.path} sessionId={sessionId} chrome={chrome} />
+              <SplitHunks hunks={shown.hunks} path={file.path} sessionId={sessionId} chrome={chrome} expandable={expandable} onExpandContext={onExpandContext} />
             ) : (
               shown.hunks.map((h, i) => (
-                <HunkLines key={i} hunk={h} path={file.path} sessionId={sessionId} chrome={chrome} />
+                <HunkLines key={i} hunk={h} path={file.path} sessionId={sessionId} chrome={chrome} expandable={expandable} onExpandContext={onExpandContext} />
               ))
             )}
           </div>
@@ -661,6 +713,8 @@ export function DiffDisplay({
   onToggleCollapse,
   onShowFull,
   onCollapseFull,
+  canExpandContext,
+  onExpandContext,
 }: {
   files: DiffFile[]
   summary?: DiffSummary
@@ -685,6 +739,9 @@ export function DiffDisplay({
   onToggleCollapse: (path: string, multi: boolean) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
+  /** T11：该文件当前上下文为数值档位时可展开上下文（'full' 无更多）。 */
+  canExpandContext?: (path: string) => boolean
+  onExpandContext?: (path: string, dir: 'up' | 'down') => void
 }) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -736,6 +793,8 @@ export function DiffDisplay({
           onToggleCollapse={onToggleCollapse}
           onShowFull={onShowFull}
           onCollapseFull={onCollapseFull}
+          expandable={canExpandContext?.(file.path) ?? false}
+          onExpandContext={onExpandContext}
           chrome={chrome}
         />
       ))}

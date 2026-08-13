@@ -325,6 +325,10 @@ interface UiState {
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
 
+  /** 展开文件时重新拉取的上下文行数档位（T6；'full' = 现状全文）。 */
+  diffContext: number | 'full'
+  setDiffContext: (c: number | 'full') => void
+
   ignoreWhitespace: boolean
   setIgnoreWhitespace: (v: boolean) => void
 
@@ -480,6 +484,9 @@ export const useUiStore = create<UiState>()(
 
       diffViewMode: 'unified',
       setDiffViewMode: (m) => set({ diffViewMode: m }),
+
+      diffContext: 'full',
+      setDiffContext: (c) => set((s) => (s.diffContext === c ? s : { diffContext: c })),
 
       ignoreWhitespace: false,
       setIgnoreWhitespace: (v) => set((s) => (s.ignoreWhitespace === v ? s : { ignoreWhitespace: v })),

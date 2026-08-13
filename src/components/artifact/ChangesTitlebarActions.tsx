@@ -12,6 +12,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -32,6 +33,8 @@ export function ChangesTitlebarActions() {
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
   const diffViewMode = useUiStore((s) => s.diffViewMode)
   const setDiffViewMode = useUiStore((s) => s.setDiffViewMode)
+  const diffContext = useUiStore((s) => s.diffContext)
+  const setDiffContext = useUiStore((s) => s.setDiffContext)
   const ignoreWhitespace = useUiStore((s) => s.ignoreWhitespace)
   const setIgnoreWhitespace = useUiStore((s) => s.setIgnoreWhitespace)
   const running = useDomainStore((s) => {
@@ -304,6 +307,23 @@ export function ChangesTitlebarActions() {
               title={narrow ? t('artifact.changesView.panelTooNarrow') : undefined}
             >
               {t('artifact.diffView.viewSplit')}
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+          {/* T6 上下文行数档位：作用于展开文件的重取粒度（初始列表保持 git 默认 -U3） */}
+          <DropdownMenuLabel>{t('artifact.changesView.contextTier')}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={diffContext === 'full' ? 'full' : String(diffContext)}
+            onValueChange={(v) => setDiffContext(v === 'full' ? 'full' : Number(v))}
+          >
+            <DropdownMenuRadioItem value="full" data-testid="changes-menu-ctx-full">
+              {t('artifact.changesView.contextAll')}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="5" data-testid="changes-menu-ctx-5">
+              {t('artifact.changesView.contextLines', { count: 5 })}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="2" data-testid="changes-menu-ctx-2">
+              {t('artifact.changesView.contextLines', { count: 2 })}
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />

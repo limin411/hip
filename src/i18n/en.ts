@@ -604,6 +604,8 @@ export const en = {
         collapse: 'Collapse file',
         viewUnified: 'Unified',
         viewSplit: 'Split',
+        expandUpContext: 'Expand context above',
+        expandDownContext: 'Expand context below',
       },
       changes: 'Changes',
       branch: {
@@ -636,6 +638,9 @@ export const en = {
         baseLabel: 'Diff baseline',
         noSessionStart: 'No session-start snapshot yet',
         ignoreWhitespace: 'Ignore whitespace',
+        contextTier: 'Context lines',
+        contextAll: 'All',
+        contextLines: '{{count}} lines',
         panelTooNarrow: 'Panel too narrow for split view',
         backToUncommitted: 'Back to uncommitted',
         commitDiffError: 'Could not load commit diff',

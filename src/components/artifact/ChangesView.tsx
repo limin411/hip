@@ -24,11 +24,20 @@ export function ChangesView() {
   })
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
   const diffViewMode = useUiStore((s) => s.diffViewMode)
+  const diffContext = useUiStore((s) => s.diffContext)
   const activeTab = useUiStore((s) => s.activeTab)
   const rootRef = useRef<HTMLDivElement>(null)
   const [focusedPath, setFocusedPath] = useState<string | null>(null)
   const [discardPath, setDiscardPath] = useState<string | null>(null)
   const [narrow, setNarrow] = useState(false)
+  /** T6/T11：每文件当前上下文行数档位（初始列表 = git 默认 -U3）。 */
+  const fileCtx = useRef<Record<string, number | 'full'>>({})
+  const ctxOf = (p: string) => fileCtx.current[p] ?? 3
+  const fetchFileCtx = (p: string, ctx: number | 'full') => {
+    if (!sessionId) return
+    fileCtx.current[p] = ctx
+    sessionService.requestDiffFile(sessionId, p, ctx)
+  }
   const running = useDomainStore((s) => {
     if (!s.activeSessionId) return false
     return s.sessions.find((x) => x.id === s.activeSessionId)?.status === 'running'
@@ -40,6 +49,20 @@ export function ChangesView() {
     if (!sessionId || activeTab !== 'changes') return
     sessionService.requestDiff(sessionId)
   }, [sessionId, activeTab])
+
+  // T6 档位切换：收起全部已展开文件后以新档位重拉，diffFile:result 重新展开。
+  // prev 守卫：只在档位真实变化时生效（挂载/切 tab 重挂载不触发）。
+  const prevCtx = useRef(diffContext)
+  useEffect(() => {
+    if (prevCtx.current === diffContext) return
+    prevCtx.current = diffContext
+    if (!sessionId) return
+    const paths = Object.keys(diff.expanded)
+    if (paths.length === 0) return
+    for (const p of paths) useDiffStore.getState().collapseFile(sessionId, p)
+    for (const p of paths) fetchFileCtx(p, diffContext)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diffContext])
 
   // Narrow right column (<420px): hide stats / file icons, keep the toolbar on one line.
   useEffect(() => {
@@ -207,8 +230,15 @@ export function ChangesView() {
             onReviewFile={(p) => reviewFiles([p])}
             onCopyPath={copyPath}
             onToggleCollapse={(p, multi) => toggleFile(p, multi)}
-            onShowFull={(p) => sessionService.requestDiffFile(sessionId, p, 'full')}
+            onShowFull={(p) => fetchFileCtx(p, 'full')}
             onCollapseFull={(p) => useDiffStore.getState().collapseFile(sessionId, p)}
+            canExpandContext={(p) => ctxOf(p) !== 'full'}
+            onExpandContext={(p, dir) => {
+              const cur = ctxOf(p)
+              if (cur === 'full') return
+              const next = Math.max(1, Math.min(50, cur + (dir === 'up' ? 5 : -5)))
+              fetchFileCtx(p, next)
+            }}
           />
         )}
       </div>

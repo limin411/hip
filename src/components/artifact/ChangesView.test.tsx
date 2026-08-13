@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import type { DiffFile } from '@hip/protocol'
 import { ChangesView } from './ChangesView'
 import { ChangesTitlebarActions } from './ChangesTitlebarActions'
@@ -85,33 +85,40 @@ vi.mock('@/components/command-palette/composerBridge', () => ({
   insertComposerText: vi.fn(() => true),
 }))
 
-vi.mock('@/components/ui/DropdownMenu', () => ({
-  DropdownMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
-  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  DropdownMenuContent: ({ children }: { children: ReactNode }) => (
-    <div data-testid="changes-toolbar-menu-content">{children}</div>
-  ),
-  DropdownMenuItem: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => (
-    <button type="button" onClick={onClick} data-testid="changes-menu-item">{children}</button>
-  ),
-  DropdownMenuRadioGroup: ({ children }: { children: ReactNode }) => (
-    <div role="radiogroup">{children}</div>
-  ),
-  DropdownMenuRadioItem: ({
-    children,
-    onValueChange,
-    value,
-  }: {
-    children: ReactNode
-    onValueChange?: (v: string) => void
-    value: string
-  }) => (
-    <button type="button" role="radio" data-value={value} onClick={() => onValueChange?.(value)}>
-      {children}
-    </button>
-  ),
-  DropdownMenuSeparator: () => <hr />,
-}))
+vi.mock('@/components/ui/DropdownMenu', () => {
+  const RadioCtx = createContext<(v: string) => void>(() => {})
+  return {
+    DropdownMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
+    DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+    DropdownMenuContent: ({ children }: { children: ReactNode }) => (
+      <div data-testid="changes-toolbar-menu-content">{children}</div>
+    ),
+    DropdownMenuItem: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => (
+      <button type="button" onClick={onClick} data-testid="changes-menu-item">{children}</button>
+    ),
+    DropdownMenuRadioGroup: ({
+      children,
+      onValueChange,
+    }: {
+      children: ReactNode
+      onValueChange?: (v: string) => void
+    }) => (
+      <RadioCtx.Provider value={onValueChange ?? (() => {})}>
+        <div role="radiogroup">{children}</div>
+      </RadioCtx.Provider>
+    ),
+    DropdownMenuRadioItem: ({ children, value }: { children: ReactNode; value: string }) => {
+      const onValueChange = useContext(RadioCtx)
+      return (
+        <button type="button" role="radio" data-value={value} onClick={() => onValueChange(value)}>
+          {children}
+        </button>
+      )
+    },
+    DropdownMenuSeparator: () => <hr />,
+    DropdownMenuLabel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  }
+})
 
 const file: DiffFile = {
   path: 'src/a.ts',
@@ -156,6 +163,7 @@ beforeEach(() => {
     activeTab: 'changes',
     diffViewMode: 'unified',
     ignoreWhitespace: false,
+    diffContext: 'full',
   })
   vi.stubGlobal('ResizeObserver', ROStub)
 })
@@ -292,5 +300,87 @@ describe('ChangesView v2', () => {
     renderChanges()
     fireEvent.click(screen.getByTestId('changes-review'))
     expect(insertComposerText).toHaveBeenCalledWith(expect.stringContaining('src/a.ts'))
+  })
+
+  // ---- PR-3: hunk 徽标 / 上下文档位 / 展开（T5/T6/T11） ----
+
+  const hunkFile: DiffFile = {
+    path: 'src/b.ts',
+    status: 'modified',
+    additions: 1,
+    deletions: 2,
+    hunks: [{
+      oldStart: 1,
+      oldLines: 2,
+      newStart: 1,
+      newLines: 1,
+      header: 'foo',
+      lines: [
+        { type: 'del', content: 'a', oldNo: 1, newNo: null },
+        { type: 'del', content: 'b', oldNo: 2, newNo: null },
+        { type: 'add', content: 'c', oldNo: null, newNo: 1 },
+      ],
+    }],
+  }
+
+  it('T5: hunk header shows +N −M badge derived from line counts', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: { ...EMPTY_DIFF, status: 'ready', state: 'ok', hasSessionStart: true, files: [hunkFile] },
+      },
+    })
+    renderChanges()
+    const badge = screen.getByTestId('diff-hunk-badge')
+    expect(badge).toHaveTextContent('+1')
+    expect(badge).toHaveTextContent('−2')
+  })
+
+  it('T6: context tier switch collapses expanded files and re-fetches with the new tier', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          files: [hunkFile],
+          expanded: { 'src/b.ts': hunkFile },
+        },
+      },
+    })
+    renderChanges()
+    // ⋯ 菜单「5 行」档位（DropdownMenu mock 的 radio 项带 data-value）
+    const five = screen.getAllByRole('radio').find((r) => r.getAttribute('data-value') === '5')!
+    fireEvent.click(five)
+    expect(useUiStore.getState().diffContext).toBe(5)
+    expect(useDiffStore.getState().bySession.s1.expanded['src/b.ts']).toBeUndefined()
+    expect(sessionService.requestDiffFile).toHaveBeenCalledWith('s1', 'src/b.ts', 5)
+  })
+
+  it('T11: expand buttons re-fetch the file with stepped context; tier switch collapses+refetches', () => {
+    useDiffStore.setState({
+      bySession: {
+        s1: {
+          ...EMPTY_DIFF,
+          status: 'ready',
+          state: 'ok',
+          hasSessionStart: true,
+          files: [hunkFile],
+          expanded: { 'src/b.ts': hunkFile },
+        },
+      },
+    })
+    renderChanges()
+    // 挂载不触发档位 effect（prev 守卫），文件保持展开；初始 ctx = git 默认 3 → ↑ = 3+5
+    expect(screen.getByTestId('diff-hunk-expand-up')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('diff-hunk-expand-up'))
+    expect(sessionService.requestDiffFile).toHaveBeenCalledWith('s1', 'src/b.ts', 8)
+    fireEvent.click(screen.getByTestId('diff-hunk-expand-down'))
+    expect(sessionService.requestDiffFile).toHaveBeenLastCalledWith('s1', 'src/b.ts', 3)
+    // 档位切到「2 行」→ 收起 + 以新档位重拉
+    const two = screen.getAllByRole('radio').find((r) => r.getAttribute('data-value') === '2')!
+    fireEvent.click(two)
+    expect(sessionService.requestDiffFile).toHaveBeenLastCalledWith('s1', 'src/b.ts', 2)
+    expect(useDiffStore.getState().bySession.s1.expanded['src/b.ts']).toBeUndefined()
   })
 })

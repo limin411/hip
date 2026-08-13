@@ -272,4 +272,178 @@ describe('DiffDisplay class polish', () => {
     })
     expect(area.querySelector('span[style*="#e6edf3"]')).toBeTruthy()
   })
+
+  // ---- PR-1: 行级可见性（T1 色条 / T2 块分组 / T3 行号列） ----
+
+  const fWith = (lines: Array<{ type: 'ctx' | 'del' | 'add'; content: string; oldNo: number | null; newNo: number | null }>): DiffFile => ({
+    path: 'src/b.ts',
+    status: 'modified',
+    additions: lines.filter((l) => l.type === 'add').length,
+    deletions: lines.filter((l) => l.type === 'del').length,
+    hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, header: '', lines }],
+  })
+
+  const rowsOf = () =>
+    Array.from(screen.getByTestId('diff-code-area').querySelectorAll<HTMLElement>('div')).filter((d) =>
+      d.className.includes('leading-[1.55]'),
+    )
+
+  it('T1/T2 unified: change rows get rail+ring shadow and block rounding; ctx rows stay plain', () => {
+    render(
+      <DiffDisplay
+        files={[fWith([
+          { type: 'ctx', content: 'keep', oldNo: 1, newNo: 1 },
+          { type: 'del', content: 'old', oldNo: 2, newNo: null },
+          { type: 'add', content: 'new', oldNo: null, newNo: 2 },
+          { type: 'ctx', content: 'tail', oldNo: 3, newNo: 3 },
+        ])]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const rows = rowsOf()
+    expect(rows).toHaveLength(4)
+    // 上下文行：无底色、无色条/描边 shadow
+    expect(rows[0]!.className).not.toMatch(/bg-(success|danger)/)
+    expect(rows[0]!.style.boxShadow).toBe('')
+    // del 行：12% 底色 + 色条 + 主色描边 + 块首圆角/间距
+    expect(rows[1]!.className).toContain('bg-danger/[0.12]')
+    expect(rows[1]!.className).toContain('rounded-t-[4px]')
+    expect(rows[1]!.className).toContain('mt-px')
+    expect(rows[1]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--danger-rgb))')
+    expect(rows[1]!.style.boxShadow).toContain('inset 0 0 0 1px rgb(var(--danger-rgb) / 0.3)')
+    // add 行：success 侧 + 块末圆角/间距
+    expect(rows[2]!.className).toContain('bg-success/[0.12]')
+    expect(rows[2]!.className).toContain('rounded-b-[4px]')
+    expect(rows[2]!.className).toContain('mb-px')
+    expect(rows[2]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--success-rgb))')
+    expect(rows[3]!.style.boxShadow).toBe('')
+  })
+
+  it('T2: multi-row run rounds only first/last rows; ctx split splits runs', () => {
+    render(
+      <DiffDisplay
+        files={[fWith([
+          { type: 'del', content: 'a', oldNo: 1, newNo: null },
+          { type: 'del', content: 'b', oldNo: 2, newNo: null },
+          { type: 'add', content: 'x', oldNo: null, newNo: 1 },
+          { type: 'add', content: 'y', oldNo: null, newNo: 2 },
+        ])]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const rows = rowsOf()
+    expect(rows[0]!.className).toContain('rounded-t-[4px]')
+    expect(rows[1]!.className).not.toMatch(/rounded-/)
+    expect(rows[2]!.className).not.toMatch(/rounded-/)
+    expect(rows[3]!.className).toContain('rounded-b-[4px]')
+    // 单行块（del,ctx,add）首末同圆角
+    cleanup()
+    render(
+      <DiffDisplay
+        files={[fWith([
+          { type: 'del', content: 'a', oldNo: 1, newNo: null },
+          { type: 'ctx', content: 'keep', oldNo: 2, newNo: 1 },
+          { type: 'add', content: 'x', oldNo: null, newNo: 2 },
+        ])]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const single = rowsOf()
+    expect(single[0]!.className).toContain('rounded-[4px]')
+    expect(single[2]!.className).toContain('rounded-[4px]')
+  })
+
+  it('T3: line-number column gets its own tint, separator, and type coloring', () => {
+    render(
+      <DiffDisplay
+        files={[fWith([
+          { type: 'ctx', content: 'keep', oldNo: 1, newNo: 1 },
+          { type: 'del', content: 'old', oldNo: 2, newNo: null },
+          { type: 'add', content: 'new', oldNo: null, newNo: 2 },
+        ])]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const rows = rowsOf()
+    const lnSpans = (row: HTMLElement) =>
+      Array.from(row.querySelectorAll('span')).filter((s) => s.className.includes('bg-surface-subtle/70'))
+    const ctxLn = lnSpans(rows[0]!)
+    expect(ctxLn).toHaveLength(2)
+    expect(ctxLn[0]!.className).toContain('text-ink-tertiary/80')
+    // 第二行号列带右侧分隔线
+    expect(ctxLn[1]!.className).toContain('border-r border-border/70')
+    expect(ctxLn[0]!.className).not.toMatch(/border-r/)
+    // 变更行行号随行类型着色
+    const delLn = lnSpans(rows[1]!)
+    expect(delLn[0]!.className).toContain('text-danger/80')
+    const addLn = lnSpans(rows[2]!)
+    expect(addLn[0]!.className).toContain('text-success/80')
+  })
+
+  it('T2/T3 split: blocks get neutral ring, per-side rail, and gutter separator', () => {
+    // 等长配对 del,del / add,add → 两行块：首行 rounded-t、末行 rounded-b
+    render(
+      <DiffDisplay
+        files={[fWith([
+          { type: 'ctx', content: 'keep', oldNo: 1, newNo: 1 },
+          { type: 'del', content: 'old1', oldNo: 2, newNo: null },
+          { type: 'del', content: 'old2', oldNo: 3, newNo: null },
+          { type: 'add', content: 'new1', oldNo: null, newNo: 2 },
+          { type: 'add', content: 'new2', oldNo: null, newNo: 3 },
+          { type: 'ctx', content: 'tail', oldNo: 4, newNo: 4 },
+        ])]}
+        viewMode="split"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const panes = document.querySelectorAll('div.overflow-x-auto')
+    expect(panes).toHaveLength(2)
+    const cells = (pane: Element) =>
+      Array.from(pane.querySelectorAll<HTMLElement>('div')).filter((d) => d.className.includes('leading-[1.55]'))
+    const left = cells(panes[0]!)
+    const right = cells(panes[1]!)
+    expect(left).toHaveLength(4) // ctx, del, del, ctx
+    // 左栏：del 行 = danger 色条 + 中性描边；首行块首圆角/间距、末行块末圆角/间距
+    expect(left[1]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--danger-rgb))')
+    expect(left[1]!.style.boxShadow).toContain('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
+    expect(left[1]!.className).toContain('rounded-t-[4px]')
+    expect(left[1]!.className).toContain('mt-px')
+    expect(left[2]!.className).toContain('rounded-b-[4px]')
+    expect(left[2]!.className).toContain('mb-px')
+    expect(left[0]!.style.boxShadow).toBe('')
+    // 右栏：add 行 = success 色条 + 中性描边
+    expect(right[1]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--success-rgb))')
+    expect(right[2]!.style.boxShadow).toContain('inset 2px 0 0 0 rgb(var(--success-rgb))')
+    // 单行号列带分隔线；del 行号着色
+    const ln = Array.from(left[1]!.querySelectorAll('span')).find((s) => s.className.includes('bg-surface-subtle/70'))!
+    expect(ln.className).toContain('border-r border-border/70')
+    expect(ln.className).toContain('text-danger/80')
+    // 不等长配对 del / add,add → 左栏空单元格仍属块（中性描边 + 块末圆角）
+    cleanup()
+    render(
+      <DiffDisplay
+        files={[fWith([
+          { type: 'del', content: 'old', oldNo: 1, newNo: null },
+          { type: 'add', content: 'new1', oldNo: null, newNo: 1 },
+          { type: 'add', content: 'new2', oldNo: null, newNo: 2 },
+        ])]}
+        viewMode="split"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const l2 = cells(document.querySelectorAll('div.overflow-x-auto')[0]!)
+    expect(l2[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)')
+    expect(l2[1]!.className).toContain('rounded-b-[4px]')
+    expect(l2[0]!.className).toContain('rounded-t-[4px]')
+  })
 })

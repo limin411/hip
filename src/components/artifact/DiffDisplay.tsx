@@ -5,7 +5,7 @@ import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSu
 import { cn } from '@/lib/utils'
 import { fileIconForName } from '@/lib/fileIcon'
 import { computeHunkWordDiffs } from '@/lib/wordDiff'
-import { buildSplitRows } from '@/lib/diffSplit'
+import { buildSplitRows, type SplitRow } from '@/lib/diffSplit'
 import { copyText } from '@/ipc/clipboard'
 import {
   CODE_BLOCK_CHROME,
@@ -45,10 +45,62 @@ function DiffFileTypeIcon({ path, size = 14 }: { path: string; size?: number }) 
   )
 }
 
-/** Soft row tint — hierarchy from background, not hard borders. */
-function lineStyle(t: DiffLineType): string {
-  return t === 'add' ? 'bg-success/[0.07]' : t === 'del' ? 'bg-danger/[0.07]' : ''
+/** 变更块内位置：first/mid/last/single（单行块），null = 上下文行。 */
+type BlockPos = 'first' | 'mid' | 'last' | 'single' | null
+
+/** 行级视觉：12% 底色 + hover 加深（T1）。分格：色条+描边用内联 boxShadow，避免 Tailwind 扫描器要求全字面量类名。 */
+function lineStyle(t: DiffLineType, pos: BlockPos = null): string {
+  if (t === 'ctx') return ''
+  const tint =
+    t === 'add' ? 'bg-success/[0.12] hover:bg-success/[0.18]' : 'bg-danger/[0.12] hover:bg-danger/[0.18]'
+  return cn(tint, blockPosCls(pos))
 }
+
+/** T1 色条（inset 2px 主色）+ T2 块描边（inset 1px）。split 块用中性边框，unified 块用主色 30%。 */
+function lineShadow(t: DiffLineType, split: boolean): string | undefined {
+  if (t === 'ctx') return undefined
+  const c = t === 'add' ? 'var(--success-rgb)' : 'var(--danger-rgb)'
+  const rail = `inset 2px 0 0 0 rgb(${c})`
+  const ring = split
+    ? 'inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)'
+    : `inset 0 0 0 1px rgb(${c} / 0.3)`
+  return `${rail}, ${ring}`
+}
+
+/** 块位置类：首/末行圆角 + 与相邻上下文行留 1px 间距。 */
+function blockPosCls(pos: BlockPos): string {
+  if (pos === 'first') return 'mt-px rounded-t-[4px]'
+  if (pos === 'last') return 'mb-px rounded-b-[4px]'
+  if (pos === 'single') return 'mt-px mb-px rounded-[4px]'
+  return ''
+}
+
+/** 连续变更行的块位置表：index → BlockPos（上下文行为 null）。isChange 谓词支持 split 行配对（任一侧变更即入块）。 */
+function changeRunPositions<T>(lines: T[], isChange: (l: T) => boolean): BlockPos[] {
+  const pos: BlockPos[] = lines.map(() => null)
+  let i = 0
+  while (i < lines.length) {
+    if (!isChange(lines[i])) {
+      i++
+      continue
+    }
+    let j = i
+    while (j < lines.length && isChange(lines[j])) j++
+    const len = j - i
+    for (let k = i; k < j; k++) pos[k] = len === 1 ? 'single' : k === i ? 'first' : k === j - 1 ? 'last' : 'mid'
+    i = j
+  }
+  return pos
+}
+
+/** 行号列（T3）：独立底纹 + 行类型着色；unified 第二列（split 单列）带右侧分隔线。 */
+function lnCls(line: DiffLine): string {
+  return cn(
+    'w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption bg-surface-subtle/70',
+    line.type === 'add' ? 'text-success/80' : line.type === 'del' ? 'text-danger/80' : 'text-ink-tertiary/80',
+  )
+}
+
 function sign(t: DiffLineType): string { return t === 'add' ? '+' : t === 'del' ? '-' : ' ' }
 
 function formatHunkText(hunk: DiffHunk): string {
@@ -151,19 +203,21 @@ function HunkLines({
 }) {
   const { t } = useTranslation()
   const spans = computeHunkWordDiffs(hunk.lines)
+  const runPos = changeRunPositions(hunk.lines, (l) => l.type !== 'ctx')
   return (
     <>
       <HunkHeader hunk={hunk} path={path} sessionId={sessionId} chrome={chrome} />
       {hunk.lines.map((line: DiffLine, i) => (
-        <div key={i} className={cn('flex leading-[1.55]', lineStyle(line.type))}>
-          <span
-            className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80"
-            style={chrome ? { color: chrome.headerText } : undefined}
-          >
+        <div
+          key={i}
+          className={cn('flex leading-[1.55]', lineStyle(line.type, runPos[i]))}
+          style={line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, false) } : undefined}
+        >
+          <span className={lnCls(line)} style={chrome ? { color: chrome.headerText } : undefined}>
             {line.oldNo ?? ''}
           </span>
           <span
-            className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80"
+            className={cn(lnCls(line), 'border-r border-border/70')}
             style={chrome ? { color: chrome.headerText } : undefined}
           >
             {line.newNo ?? ''}
@@ -192,25 +246,42 @@ function SplitCell({
   line,
   side,
   chrome,
+  blockPos = null,
 }: {
   line: DiffLine | null
   side: 'left' | 'right'
   chrome: CodeBlockChromePalette | null
+  blockPos?: BlockPos
 }) {
   if (!line) {
     return (
       <div
-        className="flex w-max min-w-full leading-[1.55] bg-surface-subtle/50"
-        style={chrome ? { backgroundColor: chrome.background, color: chrome.text } : undefined}
+        className={cn(
+          'flex w-max min-w-full leading-[1.55] bg-surface-subtle/50',
+          blockPos && blockPosCls(blockPos),
+        )}
+        style={
+          blockPos
+            ? { boxShadow: 'inset 0 0 0 1px rgb(var(--border-rgb) / 0.85)', ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}) }
+            : chrome
+              ? { backgroundColor: chrome.background, color: chrome.text }
+              : undefined
+        }
       >
         <span className="w-full" />
       </div>
     )
   }
   return (
-    <div className={cn('flex w-max min-w-full leading-[1.55]', lineStyle(line.type))}>
+    <div
+      className={cn('flex w-max min-w-full leading-[1.55]', lineStyle(line.type, blockPos))}
+      style={{
+        ...(line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, true) } : {}),
+        ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}),
+      }}
+    >
       <span
-        className="w-9 shrink-0 select-none px-1 text-right font-mono tabular-nums text-caption text-ink-tertiary/80"
+        className={cn(lnCls(line), 'border-r border-border/70')}
         style={chrome ? { color: chrome.headerText } : undefined}
       >
         {side === 'left' ? line.oldNo ?? '' : line.newNo ?? ''}
@@ -246,24 +317,29 @@ function SplitHunks({
 }) {
   return (
     <>
-      {hunks.map((h, i) => (
-        <Fragment key={i}>
-          <HunkHeader hunk={h} path={path} sessionId={sessionId} chrome={chrome} />
-          <div className="flex">
-            <div className="min-w-0 flex-1 overflow-x-auto">
-              {buildSplitRows(h.lines).map((row, j) => (
-                <SplitCell key={j} line={row.left} side="left" chrome={chrome} />
-              ))}
+      {hunks.map((h, i) => {
+        const rows = buildSplitRows(h.lines)
+        const isChange = (r: SplitRow) => r.left?.type !== 'ctx' || r.right?.type !== 'ctx'
+        const runPos = changeRunPositions(rows, isChange)
+        return (
+          <Fragment key={i}>
+            <HunkHeader hunk={h} path={path} sessionId={sessionId} chrome={chrome} />
+            <div className="flex">
+              <div className="min-w-0 flex-1 overflow-x-auto">
+                {rows.map((row, j) => (
+                  <SplitCell key={j} line={row.left} side="left" chrome={chrome} blockPos={runPos[j]} />
+                ))}
+              </div>
+              <div className="w-px shrink-0 bg-border/70" />
+              <div className="min-w-0 flex-1 overflow-x-auto">
+                {rows.map((row, j) => (
+                  <SplitCell key={j} line={row.right} side="right" chrome={chrome} blockPos={runPos[j]} />
+                ))}
+              </div>
             </div>
-            <div className="w-px shrink-0 bg-border/70" />
-            <div className="min-w-0 flex-1 overflow-x-auto">
-              {buildSplitRows(h.lines).map((row, j) => (
-                <SplitCell key={j} line={row.right} side="right" chrome={chrome} />
-              ))}
-            </div>
-          </div>
-        </Fragment>
-      ))}
+          </Fragment>
+        )
+      })}
     </>
   )
 }

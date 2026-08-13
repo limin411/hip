@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, FolderOpen, MoreHorizontal, Trash2 } from 'l
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSummary } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { fileIconForName } from '@/lib/fileIcon'
-import { computeHunkWordDiffs } from '@/lib/wordDiff'
+import { computeHunkWordDiffs, wordDiff, type WordDiffSpan } from '@/lib/wordDiff'
 import { buildSplitRows, type SplitRow } from '@/lib/diffSplit'
 import { copyText } from '@/ipc/clipboard'
 import {
@@ -102,6 +102,43 @@ function lnCls(line: DiffLine): string {
 }
 
 function sign(t: DiffLineType): string { return t === 'add' ? '+' : t === 'del' ? '-' : ' ' }
+
+/** 行内容（T4）：word diff 高亮 span（35% 主色 + 2px 圆角内衬），无配对时裸文本。 */
+function LineContent({
+  spans,
+  text,
+  type,
+  chrome,
+}: {
+  spans: WordDiffSpan[] | null
+  text: string
+  type: DiffLineType
+  chrome: CodeBlockChromePalette | null
+}) {
+  return (
+    <span
+      style={chrome ? { color: chrome.text } : undefined}
+      className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink"
+    >
+      {spans
+        ? spans.map((sp, k) => (
+            <span
+              key={k}
+              className={cn(
+                sp.changed &&
+                  (type === 'add' ? 'bg-success/35 rounded-[2px]' : 'bg-danger/35 rounded-[2px]'),
+              )}
+            >
+              {sp.text}
+            </span>
+          ))
+        : text}
+    </span>
+  )
+}
+
+/** 超长行跳过 word diff 计算（对齐 spec §7，>2000 字符）。 */
+const WORD_DIFF_MAX_LEN = 2000
 
 function formatHunkText(hunk: DiffHunk): string {
   const header = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@${hunk.header ? ` ${hunk.header}` : ''}`
@@ -223,9 +260,7 @@ function HunkLines({
             {line.newNo ?? ''}
           </span>
           <span className={cn('w-3.5 shrink-0 select-none text-center text-caption', line.type === 'add' && 'text-success', line.type === 'del' && 'text-danger')}>{sign(line.type)}</span>
-          {spans[i]
-            ? <span style={chrome ? { color: chrome.text } : undefined} className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{spans[i]!.map((sp, k) => <span key={k} className={cn(sp.changed && (line.type === 'add' ? 'bg-success/25' : 'bg-danger/25'))}>{sp.text}</span>)}</span>
-            : <span style={chrome ? { color: chrome.text } : undefined} className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink">{line.content}</span>}
+          <LineContent spans={spans[i] ?? null} text={line.content} type={line.type} chrome={chrome} />
           {line.noNewline && (
             <span
               className="select-none px-1 text-ink-tertiary"
@@ -247,11 +282,13 @@ function SplitCell({
   side,
   chrome,
   blockPos = null,
+  wdSpans = null,
 }: {
   line: DiffLine | null
   side: 'left' | 'right'
   chrome: CodeBlockChromePalette | null
   blockPos?: BlockPos
+  wdSpans?: WordDiffSpan[] | null
 }) {
   if (!line) {
     return (
@@ -293,12 +330,7 @@ function SplitCell({
       )}>
         {sign(line.type)}
       </span>
-      <span
-        className="min-w-0 flex-1 whitespace-pre px-1.5 text-ink"
-        style={chrome ? { color: chrome.text } : undefined}
-      >
-        {line.content}
-      </span>
+      <LineContent spans={wdSpans} text={line.content} type={line.type} chrome={chrome} />
     </div>
   )
 }
@@ -321,19 +353,26 @@ function SplitHunks({
         const rows = buildSplitRows(h.lines)
         const isChange = (r: SplitRow) => r.left?.type !== 'ctx' || r.right?.type !== 'ctx'
         const runPos = changeRunPositions(rows, isChange)
+        // T4 split word diff：仅等长配对行（左 del + 右 add）计算，超长行跳过
+        const wdSpans = rows.map((r) =>
+          r.left?.type === 'del' && r.right?.type === 'add' &&
+          r.left.content.length <= WORD_DIFF_MAX_LEN && r.right.content.length <= WORD_DIFF_MAX_LEN
+            ? wordDiff(r.left.content, r.right.content)
+            : null,
+        )
         return (
           <Fragment key={i}>
             <HunkHeader hunk={h} path={path} sessionId={sessionId} chrome={chrome} />
             <div className="flex">
               <div className="min-w-0 flex-1 overflow-x-auto">
                 {rows.map((row, j) => (
-                  <SplitCell key={j} line={row.left} side="left" chrome={chrome} blockPos={runPos[j]} />
+                  <SplitCell key={j} line={row.left} side="left" chrome={chrome} blockPos={runPos[j]} wdSpans={wdSpans[j]?.del ?? null} />
                 ))}
               </div>
               <div className="w-px shrink-0 bg-border/70" />
               <div className="min-w-0 flex-1 overflow-x-auto">
                 {rows.map((row, j) => (
-                  <SplitCell key={j} line={row.right} side="right" chrome={chrome} blockPos={runPos[j]} />
+                  <SplitCell key={j} line={row.right} side="right" chrome={chrome} blockPos={runPos[j]} wdSpans={wdSpans[j]?.add ?? null} />
                 ))}
               </div>
             </div>

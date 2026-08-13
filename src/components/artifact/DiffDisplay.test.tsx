@@ -217,7 +217,7 @@ describe('DiffDisplay class polish', () => {
     expect(tail.className).toMatch(/text-ink-tertiary/)
   })
 
-  it('word-diff spans use soft /25 tints', () => {
+  it('T4: word-diff spans use /35 tints with 2px rounding', () => {
     render(
       <DiffDisplay
         files={[file]}
@@ -227,12 +227,61 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     // Equal-length del/add pair → word-diff; mid '1' vs '2' is changed.
-    const success = document.querySelector('.bg-success\\/25')
-    const danger = document.querySelector('.bg-danger\\/25')
+    const success = document.querySelector('.bg-success\\/35')
+    const danger = document.querySelector('.bg-danger\\/35')
     expect(success).toBeTruthy()
     expect(danger).toBeTruthy()
-    expect(document.querySelector('.bg-success\\/30')).toBeNull()
-    expect(document.querySelector('.bg-danger\\/30')).toBeNull()
+    expect(success!.className).toContain('rounded-[2px]')
+    expect(danger!.className).toContain('rounded-[2px]')
+    expect(document.querySelector('.bg-success\\/25')).toBeNull()
+  })
+
+  it('T4: split view word-diffs aligned del/add pairs on both sides', () => {
+    render(
+      <DiffDisplay
+        files={[{ ...file, hunks: [{ ...file.hunks[0], lines: [
+          { type: 'ctx', content: 'keep', oldNo: 1, newNo: 1 },
+          { type: 'del', content: 'const x = 1', oldNo: 2, newNo: null },
+          { type: 'add', content: 'const x = 2', oldNo: null, newNo: 2 },
+        ] }] }]}
+        viewMode="split"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    const panes = document.querySelectorAll('div.overflow-x-auto')
+    expect(panes).toHaveLength(2)
+    // 左栏 del 侧有 danger 高亮 span，右栏 add 侧有 success 高亮 span
+    expect(panes[0]!.querySelector('.bg-danger\\/35')).toBeTruthy()
+    expect(panes[1]!.querySelector('.bg-success\\/35')).toBeTruthy()
+  })
+
+  it('T4: no word-diff spans for unpaired or overlong lines', () => {
+    // 纯删除（右栏无 add 配对）→ 两侧无 span；超长 add 行 → 跳过计算
+    const panesOf = (lines: Array<{ type: 'ctx' | 'del' | 'add'; content: string; oldNo: number | null; newNo: number | null }>) => {
+      cleanup()
+      render(
+        <DiffDisplay
+          files={[{ ...file, hunks: [{ ...file.hunks[0], lines }] }]}
+          viewMode="split"
+          sessionId="s1"
+          onToggleCollapse={() => {}}
+        />,
+      )
+      return document.querySelectorAll('div.overflow-x-auto')
+    }
+    let panes = panesOf([
+      { type: 'del', content: 'gone', oldNo: 1, newNo: null },
+      { type: 'ctx', content: 'after', oldNo: 2, newNo: 1 },
+    ])
+    expect(panes[0]!.querySelector('.bg-danger\\/35')).toBeNull()
+    expect(panes[1]!.querySelector('.bg-success\\/35')).toBeNull()
+    panes = panesOf([
+      { type: 'del', content: 'short', oldNo: 1, newNo: null },
+      { type: 'add', content: 'x'.repeat(2500), oldNo: null, newNo: 1 },
+    ])
+    expect(panes[0]!.querySelector('.bg-danger\\/35')).toBeNull()
+    expect(panes[1]!.querySelector('.bg-success\\/35')).toBeNull()
   })
 
   it('split view gives each column its own horizontal scroll pane', () => {

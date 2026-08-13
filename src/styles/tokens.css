@@ -281,7 +281,7 @@ html.dark[data-platform="linux"] {
    acrylic·mica），侧栏半透明底 + backdrop blur，透出桌面与原生材质。
    linux：Tauri 不支持透明窗口，无物可透，兜底不透明实色（与扁平化一致）。 */
 .sidebar-glass {
-  background: rgb(var(--bg-subtle-rgb) / 0.68);
+  background: rgb(var(--bg-subtle-rgb) / 0.85);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
   backdrop-filter: blur(24px) saturate(160%);
 }

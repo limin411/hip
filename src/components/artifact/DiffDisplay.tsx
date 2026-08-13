@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils'
 import { fileIconForName } from '@/lib/fileIcon'
 import { computeHunkWordDiffs, wordDiff, type WordDiffSpan } from '@/lib/wordDiff'
 import { buildSplitRows, type SplitRow } from '@/lib/diffSplit'
+import { setComposerQuote, insertComposerText } from '@/components/command-palette/composerBridge'
 import { copyText } from '@/ipc/clipboard'
+import { toast } from 'sonner'
 import {
   CODE_BLOCK_CHROME,
   normalizeCodeBlockThemeId,
@@ -14,7 +16,6 @@ import {
 } from '@/domain/knowledge/codeBlockTheme'
 import { useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
-import { setComposerQuote } from '@/components/command-palette/composerBridge'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Popover, PopoverContent, PopoverTrigger, PopoverClose } from '@/components/ui/Popover'
@@ -190,6 +191,8 @@ function HunkHeader({
       data-testid="diff-hunk-header"
     >
       <div
+        role="group"
+        aria-label={t('artifact.diffView.hunkLabel')}
         className="flex items-center bg-surface-subtle py-0.5 text-caption text-ink-tertiary"
         style={
           chrome
@@ -275,6 +278,22 @@ function HunkHeader({
           >
             {t('contextMenu.diffHunk.quoteToComposer')}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              const prompt = t('artifact.changesView.explainHunkPrompt', { path, text: hunkText })
+              if (insertComposerText(prompt)) {
+                toast.success(t('artifact.changesView.explainInjected'))
+              } else {
+                toast.error(t('artifact.changesView.reviewNoComposer'))
+              }
+            }}
+            className="rounded-sm px-1.5 py-0.5 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
+            data-testid="diff-hunk-explain"
+            style={chrome ? { color: chrome.headerText } : undefined}
+          >
+            {t('artifact.changesView.explainHunk')}
+          </button>
         </span>
       </div>
     </DeclarativeContextMenu>
@@ -305,6 +324,14 @@ function HunkLines({
       {hunk.lines.map((line: DiffLine, i) => (
         <div
           key={i}
+          role="row"
+          aria-label={t(
+            line.type === 'add'
+              ? 'artifact.diffView.rowAdded'
+              : line.type === 'del'
+                ? 'artifact.diffView.rowDeleted'
+                : 'artifact.diffView.rowContext',
+          )}
           className={cn('flex leading-[1.55]', line.type !== 'ctx' && 'group', lineStyle(line.type, runPos[i]))}
           style={line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, false) } : undefined}
         >
@@ -376,9 +403,12 @@ function SplitCell({
   blockPos?: BlockPos
   wdSpans?: WordDiffSpan[] | null
 }) {
+  const { t } = useTranslation()
   if (!line) {
     return (
       <div
+        role="row"
+        aria-label={t('artifact.diffView.rowContext')}
         className={cn(
           'flex w-max min-w-full leading-[1.55] bg-surface-subtle/50',
           blockPos && blockPosCls(blockPos),
@@ -397,6 +427,14 @@ function SplitCell({
   }
   return (
     <div
+      role="row"
+      aria-label={t(
+        line.type === 'add'
+          ? 'artifact.diffView.rowAdded'
+          : line.type === 'del'
+            ? 'artifact.diffView.rowDeleted'
+            : 'artifact.diffView.rowContext',
+      )}
       className={cn('flex w-max min-w-full leading-[1.55]', lineStyle(line.type, blockPos))}
       style={{
         ...(line.type !== 'ctx' ? { boxShadow: lineShadow(line.type, true) } : {}),

@@ -632,7 +632,11 @@ export const ja = {
       "viewUnified": "統合表示",
       "viewSplit": "分割表示",
       "expandUpContext": "上方向にコンテキストを展開",
-      "expandDownContext": "下方向にコンテキストを展開"
+      "expandDownContext": "下方向にコンテキストを展開",
+      "hunkLabel": "変更ハンク",
+      "rowAdded": "追加行",
+      "rowDeleted": "削除行",
+      "rowContext": "コンテキスト行"
     },
     "changes": "変更",
     "branch": {
@@ -677,6 +681,9 @@ export const ja = {
       "copyLine": "行をコピー",
       "quoteLine": "コンポーザーに引用",
       "copyDiffCopied": "差分をコピーしました",
+      "explainHunk": "agent にこの変更を説明させる",
+      "explainHunkPrompt": "このコード変更を説明してください（{{path}}）：\n\n{{text}}",
+      "explainInjected": "説明リクエストを入力欄に追加しました",
       "panelTooNarrow": "パネルが狭く分割表示できません",
       "backToUncommitted": "未コミットに戻る",
       "commitDiffError": "コミットの差分を読み込めませんでした",

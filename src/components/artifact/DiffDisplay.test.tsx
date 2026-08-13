@@ -8,18 +8,30 @@ import { clearContextProviders } from '@/components/context-menu'
 import { copyText } from '@/ipc/clipboard'
 import { useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { setComposerQuote } from '@/components/command-palette/composerBridge'
+import { insertComposerText } from '@/components/command-palette/composerBridge'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 
 vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn(async () => true) }))
 vi.mock('@/components/command-palette/composerBridge', () => ({
   setComposerQuote: vi.fn(() => true),
+  insertComposerText: vi.fn(() => true),
 }))
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
   return {
     ...actual,
-    useTranslation: () => ({ t: (key: string) => key }),
+    useTranslation: () => ({
+      t: (key: string, vars?: Record<string, unknown>) => {
+        if (key === 'artifact.changesView.explainHunkPrompt') {
+          return `EXPLAIN ${String(vars?.path ?? '')} ${String(vars?.text ?? '')}`
+        }
+        // 轻量插值：{{key}} → 值（模板文本带占位符时）
+        return vars
+          ? Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(`{{${k}}}`, String(v)), key)
+          : key
+      },
+    }),
   }
 })
 
@@ -473,6 +485,36 @@ describe('DiffDisplay class polish', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(onFilter).toHaveBeenLastCalledWith('')
     expect(screen.getByTestId('diff-filter-empty')).toHaveTextContent('无匹配')
+  })
+
+  it('T14/T15: hunk explain injects a prompt; rows expose row semantics', () => {
+    render(
+      <DiffDisplay
+        files={[fWith([
+          { type: 'ctx', content: 'keep', oldNo: 1, newNo: 1 },
+          { type: 'del', content: 'old', oldNo: 2, newNo: null },
+          { type: 'add', content: 'new', oldNo: null, newNo: 2 },
+        ])]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+      />,
+    )
+    // hunk 结构 role=group
+    const hunk = screen.getByTestId('diff-hunk-header').querySelector('[role="group"]')
+    expect(hunk).toHaveAttribute('aria-label', 'artifact.diffView.hunkLabel')
+    // 行 role=row + 行类型 aria-label
+    const rows = rowsOf()
+    expect(rows[0]).toHaveAttribute('role', 'row')
+    expect(rows[0]).toHaveAttribute('aria-label', 'artifact.diffView.rowContext')
+    expect(rows[1]).toHaveAttribute('aria-label', 'artifact.diffView.rowDeleted')
+    expect(rows[2]).toHaveAttribute('aria-label', 'artifact.diffView.rowAdded')
+    // 解释按钮 → 注入含路径与 hunk 文本的提示
+    fireEvent.click(screen.getByTestId('diff-hunk-explain'))
+    expect(insertComposerText).toHaveBeenCalledWith(
+      expect.stringContaining('src/b.ts'),
+    )
+    expect(insertComposerText).toHaveBeenCalledWith(expect.stringContaining('@@ -1,1 +1,1 @@'))
   })
 
   it('applies code block color to diff code area', () => {

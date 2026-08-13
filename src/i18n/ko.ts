@@ -632,7 +632,11 @@ export const ko = {
       "viewUnified": "통합",
       "viewSplit": "분할",
       "expandUpContext": "위쪽 컨텍스트 펼치기",
-      "expandDownContext": "아래쪽 컨텍스트 펼치기"
+      "expandDownContext": "아래쪽 컨텍스트 펼치기",
+      "hunkLabel": "변경 헝크",
+      "rowAdded": "추가된 줄",
+      "rowDeleted": "삭제된 줄",
+      "rowContext": "컨텍스트 줄"
     },
     "changes": "변경 사항",
     "branch": {
@@ -677,6 +681,9 @@ export const ko = {
       "copyLine": "줄 복사",
       "quoteLine": "입력란에 인용",
       "copyDiffCopied": "diff가 복사됨",
+      "explainHunk": "agent에게 이 변경 설명 요청",
+      "explainHunkPrompt": "이 코드 변경을 설명해 주세요 ({{path}}):\n\n{{text}}",
+      "explainInjected": "설명 요청을 입력란에 추가했습니다",
       "panelTooNarrow": "패널이 너무 좁아 분할 보기 불가",
       "backToUncommitted": "커밋되지 않은 변경으로 돌아가기",
       "commitDiffError": "커밋 변경사항을 불러올 수 없음",

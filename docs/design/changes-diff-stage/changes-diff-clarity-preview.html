@@ -203,12 +203,17 @@ body.narrow .f-ico{display:none}
 #panel.mode-before{--add-bg:7%;--del-bg:7%;--wd-a:24%}
 #panel.mode-before .summarybar{display:none}
 #panel.mode-after{--add-bg:13%;--del-bg:13%;--wd-a:36%}
+/* 深色档：低 alpha 在深底上混合后近黑（13% #4caf50 叠 #121212 = rgb(21,37,25)），
+   提升到 30%/45% 与落地一致。 */
+[data-theme="dark"] #panel.mode-after{--add-bg:30%;--del-bg:30%;--wd-a:45%}
 .drow.add{background:color-mix(in srgb,var(--success) var(--add-bg),transparent)}
 .drow.del{background:color-mix(in srgb,var(--danger) var(--del-bg),transparent)}
 #panel.mode-before .drow.add,#panel.mode-before .drow.del{box-shadow:none}
 #panel.mode-after .drow.add{box-shadow:inset 3px 0 0 0 var(--success)}
 #panel.mode-after .drow.del{box-shadow:inset 3px 0 0 0 var(--danger)}
 #panel.mode-after .drow.add:hover{background:color-mix(in srgb,var(--success) 19%,transparent)}
+[data-theme="dark"] #panel.mode-after .drow.add:hover{background:color-mix(in srgb,var(--success) 36%,transparent)}
+[data-theme="dark"] #panel.mode-after .drow.del:hover{background:color-mix(in srgb,var(--danger) 36%,transparent)}
 #panel.mode-after .drow.del:hover{background:color-mix(in srgb,var(--danger) 19%,transparent)}
 /* 变更块（T2） */
 .chg{display:block;border-radius:0;margin:0}

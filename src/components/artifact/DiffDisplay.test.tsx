@@ -230,7 +230,7 @@ describe('DiffDisplay class polish', () => {
     expect(tail.className).toMatch(/text-ink-tertiary/)
   })
 
-  it('T4: word-diff spans use /36 tints with 2px rounding', () => {
+  it('T4: word-diff spans use wd tint classes with 2px rounding', () => {
     render(
       <DiffDisplay
         files={[file]}
@@ -240,8 +240,8 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     // Equal-length del/add pair → word-diff; mid '1' vs '2' is changed.
-    const success = document.querySelector('.bg-diff-add\\/\\[0\\.36\\]')
-    const danger = document.querySelector('.bg-diff-del\\/\\[0\\.36\\]')
+    const success = document.querySelector('.diff-add-wd')
+    const danger = document.querySelector('.diff-del-wd')
     expect(success).toBeTruthy()
     expect(danger).toBeTruthy()
     expect(success!.className).toContain('rounded-[2px]')
@@ -265,8 +265,8 @@ describe('DiffDisplay class polish', () => {
     const panes = document.querySelectorAll('div.overflow-x-auto')
     expect(panes).toHaveLength(2)
     // 左栏 del 侧有 danger 高亮 span，右栏 add 侧有 success 高亮 span
-    expect(panes[0]!.querySelector('.bg-diff-del\\/\\[0\\.36\\]')).toBeTruthy()
-    expect(panes[1]!.querySelector('.bg-diff-add\\/\\[0\\.36\\]')).toBeTruthy()
+    expect(panes[0]!.querySelector('.diff-del-wd')).toBeTruthy()
+    expect(panes[1]!.querySelector('.diff-add-wd')).toBeTruthy()
   })
 
   it('T4: no word-diff spans for unpaired or overlong lines', () => {
@@ -287,14 +287,14 @@ describe('DiffDisplay class polish', () => {
       { type: 'del', content: 'gone', oldNo: 1, newNo: null },
       { type: 'ctx', content: 'after', oldNo: 2, newNo: 1 },
     ])
-    expect(panes[0]!.querySelector('.bg-diff-del\\/\\[0\\.36\\]')).toBeNull()
-    expect(panes[1]!.querySelector('.bg-diff-add\\/\\[0\\.36\\]')).toBeNull()
+    expect(panes[0]!.querySelector('.diff-del-wd')).toBeNull()
+    expect(panes[1]!.querySelector('.diff-add-wd')).toBeNull()
     panes = panesOf([
       { type: 'del', content: 'short', oldNo: 1, newNo: null },
       { type: 'add', content: 'x'.repeat(2500), oldNo: null, newNo: 1 },
     ])
-    expect(panes[0]!.querySelector('.bg-diff-del\\/\\[0\\.36\\]')).toBeNull()
-    expect(panes[1]!.querySelector('.bg-diff-add\\/\\[0\\.36\\]')).toBeNull()
+    expect(panes[0]!.querySelector('.diff-del-wd')).toBeNull()
+    expect(panes[1]!.querySelector('.diff-add-wd')).toBeNull()
   })
 
   it('split view gives each column its own horizontal scroll pane', () => {

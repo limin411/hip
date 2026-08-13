@@ -135,9 +135,10 @@
   --diff-add-rgb: 47 125 64;
   --diff-del-rgb: 198 59 59;
   /* diff 行底色透明度：浅色底 13%/19% 已是可见浅绿；深底上低 alpha 混合后近黑，
-     深色档提升到 22%/28%（chrome 深色代码块容器同值）。 */
+     深色档提升到 30%/36%（chrome 深色代码块容器同值）；word diff 深色档 45%。 */
   --diff-bg-a: 0.13;
   --diff-hover-a: 0.19;
+  --diff-wd-a: 0.36;
   --on-btn-primary-rgb: 250 250 250;
   --effort-max-rgb: 124 58 237;
   /*
@@ -276,8 +277,9 @@ html[data-platform="linux"] {
   /* diff 专用主色：原型深色板 #4caf50 / #ff5252（changes-diff-clarity spec） */
   --diff-add-rgb: 76 175 80;
   --diff-del-rgb: 255 82 82;
-  --diff-bg-a: 0.22;
-  --diff-hover-a: 0.28;
+  --diff-bg-a: 0.3;
+  --diff-hover-a: 0.36;
+  --diff-wd-a: 0.45;
   --on-btn-primary-rgb: 20 20 20;
   --effort-max-rgb: 167 139 250;
 }
@@ -691,4 +693,10 @@ a:hover {
 }
 .diff-del-bg:hover {
   background: rgb(var(--diff-del-rgb) / var(--diff-hover-a, 0.19));
+}
+.diff-add-wd {
+  background: rgb(var(--diff-add-rgb) / var(--diff-wd-a, 0.36));
+}
+.diff-del-wd {
+  background: rgb(var(--diff-del-rgb) / var(--diff-wd-a, 0.36));
 }

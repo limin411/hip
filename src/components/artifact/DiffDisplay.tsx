@@ -131,7 +131,7 @@ function LineContent({
               key={k}
               className={cn(
                 sp.changed &&
-                  (type === 'add' ? 'bg-diff-add/[0.36] rounded-[2px]' : 'bg-diff-del/[0.36] rounded-[2px]'),
+                  (type === 'add' ? 'diff-add-wd rounded-[2px]' : 'diff-del-wd rounded-[2px]'),
               )}
             >
               {sp.text}
@@ -448,11 +448,8 @@ function SplitCell({
                 boxShadow: chrome
                   ? `inset 0 0 0 1px ${chrome.border}`
                   : 'inset 0 0 0 1px rgb(var(--border-rgb))',
-                ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}),
               }
-            : chrome
-              ? { backgroundColor: chrome.background, color: chrome.text }
-              : undefined
+            : undefined
         }
       >
         <span className="w-full" />
@@ -474,7 +471,8 @@ function SplitCell({
         ...(line.type !== 'ctx'
           ? { boxShadow: lineShadow(line.type, true, chrome), borderLeftColor: railColor(line.type) }
           : {}),
-        ...(chrome ? { backgroundColor: chrome.background, color: chrome.text } : {}),
+        // 行背景交给 pane 容器（chrome 色）+ .diff-*-bg 类：内联纯色背景会盖掉底色类
+        ...(chrome ? { color: chrome.text } : {}),
       }}
     >
       <span
@@ -536,13 +534,19 @@ function SplitHunks({
           <Fragment key={i}>
             <HunkHeader hunk={h} path={path} sessionId={sessionId} chrome={chrome} expandable={expandable} onExpandContext={onExpandContext} />
             <div className="flex">
-              <div className="min-w-0 flex-1 overflow-x-auto">
+              <div
+                className="min-w-0 flex-1 overflow-x-auto"
+                style={chrome ? { backgroundColor: chrome.background } : undefined}
+              >
                 {rows.map((row, j) => (
                   <SplitCell key={j} line={row.left} side="left" chrome={chrome} blockPos={runPos[j]} wdSpans={wdSpans[j]?.del ?? null} />
                 ))}
               </div>
               <div className="w-px shrink-0 bg-border" style={chrome ? { backgroundColor: chrome.border } : undefined} />
-              <div className="min-w-0 flex-1 overflow-x-auto">
+              <div
+                className="min-w-0 flex-1 overflow-x-auto"
+                style={chrome ? { backgroundColor: chrome.background } : undefined}
+              >
                 {rows.map((row, j) => (
                   <SplitCell key={j} line={row.right} side="right" chrome={chrome} blockPos={runPos[j]} wdSpans={wdSpans[j]?.add ?? null} />
                 ))}
@@ -794,8 +798,9 @@ function FileDiff({
                     ...({
                       '--diff-add-rgb': chrome === CODE_BLOCK_CHROME.dark ? '76 175 80' : '47 125 64',
                       '--diff-del-rgb': chrome === CODE_BLOCK_CHROME.dark ? '255 82 82' : '198 59 59',
-                      '--diff-bg-a': chrome === CODE_BLOCK_CHROME.dark ? '0.22' : '0.13',
-                      '--diff-hover-a': chrome === CODE_BLOCK_CHROME.dark ? '0.28' : '0.19',
+                      '--diff-bg-a': chrome === CODE_BLOCK_CHROME.dark ? '0.3' : '0.13',
+                      '--diff-hover-a': chrome === CODE_BLOCK_CHROME.dark ? '0.36' : '0.19',
+                      '--diff-wd-a': chrome === CODE_BLOCK_CHROME.dark ? '0.45' : '0.36',
                     } as React.CSSProperties),
                   }
                 : undefined

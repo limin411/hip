@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compute Use（电脑操控）— 通用设置 · 方案总览</title>
+<style>
+/* ═══════════ 设计令牌（对齐 src/styles/tokens.css）═══════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F6F5F3; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --text-primary:#111111; --text-secondary:#5e5e5e; --text-tertiary:#757575;
+  --accent:#c2410c; --accent-hover:#9a3412; --accent-strong:#7c2d12;
+  --accent-subtle:#f0f0f0; --accent-active:#e6e6e6; --on-accent:#fff;
+  --success:#2f7d40; --danger:#c63b3b; --warning:#b45309;
+  --role-vision:#5bb8f0; --role-ax:#5cb86a; --role-native:#e09a40;
+  --dur-chrome:100ms; --dur-content:120ms; --ease:cubic-bezier(0.2,0,0,1);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+[data-theme="dark"]{
+  --bg-app:#0f0f0f; --bg-subtle:#161616; --bg-muted:#1e1e1e; --bg-content:#141414;
+  --border:#333333; --border-strong:#454545;
+  --text-primary:#f0f0f0; --text-secondary:#b3b3b3; --text-tertiary:#8a8a8a;
+  --accent:#ffb300; --accent-hover:#ffc233; --accent-strong:#ffcc80;
+  --accent-subtle:#222222; --accent-active:#2e2e2e; --on-accent:#111111;
+  --success:#5aad5e; --danger:#e85a5a; --warning:#e6a23c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-app);color:var(--text-primary)}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;font-size:13px;line-height:1.5;padding-bottom:64px}
+button,select,input{font-family:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.mono{font-family:var(--mono)}
+
+/* ═══════════ 顶栏 ═══════════ */
+.topbar{position:sticky;top:0;z-index:80;background:var(--bg-app);border-bottom:1px solid var(--border);padding:10px 0}
+.topbar .row{display:flex;align-items:center;gap:12px}
+.topbar h1{font-size:15.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+.topbar .sub{color:var(--text-tertiary);font-size:11.5px;white-space:nowrap}
+.spacer{flex:1}
+.tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.tabs button{padding:5px 13px;font-size:12px;color:var(--text-secondary);background:var(--bg-subtle)}
+.tabs button + .tabs button{border-left:1px solid var(--border)}
+.tabs button.on{background:var(--accent-subtle);color:var(--text-primary);font-weight:600}
+.theme-btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:7px;padding:5px 11px;font-size:12px;color:var(--text-secondary);transition:all var(--dur-chrome)}
+.theme-btn:hover{background:var(--accent-subtle);color:var(--text-primary)}
+
+/* ═══════════ 要点 strip ═══════════ */
+.points{display:flex;gap:10px;margin:14px auto 12px;flex-wrap:wrap}
+.point{flex:1;min-width:200px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:var(--bg-subtle)}
+.point b{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:650;margin-bottom:3px}
+.point b .n{font-size:9.5px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:1px 5px}
+.point p{font-size:11.5px;color:var(--text-secondary);line-height:1.55}
+.point p code{font-family:var(--mono);font-size:10.5px;background:var(--accent-subtle);border-radius:3px;padding:0 4px;color:var(--text-primary)}
+
+/* ═══════════ 章节 ═══════════ */
+h2.sec{font-size:15px;font-weight:650;letter-spacing:-.01em;margin:36px 0 4px;display:flex;align-items:center;gap:8px}
+h2.sec .tag{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);padding:2px 7px;border-radius:4px;letter-spacing:.04em}
+p.sec-sub{color:var(--text-tertiary);font-size:12px;margin-bottom:14px}
+.card{border:1px solid var(--border);border-radius:10px;background:var(--bg-app);overflow:hidden}
+
+/* ═══════════ 架构图 ═══════════ */
+.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:8px;align-items:stretch;padding:16px}
+.fbox{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--bg-subtle);display:flex;flex-direction:column;gap:4px;min-width:0}
+.fbox.head{background:var(--bg-muted)}
+.fbox .tt{font-size:12px;font-weight:650;display:flex;align-items:center;gap:6px}
+.fbox .tt .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.fbox .d{font-size:11px;color:var(--text-secondary);line-height:1.5}
+.fbox .d code{font-family:var(--mono);font-size:10px;background:var(--accent-subtle);border-radius:3px;padding:0 4px}
+.farrow{align-self:center;color:var(--text-tertiary);font-size:16px;white-space:nowrap}
+.farrow small{display:block;font-size:9px;text-align:center;color:var(--text-tertiary);font-family:var(--mono)}
+.dot-v{background:var(--role-vision)} .dot-a{background:var(--role-ax)} .dot-n{background:var(--role-native)} .dot-g{background:var(--accent)}
+
+/* ═══════════ 设置页原型 ═══════════ */
+.grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:0}
+.pane{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-app)}
+.pane-head{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border);background:var(--bg-subtle)}
+.pane-head .t{font-size:12.5px;font-weight:600;flex:1}
+.pane-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--border)}
+.srow:last-child{border-bottom:0}
+.srow .l{min-width:0;flex:1}
+.srow .lt{font-size:12.5px;font-weight:500;color:var(--text-primary)}
+.srow .ld{font-size:11px;color:var(--text-tertiary);margin-top:1px;line-height:1.45}
+.srow .ld b{color:var(--text-secondary);font-weight:600}
+.srow.off{opacity:.38}
+.srow.off .lt,.srow.off .ld{pointer-events:none}
+
+/* switch（hip Switch 样式） */
+.sw{width:34px;height:20px;border-radius:999px;background:var(--border-strong);position:relative;transition:background var(--dur-chrome);flex-shrink:0}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left var(--dur-chrome) var(--ease);box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.sw.on{background:var(--accent)}
+.sw.on::after{left:16px}
+
+/* select（hip 下拉） */
+.sel{border:1px solid var(--border);background:var(--bg-app);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text-primary);min-width:132px;transition:border-color var(--dur-chrome)}
+.sel:hover{border-color:var(--border-strong)}
+.num{border:1px solid var(--border);background:var(--bg-app);border-radius:6px;padding:4px 8px;font-size:12px;width:64px;font-variant-numeric:tabular-nums}
+.num:focus,.sel:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)}
+
+/* 状态 chip / 权限行 */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;border-radius:6px;padding:2px 8px;border:1px solid var(--border);background:var(--bg-subtle);white-space:nowrap}
+.chip.ok{color:var(--success);border-color:color-mix(in srgb,var(--success) 35%,var(--border))}
+.chip.bad{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,var(--border))}
+.chip.warn{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 35%,var(--border))}
+.chip .i{width:5px;height:5px;border-radius:50%;background:currentColor}
+.mini-btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:6px;padding:3px 9px;font-size:11px;color:var(--text-secondary);transition:all var(--dur-chrome);white-space:nowrap}
+.mini-btn:hover{background:var(--accent-subtle);color:var(--text-primary)}
+
+/* 场景切换 */
+.scenes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.scenes button{border:1px solid var(--border);background:var(--bg-subtle);border-radius:999px;padding:4px 12px;font-size:11.5px;color:var(--text-secondary);transition:all var(--dur-chrome)}
+.scenes button:hover{color:var(--text-primary)}
+.scenes button.on{background:var(--accent-subtle);color:var(--text-primary);border-color:var(--border-strong);font-weight:600}
+
+/* 解析结果条 */
+.resolve{border:1px solid var(--border);border-radius:8px;background:var(--bg-subtle);padding:8px 12px;font-size:11.5px;color:var(--text-secondary);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.resolve b{color:var(--text-primary)}
+.resolve .mode{font-family:var(--mono);font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px}
+.resolve .mode.vision{background:color-mix(in srgb,var(--role-vision) 18%,transparent);color:var(--role-vision);border:1px solid color-mix(in srgb,var(--role-vision) 40%,transparent)}
+.resolve .mode.ax{background:color-mix(in srgb,var(--role-ax) 18%,transparent);color:var(--role-ax);border:1px solid color-mix(in srgb,var(--role-ax) 40%,transparent)}
+.resolve .mode.none{background:var(--bg-muted);color:var(--text-tertiary);border:1px solid var(--border)}
+
+/* ═══════════ 双模式对比 ═══════════ */
+.cmp-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cmp{padding:14px;display:flex;flex-direction:column;gap:10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-app)}
+.cmp .h{display:flex;align-items:center;gap:8px}
+.cmp .h .dot{width:8px;height:8px;border-radius:50%}
+.cmp .h b{font-size:13px}
+.cmp .h .tag2{font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 6px}
+.cmp .h .tag2.v{background:color-mix(in srgb,var(--role-vision) 18%,transparent);color:var(--role-vision)}
+.cmp .h .tag2.a{background:color-mix(in srgb,var(--role-ax) 18%,transparent);color:var(--role-ax)}
+.cmp .req{font-size:11px;color:var(--text-tertiary)}
+.cmp .req b{color:var(--text-secondary)}
+.stepline{display:flex;flex-direction:column;gap:0;position:relative;padding-left:16px}
+.stepline::before{content:"";position:absolute;left:4px;top:8px;bottom:8px;width:1px;background:var(--border)}
+.step{position:relative;padding:4px 0}
+.step::before{content:"";position:absolute;left:-15px;top:9px;width:7px;height:7px;border-radius:50%;background:var(--bg-app);border:2px solid var(--accent)}
+.step .st{font-size:11.5px;font-weight:600}
+.step .sd{font-size:11px;color:var(--text-secondary);line-height:1.5}
+.step .sd code{font-family:var(--mono);font-size:10px;background:var(--accent-subtle);border-radius:3px;padding:0 4px}
+.screen-mock{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg-app)}
+.screen-mock .bar{height:22px;background:var(--bg-subtle);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 8px;gap:5px}
+.screen-mock .bar i{width:7px;height:7px;border-radius:50%}
+.screen-mock .bar i:nth-child(1){background:#ff5f57}.screen-mock .bar i:nth-child(2){background:#febc2e}.screen-mock .bar i:nth-child(3){background:#28c840}
+.screen-mock .body{padding:10px;display:flex;flex-direction:column;gap:6px}
+.btnm{height:22px;border-radius:5px;border:1px solid var(--border);background:var(--bg-subtle);display:flex;align-items:center;padding:0 8px;font-size:10.5px;color:var(--text-secondary)}
+.btnm.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.inm{height:22px;border-radius:5px;border:1px solid var(--border);background:var(--bg-app);padding:0 8px;font-size:10.5px;color:var(--text-tertiary);display:flex;align-items:center}
+.som-n{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-size:8.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff}
+.ax-tree{font-family:var(--mono);font-size:10px;line-height:1.7;color:var(--text-secondary);background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:8px 10px;overflow-x:auto;white-space:pre}
+.ax-tree .hl{color:var(--accent);font-weight:700}
+.ax-tree .dim{color:var(--text-tertiary)}
+
+/* ═══════════ 审批弹窗 ═══════════ */
+.modal-card{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-app);max-width:400px;box-shadow:0 8px 30px rgba(15,15,15,.18)}
+.modal-card .mh{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.modal-card .mh .k{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:2px 6px}
+.modal-card .mh b{font-size:12.5px;flex:1}
+.modal-card .mb{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.actline{font-family:var(--mono);font-size:11px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text-primary)}
+.warnline{font-size:11px;color:var(--warning);display:flex;gap:6px;align-items:flex-start;line-height:1.5}
+.warnline svg{flex-shrink:0;margin-top:1px}
+.modal-card .mf{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);justify-content:flex-end}
+.btn2{border-radius:6px;padding:5px 12px;font-size:12px;border:1px solid var(--border);background:var(--bg-subtle);color:var(--text-secondary);transition:all var(--dur-chrome)}
+.btn2:hover{background:var(--accent-subtle);color:var(--text-primary)}
+.btn2.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn2.primary:hover{background:var(--accent-hover)}
+.btn2.danger{color:var(--danger)}
+.modal-demo{display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px}
+.trigger-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.feedback{font-size:11.5px;color:var(--text-secondary);min-height:18px;text-align:center}
+.feedback b{color:var(--text-primary)}
+
+/* ═══════════ 门控矩阵 ═══════════ */
+table.mx{width:100%;border-collapse:collapse;font-size:12px}
+table.mx th{background:var(--bg-subtle);border-bottom:1px solid var(--border);padding:7px 10px;text-align:left;font-size:11px;color:var(--text-tertiary);font-weight:600}
+table.mx td{border-bottom:1px solid var(--border);padding:7px 10px;color:var(--text-secondary)}
+table.mx td code{font-family:var(--mono);font-size:10.5px;background:var(--accent-subtle);border-radius:3px;padding:0 4px;color:var(--text-primary)}
+table.mx tr:last-child td{border-bottom:0}
+table.mx td .y{color:var(--success);font-weight:600}
+table.mx td .n{color:var(--danger)}
+table.mx td .m{color:var(--warning)}
+
+/* ═══════════ 阶段时间线 ═══════════ */
+.road{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.phase{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--bg-subtle);display:flex;flex-direction:column;gap:6px;position:relative}
+.phase .ph{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:1px 6px;align-self:flex-start}
+.phase b{font-size:12px}
+.phase ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.phase li{font-size:10.5px;color:var(--text-secondary);line-height:1.45;padding-left:10px;position:relative}
+.phase li::before{content:"–";position:absolute;left:0;color:var(--text-tertiary)}
+.phase .deps{font-size:10px;color:var(--text-tertiary);border-top:1px dashed var(--border);padding-top:5px;margin-top:auto}
+
+.footer{text-align:center;color:var(--text-tertiary);font-size:11px;margin-top:44px;line-height:1.8}
+.footer a{color:var(--accent);text-decoration:none}
+.footer a:hover{text-decoration:underline}
+kbd{font-family:var(--mono);font-size:10px;background:var(--bg-muted);border:1px solid var(--border);border-radius:4px;padding:0 4px}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap row">
+  <h1>Compute Use（电脑操控）</h1><span class="sub">通用设置 · 方案总览 · 仅承诺 macOS / Windows</span>
+  <div class="spacer"></div>
+  <div class="tabs" id="navtabs">
+    <button data-scroll="sec-flow" class="on">架构</button>
+    <button data-scroll="sec-settings">设置页</button>
+    <button data-scroll="sec-modes">双模式</button>
+    <button data-scroll="sec-approve">审批</button>
+    <button data-scroll="sec-gate">门控</button>
+    <button data-scroll="sec-road">计划</button>
+  </div>
+  <button class="theme-btn" id="themeBtn">暗色</button>
+</div></div>
+
+<div class="wrap">
+
+  <!-- 要点 -->
+  <div class="points">
+    <div class="point"><b><span class="n">决策 1</span>双感知模式</b>
+      <p>模型不一定有多模态能力：<code>vision</code>（截图坐标）与 <code>accessibility</code>（AX/UIA 文本树 + element_id）双路径，<code>auto</code> 自动降级。</p></div>
+    <div class="point"><b><span class="n">决策 2</span>原生执行通道</b>
+      <p>截图/输入注入放 Rust（xcap + enigo），sidecar 经 UI 桥触发 —— 复用 <code>terminal_exec</code> 桥接模式，macOS TCC 权限绑定 app 本体。</p></div>
+    <div class="point"><b><span class="n">决策 3</span>安全基线</b>
+      <p>锁屏拒绝执行；输入动作 HITL 审批；截图不落盘不进 DB；执行期徽标 + <kbd>Esc</kbd> 中断。</p></div>
+    <div class="point"><b><span class="n">决策 4</span>平台承诺</b>
+      <p>v1 仅 <b>macOS + Windows</b>；其他平台设置页显示「暂不支持」，工具不注入。</p></div>
+  </div>
+
+  <!-- ════════ 架构 ════════ -->
+  <h2 class="sec" id="sec-flow"><span class="tag">01</span>执行架构：一个请求的旅程</h2>
+  <p class="sec-sub">对齐 <code>terminal_exec</code> 桥接模式；sidecar 只做协议翻译，原生能力全部收口在 Rust。</p>
+  <div class="card flow">
+    <div class="fbox head"><span class="tt"><span class="dot dot-v"></span>Agent 模型</span><div class="d">调用 <code>computer</code> 工具<br>（Anthropic <code>computer_20250124</code> 词汇表子集）</div></div>
+    <div class="farrow">→<small>tool call</small></div>
+    <div class="fbox head"><span class="tt"><span class="dot dot-g"></span>sidecar 工具层</span><div class="d">schema 校验 · 步数上限<br>只读动作直通 / 输入动作 HITL<br><code>bridge.send + waitForUi</code></div></div>
+    <div class="farrow">→<small>session:computerUse:request</small></div>
+    <div class="fbox head"><span class="tt"><span class="dot dot-g"></span>UI 桥</span><div class="d">审批弹窗（<code>kind:'input'</code>）<br><code>invoke('computer_use_*')</code><br>超时取消（截图 5s / 输入 15s）</div></div>
+    <div class="farrow">→<small>tauri invoke</small></div>
+    <div class="fbox head"><span class="tt"><span class="dot dot-n"></span>Rust 原生层</span><div class="d">锁屏校验 · 权限校验<br>xcap 截图（排除 hip 窗口）<br>CGEvent/enigo 输入注入</div></div>
+  </div>
+
+  <!-- ════════ 设置页原型 ════════ -->
+  <h2 class="sec" id="sec-settings"><span class="tag">02</span>通用设置 · Compute Use 区块（交互原型）</h2>
+  <p class="sec-sub">切换场景观察能力解析与降级提示；所有控件可交互，落盘走 <code>updateSection('computerUse', …)</code> → hip.toml <code>[computerUse]</code>。</p>
+
+  <div class="scenes" id="scenes">
+    <button data-scene="vision" class="on">场景 A · 多模态模型</button>
+    <button data-scene="text">场景 B · 文本模型</button>
+    <button data-scene="unknown">场景 C · 能力未知（自定义 provider）</button>
+    <button data-scene="noperm">场景 D · macOS 权限缺失</button>
+    <button data-scene="linux">场景 E · 非支持平台</button>
+  </div>
+
+  <div class="grid2" style="display:grid;gap:14px">
+    <!-- 设置面板 -->
+    <div class="pane">
+      <div class="pane-head"><span class="t">设置 · General</span><span class="chip" id="permChip">…</span></div>
+      <div class="pane-body">
+
+        <div class="srow" id="row-enabled">
+          <div class="l"><div class="lt">启用 Compute Use</div><div class="ld">开启后，Agent 可截图、控制鼠标键盘（<b>经审批</b>）。默认关闭。</div></div>
+          <button class="sw on" id="swEnabled" aria-label="启用"></button>
+        </div>
+
+        <div class="srow">
+          <div class="l"><div class="lt">感知模式</div><div class="ld" id="modeDesc">当前模型 vision：<b id="visionState">是</b> · 生效模式：<b id="effectiveMode">vision</b><span id="degradeNote"></span></div></div>
+          <select class="sel" id="selMode">
+            <option value="auto" selected>auto（自动）</option>
+            <option value="vision">vision（截图坐标）</option>
+            <option value="accessibility">accessibility（AX 树）</option>
+          </select>
+        </div>
+
+        <div class="srow">
+          <div class="l"><div class="lt">输入动作审批</div><div class="ld">ask：每个动作确认 · askOnce：每回合一次 · auto：仅 plan 模式软审批。</div></div>
+          <select class="sel" id="selApproval">
+            <option value="ask" selected>ask（每动作）</option>
+            <option value="askOnce">askOnce（每回合）</option>
+            <option value="auto">auto</option>
+          </select>
+        </div>
+
+        <div class="srow" id="row-perms">
+          <div class="l">
+            <div class="lt">系统权限</div>
+            <div class="ld" id="permDesc"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+            <span class="chip" id="permScreen">屏幕录制</span>
+            <span class="chip" id="permInput">辅助功能</span>
+          </div>
+        </div>
+
+        <div class="srow">
+          <div class="l"><div class="lt">锁屏时允许执行</div><div class="ld">默认<b>关</b>（对齐 codex <code>allow_locked_computer_use=false</code> 基线）。</div></div>
+          <button class="sw" id="swLocked" aria-label="锁屏允许"></button>
+        </div>
+
+        <div class="srow">
+          <div class="l"><div class="lt">每回合动作上限</div><div class="ld">防死循环硬上限（clamp 1–100，默认 20）。</div></div>
+          <input class="num" type="number" id="numSteps" value="20" min="1" max="100">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 解析结果 -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="pane">
+        <div class="pane-head"><span class="t">能力解析 <span class="mono" style="font-weight:400;color:var(--text-tertiary)">resolveComputeUseMode()</span></span></div>
+        <div class="pane-body">
+          <div class="resolve" id="resolveBar"><span>未初始化</span></div>
+          <div class="ld" style="font-size:11px;color:var(--text-tertiary);line-height:1.6" id="resolveReason"></div>
+          <div style="font-size:11px;color:var(--text-tertiary);border-top:1px dashed var(--border);padding-top:8px;line-height:1.6">
+            信号源：models.dev <code class="mono">attachment</code>（与附件按钮同一信号）→ 用户显式 <code class="mono">mode</code> 覆盖 → 未知则保守降级。<br>
+            与 <code class="mono">attachmentEligibility.ts</code> 共用「当前模型 / 任一启用 agent」多模态判定，不新造第二套检测。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="pane-head"><span class="t">Composer 工具入口门控</span></div>
+        <div class="pane-body">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="chip" id="toolChip">computer 已注入</span>
+            <span style="font-size:11px;color:var(--text-tertiary)" id="toolNote"></span>
+          </div>
+          <div style="font-size:11px;color:var(--text-tertiary);line-height:1.6">
+            不可用时按钮禁用 + tooltip 给出原因（<code class="mono">disabled / no-multimodal-model / platform-unsupported / no-permission</code>）；工具不存在 = 模型不可见，避免幻觉调用。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="pane-head"><span class="t">hip.toml 落盘（实时镜像）</span></div>
+        <div class="ax-tree" id="tomlMirror"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 双模式 ════════ -->
+  <h2 class="sec" id="sec-modes"><span class="tag">03</span>双感知模式：同一条工具，两条感知路径</h2>
+  <p class="sec-sub">模型动作词汇表完全一致（Anthropic 协议）；只有「看」的部分随能力切换 —— 这是本方案对「模型不一定有多模态能力」的核心答案。</p>
+  <div class="cmp-pair">
+    <div class="cmp">
+      <div class="h"><span class="dot" style="background:var(--role-vision)"></span><b>vision 模式</b><span class="tag2 v">需多模态模型</span></div>
+      <div class="req">要求：catalog <code class="mono">attachment=true</code>，或用户显式指定 <code class="mono">mode=vision</code></div>
+      <div class="screen-mock" style="position:relative">
+        <div class="bar"><i></i><i></i><i></i><span class="mono" style="font-size:9px;color:var(--text-tertiary);margin-left:4px">display 1280×800 · PNG</span></div>
+        <div class="body">
+          <div style="display:flex;gap:6px;align-items:center">
+            <div class="inm" style="flex:1">名称</div>
+            <div class="btnm" style="width:64px">搜索</div>
+          </div>
+          <div class="btnm primary" style="position:relative">提交申请 <span class="som-n" style="top:-6px;right:-6px">7</span></div>
+        </div>
+      </div>
+      <div class="stepline">
+        <div class="step"><div class="st">1 · screenshot</div><div class="sd">返回截图（PNG base64，长边 1280），随消息图像内容块进上下文。</div></div>
+        <div class="step"><div class="st">2 · left_click</div><div class="sd">模型按 <code>display_width_px/height_px</code> 基准输出 <code>coordinate:[x,y]</code>（可选 SoM 标注 v1.5）。</div></div>
+        <div class="step"><div class="st">3 · screenshot 验证</div><div class="sd">动作后回读截图验证效果 —— 每次动作都是对上一帧的假设检验。</div></div>
+      </div>
+    </div>
+    <div class="cmp">
+      <div class="h"><span class="dot" style="background:var(--role-ax)"></span><b>accessibility 模式</b><span class="tag2 a">任何文本模型</span></div>
+      <div class="req">触发：模型无视觉能力 / 能力未知 / 用户显式 <code class="mono">mode=accessibility</code>（auto 降级时 UI 明示）</div>
+      <div class="ax-tree">[1] AXWindow "设置" focused
+[2] AXTextField "搜索" role=textfield
+[3] AXButton "通用" enabled
+<span class="hl">[4] AXButton "提交" enabled</span>
+[5] AXStaticText "已选中 2 项"
+<span class="dim">— 树截断：深度/节点上限 200，超限提示重截 —</span></div>
+      <div class="stepline">
+        <div class="step"><div class="st">1 · screenshot</div><div class="sd">返回<b>文本快照</b>而非图像：前台应用 AX/UIA 树带索引行。</div></div>
+        <div class="step"><div class="st">2 · left_click</div><div class="sd">动作带 <code>element_id:"4"</code>：由树查屏幕矩形 → 原生派发；<code>type</code> 优先 AX/UIA 直接赋值。</div></div>
+        <div class="step"><div class="st">3 · 验证线索</div><div class="sd">动作结果自动附状态线索：<code>(focused window changed: "设置")</code> / <code>(no change detected)</code> —— 没有截图也能判断状态变化。</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 审批 ════════ -->
+  <h2 class="sec" id="sec-approve"><span class="tag">04</span>HITL 审批弹窗（原型）</h2>
+  <p class="sec-sub">复用现有 PermissionRequestPayload 渲染，新增 <code>kind:'input'</code>；点击动作卡片模拟一次审批流。</p>
+  <div class="card modal-demo">
+    <div class="trigger-row">
+      <button class="mini-btn" data-act="left_click">computer · left_click [512,340]</button>
+      <button class="mini-btn" data-act="type">computer · type "Hello"</button>
+      <button class="mini-btn" data-act="key">computer · key "cmd+s"</button>
+      <button class="mini-btn" data-act="screenshot">computer · screenshot（只读）</button>
+    </div>
+
+    <div class="modal-card" id="approveModal" style="display:none">
+      <div class="mh"><span class="k">input · computer</span><b id="mTitle">left_click</b><span class="chip warn">需审批</span></div>
+      <div class="mb">
+        <div class="actline" id="mAction"></div>
+        <div class="warnline">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <span>该动作将注入真实鼠标/键盘事件；如触发 <b>screenshot</b>，当前屏幕内容将发送给模型（仅内存往返，不落盘）。</span>
+        </div>
+      </div>
+      <div class="mf">
+        <button class="btn2 danger" id="btnReject">拒绝</button>
+        <button class="btn2" id="btnAlways">本次会话允许</button>
+        <button class="btn2 primary" id="btnOnce">允许一次</button>
+      </div>
+    </div>
+    <div class="feedback" id="approveFeedback"></div>
+  </div>
+
+  <!-- ════════ 门控矩阵 ════════ -->
+  <h2 class="sec" id="sec-gate"><span class="tag">05</span>动作 × 审批矩阵 · 工具注入门控</h2>
+  <p class="sec-sub">只读动作永不审批；<code>askOnce</code> 按回合记忆（同 <code>isApproved</code> 机制）；<code>maxStepsPerTurn</code> 为硬上限。</p>
+  <div class="card" style="padding:6px 14px 10px">
+    <table class="mx">
+      <tr><th>action</th><th>类型</th><th>ask</th><th>askOnce</th><th>auto</th><th>锁屏</th></tr>
+      <tr><td><code>screenshot</code> / <code>cursor_position</code> / <code>wait</code></td><td>只读</td><td class="n">免审</td><td class="n">免审</td><td class="n">免审</td><td class="n">拒绝</td></tr>
+      <tr><td><code>mouse_move</code></td><td>低危</td><td><span class="y">审批</span></td><td><span class="m">回合首审</span></td><td class="n">免审</td><td class="n">拒绝</td></tr>
+      <tr><td><code>left_click</code> / <code>right_click</code> / <code>double_click</code> / <code>scroll</code> / <code>left_click_drag</code></td><td>中危</td><td><span class="y">审批</span></td><td><span class="m">回合首审</span></td><td class="n">免审</td><td class="n">拒绝</td></tr>
+      <tr><td><code>type</code> / <code>key</code></td><td>高危</td><td><span class="y">审批</span></td><td><span class="m">回合首审</span></td><td class="n">免审</td><td class="n">拒绝</td></tr>
+    </table>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+    <div class="point" style="min-width:220px"><b><span class="n">门控</span>工具注入条件</b>
+      <p><code class="mono">resolveComputeUseMode(...).available</code> = 配置开启 ∧ 平台 macOS/Windows ∧ 权限就绪 ∧ 模式可解析 —— 任一不满足则 <code>computer</code> 工具不注册。</p></div>
+    <div class="point" style="min-width:220px"><b><span class="n">防线</span>三道兜底</b>
+      <p>① 锁屏拒绝（<code>locked</code> 错误码）；② 回合步数上限；③ <kbd>Esc</kbd> 中断（AbortController 透传，同 stop 语义）。</p></div>
+    <div class="point" style="min-width:220px"><b><span class="n">隐私</span>数据边界</b>
+      <p>截图仅内存往返：不进 sessions DB、不进附件表；历史回放显示「[截图] computer screenshot 1200×800」占位文本。</p></div>
+  </div>
+
+  <!-- ════════ 计划 ════════ -->
+  <h2 class="sec" id="sec-road"><span class="tag">06</span>分阶段落地（P0–P4，每 PR 独立可合）</h2>
+  <p class="sec-sub">详细文件级任务见 <a href="computer-use-plan.md" style="color:var(--accent)">computer-use-plan.md</a>；P0 先行，P1/P2/P3 可并行，P4 收尾。</p>
+  <div class="road">
+    <div class="phase"><span class="ph">P0</span><b>原生层 + 配置</b><ul>
+      <li><code>computer_use.rs</code>：xcap 截图 / enigo + CGEvent 输入 / 锁屏与权限校验（仅 macOS/Windows 实现）</li>
+      <li>hip.toml <code>[computerUse]</code> 分区 + resolver + 契约测试</li>
+      <li>permissions 命令 + capabilities 白名单</li></ul><div class="deps">依赖：—</div></div>
+    <div class="phase"><span class="ph">P1</span><b>vision 路径</b><ul>
+      <li>sidecar <code>computer</code> 工具（11 action 子集）</li>
+      <li><code>session:computerUse:*</code> 桥接消息对</li>
+      <li>HITL <code>kind:'input'</code> + 审批三态</li></ul><div class="deps">依赖：P0</div></div>
+    <div class="phase"><span class="ph">P2</span><b>accessibility 路径</b><ul>
+      <li>Rust AX/UIA 树快照（≤200 节点）</li>
+      <li><code>element_id</code> 动作 + 直接赋值 typing</li>
+      <li>动作后验证线索</li></ul><div class="deps">依赖：P0</div></div>
+    <div class="phase"><span class="ph">P3</span><b>设置 UI + E2E</b><ul>
+      <li><code>computeUseEligibility</code> 纯函数（复用 attachment 信号）</li>
+      <li>GeneralSettings 新区块 + i18n 五语言</li>
+      <li>Composer 入口门控 + E2E</li></ul><div class="deps">依赖：P0（可与 P1/P2 并行）</div></div>
+    <div class="phase"><span class="ph">P4</span><b>加固</b><ul>
+      <li>锁屏状态展示 / Windows 排除自身窗口</li>
+      <li>运行中徽标 + Esc 中断</li>
+      <li>dogfood + SoM 预研（v1.5 输入）</li></ul><div class="deps">依赖：P1/P2</div></div>
+  </div>
+
+  <div class="footer">
+    配套文档：<a href="computer-use-spec.md">computer-use-spec.md</a> · <a href="computer-use-plan.md">computer-use-plan.md</a><br>
+    参考：Anthropic Computer Use tool · UI-TARS-desktop · hermes-agent（som/vision/ax 三模式）· Touchpoint（no-vision）· codex（allow_locked_computer_use）<br>
+    设计令牌对齐 <code>src/styles/tokens.css</code>；本页为方案总览原型，非最终产品界面。
+  </div>
+
+</div>
+
+<script>
+/* ── 主题 ── */
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  themeBtn.textContent = next === 'light' ? '暗色' : '亮色';
+});
+
+/* ── 导航 ── */
+document.getElementById('navtabs').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-scroll]');
+  if (!b) return;
+  document.querySelectorAll('#navtabs button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.getElementById(b.dataset.scroll).scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+/* ── 状态模型 ── */
+const S = {
+  enabled: true,
+  mode: 'auto',          // auto | vision | accessibility
+  approval: 'ask',
+  allowLocked: false,
+  maxSteps: 20,
+  scene: 'vision',       // vision | text | unknown | noperm | linux
+  perms: { screen: true, input: true },
+};
+
+function sceneModel(scene) {
+  // { platform, vision, screen, input }
+  switch (scene) {
+    case 'vision':  return { platform: 'macos',   vision: true,  screen: true,  input: true };
+    case 'text':    return { platform: 'macos',   vision: false, screen: true,  input: true };
+    case 'unknown': return { platform: 'macos',   vision: null,  screen: true,  input: true };
+    case 'noperm':  return { platform: 'macos',   vision: true,  screen: false, input: true };
+    case 'linux':   return { platform: 'linux',   vision: true,  screen: true,  input: true };
+  }
+}
+
+function resolve(scene, mode, enabled, perms) {
+  const m = sceneModel(scene);
+  if (!enabled) return { available: false, mode: 'none', degraded: false, reason: '配置未开启（disabled）', detail: 'composer 入口禁用：settings → computerUse.enabled = false' };
+  if (m.platform !== 'macos' && m.platform !== 'windows') return { available: false, mode: 'none', degraded: false, reason: '平台暂不支持（platform-unsupported）', detail: 'v1 仅承诺 macOS / Windows；工具不注入，设置页显示「暂不支持」' };
+  if (!m.screen) return { available: false, mode: 'none', degraded: false, reason: '权限缺失（no-permission）', detail: 'macOS 屏幕录制未授权 → 打开系统设置深链引导；Windows 无需授权' };
+  const effective = mode === 'auto' ? (m.vision === true ? 'vision' : 'accessibility') : mode;
+  const degraded = mode === 'auto' && m.vision !== true;
+  return {
+    available: true, mode: effective, degraded,
+    reason: degraded ? `auto 降级：模型 ${m.vision === null ? '视觉能力未知（自定义 provider 无 catalog 元数据）' : '无视觉能力'} → accessibility` : 'vision：模型多模态（catalog attachment=true）',
+    detail: degraded ? '文本快照 + element_id 路径；任何文本模型可用。用户可显式 mode=vision 覆盖（失败由模型侧报错可见）。' : '截图坐标路径；schema 注入 display_width_px/height_px 作为坐标基准。',
+  };
+}
+
+/* ── 渲染 ── */
+const $ = (id) => document.getElementById(id);
+
+function render() {
+  const r = resolve(S.scene, S.mode, S.enabled, S.perms);
+  const m = sceneModel(S.scene);
+
+  // 开关与行禁用
+  $('swEnabled').classList.toggle('on', S.enabled);
+  document.querySelectorAll('#row-enabled ~ .srow').forEach(row => {
+    row.classList.toggle('off', !S.enabled);
+  });
+
+  // 权限行（仅 macOS 显示）
+  const permRows = $('row-perms');
+  const isMac = m.platform === 'macos';
+  permRows.style.display = S.enabled && isMac ? '' : 'none';
+  $('permScreen').className = 'chip ' + (m.screen ? 'ok' : 'bad');
+  $('permScreen').innerHTML = '<span class="i"></span>' + (m.screen ? '屏幕录制 · 已授权' : '屏幕录制 · 未授权');
+  $('permInput').className = 'chip ' + (m.input ? 'ok' : 'bad');
+  $('permInput').innerHTML = '<span class="i"></span>' + (m.input ? '辅助功能 · 已授权' : '辅助功能 · 未授权');
+
+  // 顶部权限 chip
+  const pc = $('permChip');
+  if (!S.enabled) { pc.className = 'chip'; pc.textContent = '未启用'; }
+  else if (m.platform !== 'macos' && m.platform !== 'windows') { pc.className = 'chip warn'; pc.textContent = '平台暂不支持'; }
+  else if (!m.screen) { pc.className = 'chip bad'; pc.textContent = '权限缺失'; }
+  else { pc.className = 'chip ok'; pc.textContent = '就绪'; }
+
+  // 模式说明
+  const vs = m.vision === true ? '是' : m.vision === false ? '否' : '未知';
+  $('visionState').textContent = vs;
+  $('effectiveMode').textContent = r.mode === 'none' ? '—' : r.mode;
+  $('degradeNote').textContent = r.degraded ? '（已降级）' : '';
+
+  // 解析条
+  const bar = $('resolveBar');
+  bar.innerHTML = r.available
+    ? `状态 <b>available</b> · 生效模式 <span class="mode ${r.mode}">${r.mode}</span> ${r.degraded ? '· 已降级' : ''}`
+    : `状态 <b style="color:var(--danger)">unavailable</b> · <span class="mode none">工具不注入</span>`;
+  $('resolveReason').textContent = r.reason + ' — ' + r.detail;
+
+  // 工具 chip
+  $('toolChip').className = 'chip ' + (r.available ? 'ok' : 'bad');
+  $('toolChip').textContent = r.available ? 'computer 已注入会话工具集' : 'computer 未注入';
+  $('toolNote').textContent = r.available ? '' : '（模型不可见，避免幻觉调用）';
+
+  // toml 镜像
+  $('tomlMirror').innerHTML =
+    `[computerUse]
+enabled = ${S.enabled}
+mode = "${S.mode}"
+approval = "${S.approval}"
+allowLockedScreen = ${S.allowLocked}
+maxStepsPerTurn = ${S.maxSteps}`;
+
+  // 场景按钮
+  document.querySelectorAll('#scenes button').forEach(b => b.classList.toggle('on', b.dataset.scene === S.scene));
+}
+
+/* ── 交互绑定 ── */
+$('swEnabled').addEventListener('click', () => { S.enabled = !S.enabled; render(); });
+$('selMode').addEventListener('change', (e) => { S.mode = e.target.value; render(); });
+$('selApproval').addEventListener('change', (e) => { S.approval = e.target.value; render(); });
+$('swLocked').addEventListener('click', () => { S.allowLocked = !S.allowLocked; render(); });
+$('numSteps').addEventListener('change', (e) => { S.maxSteps = Math.min(100, Math.max(1, Number(e.target.value) || 20)); e.target.value = S.maxSteps; render(); });
+document.getElementById('scenes').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-scene]');
+  if (!b) return;
+  S.scene = b.dataset.scene;
+  const m = sceneModel(S.scene);
+  S.perms = { screen: m.screen, input: m.input };
+  // 场景 A/C/D/E 默认 auto；B 自动切到 auto 演示降级
+  S.mode = 'auto';
+  $('selMode').value = 'auto';
+  render();
+});
+
+/* ── 审批弹窗 ── */
+const acts = {
+  left_click:  { title: 'left_click', line: 'action:"left_click"  coordinate:[512,340]', modal: true },
+  type:        { title: 'type',       line: 'action:"type"  text:"Hello"',             modal: true },
+  key:         { title: 'key',        line: 'action:"key"  text:"cmd+s"',              modal: true },
+  screenshot:  { title: 'screenshot', line: 'action:"screenshot"（只读 · 免审直通）',   modal: false },
+};
+document.querySelectorAll('[data-act]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const a = acts[btn.dataset.act];
+    $('mTitle').textContent = a.title;
+    $('mAction').textContent = a.line;
+    $('approveFeedback').textContent = '';
+    if (a.modal) { $('approveModal').style.display = ''; $('approveFeedback').textContent = '等待用户决策…'; }
+    else { $('approveModal').style.display = 'none'; $('approveFeedback').innerHTML = '<b>screenshot</b> 只读动作，直接经桥接执行，无需审批。'; }
+  });
+});
+function decide(label) {
+  $('approveModal').style.display = 'none';
+  $('approveFeedback').innerHTML = `已<b>${label}</b> → 桥接 <code class="mono">session:computerUse:request</code> → Rust 执行 → 结果回传工具。`;
+}
+$('btnOnce').addEventListener('click', () => decide('允许一次'));
+$('btnAlways').addEventListener('click', () => decide('本次会话允许'));
+$('btnReject').addEventListener('click', () => { $('approveModal').style.display = 'none'; $('approveFeedback').innerHTML = '已<b style="color:var(--danger)">拒绝</b> → 工具返回 rejected，模型被告知动作未执行。'; });
+
+render();
+</script>
+</body>
+</html>

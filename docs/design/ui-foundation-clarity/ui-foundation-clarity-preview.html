@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>hip 基础视觉整改 · 高保真对照预览（层次 / 对比 / 焦点 / 动效）</title>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   hip 令牌（与 src/styles/tokens.css 对齐的预览子集）
+   左侧「现状」= 当前 Flat Solid；右侧「提案」= ui-foundation-clarity spec
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F6F5F3; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --ink:#111111; --ink-2:#5e5e5e; --ink-3:#757575;
+  --accent:#c2410c; --accent-hover:#9a3412; --accent-strong:#7c2d12;
+  --accent-subtle:#f0f0f0; --accent-active:#e6e6e6;
+  --on-accent:#ffffff; --btn-primary:#3a3a3a; --btn-primary-hover:#2e2e2e;
+  --success:#2f7d40; --danger:#c63b3b; --warning:#9a5d10;
+  --dur-chrome:100ms; --dur-content:120ms; --dur-panel:220ms;
+  --ease:cubic-bezier(.2,0,0,1);
+  --font:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Consolas,monospace;
+}
+html.dark{
+  --bg-app:#0f0f0f; --bg-subtle:#161616; --bg-muted:#1e1e1e; --bg-content:#141414;
+  --border:#333333; --border-strong:#454545;
+  --ink:#f0f0f0; --ink-2:#b3b3b3; --ink-3:#8a8a8a;
+  --accent:#ffb300; --accent-hover:#ffc233; --accent-strong:#ffcc80;
+  --accent-subtle:#222222; --accent-active:#2e2e2e;
+  --on-accent:#111111; --btn-primary:#e0e0e0; --btn-primary-hover:#ececec;
+  --success:#5aad5e; --danger:#e85a5a; --warning:#e6a23c;
+}
+/* ── 提案专用覆盖（仅 .after 面板作用域，不污染「现状」） ── */
+.scope-after{
+  /* P0-1 亮色 hover/选中 */
+  --after-hover:#dfdfdf; --after-active:#d3d3d3;
+  /* P0-3 tertiary */
+  --after-ink-3:#6a6a6a;
+  /* P1-1 brand CTA */
+  --after-btn:#c2410c;
+  /* P0-2 暗色提案 */
+  --after-app:#101010; --after-subtle:#1c1c1c; --after-content:#161616; --after-muted:#262626;
+  --after-border:#3a3a3a; --after-border-strong:#4d4d4d;
+  --after-hover-dark:#2f2f2f; --after-active-dark:#3d3d3d;
+  --after-btn-dark:#ffb300;
+}
+html.dark .scope-after{
+  --after-btn:#ffb300;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);font-size:13px;line-height:1.7;color:var(--ink);background:var(--bg-app);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.mono{font-family:var(--mono)}.tabular{font-variant-numeric:tabular-nums}
+
+/* ── 预览页 chrome ─────────────────────────────────────── */
+.hero{padding:32px 40px 16px;max-width:1180px;margin:0 auto}
+.hero h1{font-size:20px;line-height:1.3;margin:0 0 4px}
+.hero .sub{color:var(--ink-2);font-size:13px;max-width:760px}
+.hero .tags{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.tag{font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);color:var(--ink-2);background:var(--bg-subtle)}
+.tag.new{border-color:var(--accent);color:var(--accent)}
+.legend{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--ink-3);flex-wrap:wrap}
+.legend b{color:var(--ink-2);font-weight:500}
+.theme-btn{position:fixed;top:18px;right:24px;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-subtle);color:var(--ink-2);transition:background-color var(--dur-chrome),color var(--dur-chrome)}
+.theme-btn:hover{background:var(--accent-subtle);color:var(--ink)}
+
+/* ── 对照面板 ─────────────────────────────────────────── */
+section.cmp{max-width:1180px;margin:28px auto 0;padding:0 40px}
+.cmp-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.cmp-head h2{font-size:15px;margin:0}
+.cmp-head .n{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.cmp-head .ref{font-size:11px;color:var(--ink-3);margin-left:auto}
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.panel{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-app);display:flex;flex-direction:column}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--bg-subtle);font-size:12px;color:var(--ink-2);font-weight:500}
+.panel-head .st{font-size:10px;padding:1px 7px;border-radius:6px;font-weight:500}
+.st-before{background:var(--bg-muted);color:var(--ink-3)}
+.st-after{background:var(--accent);color:var(--on-accent)}
+.panel-body{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:200px;background:var(--bg-app)}
+.panel-body.centered{justify-content:center}
+.play-row{display:flex;align-items:center;gap:10px;margin:8px 0 0;padding:0 40px;max-width:1180px}
+.play-btn{height:28px;padding:0 14px;border-radius:6px;background:var(--btn-primary);color:var(--bg-app);font-size:12px;font-weight:500;transition:background-color var(--dur-chrome)}
+html.dark .play-btn{color:var(--on-accent)}
+.play-btn:hover{filter:brightness(1.12)}
+.note{font-size:11px;color:var(--ink-3);margin-left:auto}
+.kv{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.sw{width:14px;height:14px;border-radius:4px;border:1px solid var(--border);flex-shrink:0}
+
+/* ═══════════ S1 侧栏行 hover / 选中 ═══════════ */
+.side-mock{width:260px;border:1px solid var(--border);border-radius:10px;background:var(--bg-subtle);padding:8px;display:flex;flex-direction:column;gap:4px}
+.side-row{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:8px;color:var(--ink-2);font-size:13px;transition:background-color var(--dur-chrome)}
+.side-row .ic{width:14px;height:14px;border-radius:4px;background:var(--ink-3);opacity:.5;flex-shrink:0}
+.side-row .cnt{margin-left:auto;font-size:11px;color:var(--ink-3)}
+/* 现状 */
+.side-row.hover-before:hover{background:var(--accent-subtle)}
+.side-row.active-before{background:var(--accent-subtle);color:var(--ink)}
+.side-row.active-before2{background:var(--accent-active);color:var(--ink)}
+/* 提案（作用域变量） */
+.scope-after .side-row.hover-after:hover{background:var(--after-hover,var(--after-hover-dark))}
+html.dark .scope-after .side-row.hover-after:hover{background:var(--after-hover-dark)}
+.scope-after .side-row.active-after{background:var(--after-active,var(--after-active-dark));color:var(--ink)}
+html.dark .scope-after .side-row.active-after{background:var(--after-active-dark)}
+.row-cap{font-size:11px;color:var(--ink-3);margin:2px 0 0}
+.ratio-badge{display:inline-block;margin-left:6px;padding:0 6px;border-radius:6px;font-family:var(--mono);font-size:10px;font-weight:500}
+.ok{background:color-mix(in srgb,var(--success) 14%,transparent);color:var(--success)}
+.bad{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger)}
+
+/* ═══════════ S2 焦点环 ═══════════ */
+.field{display:block;width:100%;height:36px;border:1px solid var(--border);border-radius:6px;background:var(--bg-app);padding:0 12px;font-size:13px;color:var(--ink);font-family:var(--font)}
+.field::placeholder{color:var(--ink-3)}
+.field.focus-before:focus-visible{outline:none}
+.scope-after .field.focus-after:focus-visible{outline:none;box-shadow:0 0 0 2px rgb(var(--ink-rgb,17 17 17)/.25)}
+html.dark .scope-after .field.focus-after:focus-visible{box-shadow:0 0 0 2px rgb(240 240 240/.25)}
+.ghost-ic{width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-2)}
+.ghost-ic:focus-visible{outline:none;box-shadow:0 0 0 2px rgb(var(--ink-rgb,17 17 17)/.2)}
+html.dark .ghost-ic:focus-visible{box-shadow:0 0 0 2px rgb(240 240 240/.2)}
+
+/* ═══════════ S3 暗色表面阶差 ═══════════ */
+.stack{display:flex;flex-direction:column;gap:6px;width:100%}
+.layer{display:flex;align-items:center;gap:8px;border-radius:8px;padding:10px 12px;font-size:12px}
+.layer .lb{font-family:var(--mono);font-size:11px;opacity:.85}
+.layer .rt{margin-left:auto;font-family:var(--mono);font-size:10px;opacity:.7}
+
+/* ═══════════ S4 文字对比度 ═══════════ */
+.ink-sample{display:flex;align-items:center;gap:10px;border-radius:8px;padding:8px 12px;font-size:12px}
+.ink-sample .rt{margin-left:auto;font-family:var(--mono);font-size:10px}
+.ink-sample small{display:block;font-size:11px;opacity:.85}
+
+/* ═══════════ S5 品牌 CTA ═══════════ */
+.cta-row{display:flex;align-items:center;gap:10px}
+.btn-cta{height:28px;padding:0 14px;border-radius:6px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:background-color var(--dur-chrome)}
+.btn-gray{background:var(--btn-primary);color:var(--bg-app)}
+html.dark .btn-gray{color:var(--on-accent)}
+.btn-gray:hover{background:var(--btn-primary-hover)}
+.scope-after .btn-brand{background:var(--after-btn);color:#fff}
+html.dark .scope-after .btn-brand{background:var(--after-btn);color:#111}
+.scope-after .btn-brand:hover{filter:brightness(1.08)}
+.composer-mock{border:1px solid var(--border);border-radius:10px;background:var(--bg-subtle);padding:10px;display:flex;flex-direction:column;gap:8px}
+.composer-mock .in{height:24px;border-radius:6px;background:transparent;font-size:13px;color:var(--ink)}
+.send{width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto}
+.send svg{width:14px;height:14px}
+
+/* ═══════════ S6 右栏抽屉 ═══════════ */
+.app-mock{display:flex;height:150px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-app)}
+.app-main{flex:1;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:11px;background:var(--bg-content)}
+.app-rail{background:var(--bg-subtle);border-left:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:11px;overflow:hidden}
+.rail-instant{width:0;transition:none}
+.rail-instant.on{width:34%}
+.scope-after .rail-anim{width:0;transition:flex-basis var(--dur-panel) var(--ease)}
+.rail-anim-inner{flex:0 0 0;transition:flex-basis var(--dur-panel) var(--ease);min-width:0}
+.rail-anim-inner.on{flex-basis:34%}
+.rail-anim.on2{width:34%}
+
+/* ═══════════ S7 主题切换原子化 ═══════════ */
+.theme-strip{display:flex;gap:6px;align-items:center}
+.tp{width:64px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px}
+.tp-mixed{transition:none}
+.tp-uniform{transition:background-color .12s var(--ease),color .12s var(--ease)}
+html[data-theme-switching] .tp-uniform,.tp-uniform.uniform-all{transition:background-color .12s var(--ease),color .12s var(--ease)!important}
+html[data-theme-switching] .tp-mixed.uniform-all{transition:background-color .12s var(--ease),color .12s var(--ease)!important}
+
+/* ═══════════ S8 布局 ═══════════ */
+.layout-mock{display:flex;gap:8px;align-items:flex-end}
+.win{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-app)}
+.win .bar{height:22px;background:var(--bg-subtle);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 8px;font-size:10px;color:var(--ink-3)}
+.win .body{display:flex;height:70px}
+.win .side{background:var(--bg-subtle);border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--ink-3);font-family:var(--mono)}
+.win .main{flex:1;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-3);background:var(--bg-content)}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border);padding:8px 0;font-size:12px}
+.settings-row .ctl{width:96px;height:24px;border:1px solid var(--border);border-radius:6px;flex-shrink:0}
+
+/* ═══════════ 令牌对照表 ═══════════ */
+table.tokens{width:100%;border-collapse:collapse;font-size:12px}
+table.tokens th{text-align:left;padding:6px 10px;border-bottom:1px solid var(--border-strong);color:var(--ink-2);font-weight:500;font-size:11px}
+table.tokens td{padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+table.tokens .tok{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+table.tokens .ratio{font-family:var(--mono);font-size:11px}
+footer{margin:40px auto 60px;max-width:1180px;padding:0 40px;font-size:11px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+
+<button class="theme-btn" id="themeBtn">亮 / 暗主题</button>
+
+<div class="hero">
+  <h1>基础视觉整改 · 对照预览</h1>
+  <p class="sub">系列 <span class="mono">ui-foundation-clarity</span> —— 修复 hover/选中不可见、暗色阶差失守、键盘焦点缺口、tertiary 不达 AA、品牌 CTA 缺席、右栏开合生硬、主题切换混合帧。左侧「现状」= 当前 token;右侧「提案」= spec 裁决值。所有对比度由页面内 WCAG 计算器实时生成。</p>
+  <div class="tags">
+    <span class="tag new">P0-1 hover/选中</span><span class="tag new">P0-2 暗色表面</span><span class="tag new">P0-3 tertiary AA</span><span class="tag new">P0-4 焦点环</span>
+    <span class="tag new">P1-1 brand CTA</span><span class="tag new">P1-2 右栏动画</span><span class="tag new">P1-3 主题原子化</span><span class="tag">P2 布局</span>
+  </div>
+  <div class="legend"><b>规则</b> hover ≥ 1.2:1 ｜ 选中 vs hover ≥ 1.1:1 ｜ 11–13px 文字 vs 任意面 ≥ 4.5:1 ｜ 每屏至多 1 个 brand CTA</div>
+</div>
+
+<!-- ═══════════ S1 hover / 选中 ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>S1 侧栏行 hover 与选中可见性</h2><span class="n">P0-1</span><span class="ref">tokens.css: --accent-subtle / --accent-active（悬停行试试）</span></div>
+  <div class="cmp-grid">
+    <div class="panel">
+      <div class="panel-head">现状 <span class="st st-before">#f0f0f0 / #e6e6e6</span></div>
+      <div class="panel-body centered">
+        <div class="side-mock">
+          <div class="side-row hover-before"><span class="ic"></span>悬停这一行<span class="cnt">3</span></div>
+          <div class="side-row active-before"><span class="ic"></span>当前会话(选中)<span class="cnt">1</span></div>
+          <div class="side-row"><span class="ic"></span>普通行对照<span class="cnt">2</span></div>
+        </div>
+        <div class="row-cap">hover vs 侧栏底 <b class="mono" data-ratio="f0f0f0|F6F5F3"></b> <span data-aa="f0f0f0|F6F5F3|hover"></span> · 选中 vs 侧栏底 <b class="mono" data-ratio="e6e6e6|F6F5F3"></b></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">提案 <span class="st st-after">#dfdfdf / #d3d3d3</span></div>
+      <div class="panel-body centered scope-after">
+        <div class="side-mock">
+          <div class="side-row hover-after"><span class="ic"></span>悬停这一行<span class="cnt">3</span></div>
+          <div class="side-row active-after"><span class="ic"></span>当前会话(选中)<span class="cnt">1</span></div>
+          <div class="side-row"><span class="ic"></span>普通行对照<span class="cnt">2</span></div>
+        </div>
+        <div class="row-cap">hover vs 侧栏底 <b class="mono" data-ratio="dfdfdf|F6F5F3"></b> <span data-aa="dfdfdf|F6F5F3|hover"></span> · 选中 vs hover <b class="mono" data-ratio="d3d3d3|dfdfdf"></b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ S2 焦点环 ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>S2 文本输入键盘焦点</h2><span class="n">P0-4</span><span class="ref">focusClasses.ts: focusField（点进输入框 / Tab 走查）</span></div>
+  <div class="cmp-grid">
+    <div class="panel">
+      <div class="panel-head">现状 <span class="st st-before">outline:none,无 ring</span></div>
+      <div class="panel-body centered">
+        <input class="field focus-before" placeholder="Tab 聚焦我 —— 看不到任何焦点指示"/>
+        <div class="row-cap">唯一的反馈是卡片边框 #e0e0e0→#c9c9c9（1.32→1.66:1，几乎无感）</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">提案 <span class="st st-after">ring-ink/25 2px</span></div>
+      <div class="panel-body centered scope-after">
+        <input class="field focus-after" placeholder="Tab 聚焦我 —— 灰色 2px ring 可见"/>
+        <div class="row-cap">中性灰 ring，与 focusChrome 同族；不触犯 ring-accent 门禁（T2 裁决）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ S3 暗色表面 ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>S3 暗色表面阶差与层级方向</h2><span class="n">P0-2</span><span class="ref">.dark 四层表面（切换右上角主题查看）</span></div>
+  <div class="cmp-grid">
+    <div class="panel">
+      <div class="panel-head">现状 <span class="st st-before">1.04–1.06:1</span></div>
+      <div class="panel-body">
+        <div class="stack" id="darkBefore"></div>
+        <div class="row-cap">主列(#141414)比侧栏(#161616)还暗 —— 层级方向反向，四层糊成一片</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">提案 <span class="st st-after">app &lt; content &lt; subtle &lt; muted</span></div>
+      <div class="panel-body">
+        <div class="stack" id="darkAfter"></div>
+        <div class="row-cap">主列介于 app 与侧栏之间；边框对比度 1.52→~1.25 修复分层</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ S4 文字对比度 ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>S4 三级文字对比度（tertiary）</h2><span class="n">P0-3</span><span class="ref">--text-tertiary: 时间戳 / 状态行 / 占位符 / 工具行</span></div>
+  <div class="cmp-grid">
+    <div class="panel">
+      <div class="panel-head">现状 <span class="st st-before">#757575</span></div>
+      <div class="panel-body">
+        <div class="ink-sample" style="background:#ffffff"><span style="color:#757575">12px 元信息 · 白底</span><span class="rt" data-ratio="757575|ffffff"></span></div>
+        <div class="ink-sample" style="background:#F6F5F3"><span style="color:#757575">12px 元信息 · 侧栏底</span><span class="rt" data-ratio="757575|F6F5F3"></span></div>
+        <div class="ink-sample" style="background:#f1f1f1"><span style="color:#757575">11px 标签 · muted 底</span><span class="rt" data-ratio="757575|f1f1f1"></span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">提案 <span class="st st-after">#6a6a6a</span></div>
+      <div class="panel-body">
+        <div class="ink-sample" style="background:#ffffff"><span style="color:#6a6a6a">12px 元信息 · 白底</span><span class="rt" data-ratio="6a6a6a|ffffff"></span></div>
+        <div class="ink-sample" style="background:#F6F5F3"><span style="color:#6a6a6a">12px 元信息 · 侧栏底</span><span class="rt" data-ratio="6a6a6a|F6F5F3"></span></div>
+        <div class="ink-sample" style="background:#f1f1f1"><span style="color:#6a6a6a">11px 标签 · muted 底</span><span class="rt" data-ratio="6a6a6a|f1f1f1"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ S5 品牌 CTA ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>S5 品牌 CTA（发送按钮）</h2><span class="n">P1-1</span><span class="ref">Button 新增 brand 变体；每屏至多 1 个</span></div>
+  <div class="cmp-grid">
+    <div class="panel">
+      <div class="panel-head">现状 <span class="st st-before">软黑 #3a3a3a</span></div>
+      <div class="panel-body centered">
+        <div class="composer-mock">
+          <div class="in">给 hip 发消息…</div>
+          <div class="cta-row">
+            <span class="kv"><span class="sw" style="background:#c2410c"></span>品牌橙仅在小圆点</span>
+            <button class="send btn-gray"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          </div>
+        </div>
+        <div class="row-cap">发送与停止、其他主按钮零区别，产品无识别度</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">提案 <span class="st st-after">brand 橙实底</span></div>
+      <div class="panel-body centered scope-after">
+        <div class="composer-mock">
+          <div class="in">给 hip 发消息…</div>
+          <div class="cta-row">
+            <span class="kv"><span class="sw" style="background:var(--accent)"></span>唯一 accent 实底 = 主 CTA</span>
+            <button class="send btn-brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          </div>
+        </div>
+        <div class="row-cap">暗色下 accent #ffb300 + 近黑字，对比自动达标</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ S6 右栏抽屉 ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>S6 右栏抽屉开合</h2><span class="n">P1-2</span><span class="ref">动效例外③：--duration-panel 220ms 宽度过渡</span></div>
+  <div class="cmp-grid">
+    <div class="panel">
+      <div class="panel-head">现状 <span class="st st-before">instant</span></div>
+      <div class="panel-body centered">
+        <div class="app-mock">
+          <div class="app-main">主列</div>
+          <div class="app-rail rail-instant" id="railBefore">右栏</div>
+        </div>
+        <div class="play-row" style="padding:0;margin:0"><button class="play-btn" id="railBeforeBtn">切换右栏</button><span class="note">窗口先变宽 + 面板闪现</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">提案 <span class="st st-after">220ms 宽度过渡</span></div>
+      <div class="panel-body centered scope-after">
+        <div class="app-mock">
+          <div class="app-main">主列</div>
+          <div class="rail-anim-inner" id="railAfter"><div class="app-rail rail-anim" style="width:100%">右栏</div></div>
+        </div>
+        <div class="play-row" style="padding:0;margin:0"><button class="play-btn" id="railAfterBtn">切换右栏</button><span class="note">内容随宽度展开淡入</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ S7 主题切换原子化 ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>S7 主题切换（快切无混合帧）</h2><span class="n">P1-3</span><span class="ref">ThemeProvider: data-theme-switching 150ms 全局统一过渡</span></div>
+  <div class="cmp-grid">
+    <div class="panel">
+      <div class="panel-head">现状 <span class="st st-before">部分渐变</span></div>
+      <div class="panel-body centered">
+        <div class="theme-strip" id="stripBefore"></div>
+        <div class="row-cap">带 transition 的表面渐变、不带的面瞬切 —— 同一帧半亮半暗</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">提案 <span class="st st-after">全局同步 120ms</span></div>
+      <div class="panel-body centered">
+        <div class="theme-strip" id="stripAfter"></div>
+        <div class="row-cap">切换期所有表面统一 transition，无混合中间帧</div>
+      </div>
+    </div>
+  </div>
+  <div class="play-row"><button class="play-btn" id="themePlay">在本节局部切换主题</button><span class="note">注意右栏提案所有色块同步渐变</span></div>
+</section>
+
+<!-- ═══════════ S8 布局 ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>S8 布局修整（侧栏宽 / 设置页行宽）</h2><span class="n">P2</span><span class="ref">sidebarWidth.ts 300→280；SettingsPanel max-w 880</span></div>
+  <div class="cmp-grid">
+    <div class="panel">
+      <div class="panel-head">现状 <span class="st st-before">300px / 无 max-w</span></div>
+      <div class="panel-body">
+        <div class="layout-mock">
+          <div class="win" style="width:300px"><div class="bar">侧栏 300px</div><div class="body"><div class="side" style="width:76px">300</div><div class="main">主列被挤占</div></div></div>
+          <div class="win" style="flex:1"><div class="bar">设置页 1600px 窗口</div><div class="body" style="flex-direction:column;height:auto;padding:8px">
+            <div class="settings-row" style="width:100%"><span>语言</span><span class="ctl"></span></div>
+            <div class="settings-row" style="width:100%"><span>界面密度</span><span class="ctl"></span></div>
+          </div></div>
+        </div>
+        <div class="row-cap">行宽拉满：标签最左、控件最右，中间 1000px+ 空白</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">提案 <span class="st st-after">280px / max-w 880</span></div>
+      <div class="panel-body">
+        <div class="layout-mock">
+          <div class="win" style="width:284px"><div class="bar">侧栏 280px</div><div class="body"><div class="side" style="width:71px">280</div><div class="main">主列 +20px</div></div></div>
+          <div class="win" style="flex:1"><div class="bar">设置页 max-w 880</div><div class="body" style="flex-direction:column;height:auto;padding:8px;align-items:center">
+            <div class="settings-row" style="width:100%;max-width:880px"><span>语言</span><span class="ctl"></span></div>
+            <div class="settings-row" style="width:100%;max-width:880px"><span>界面密度</span><span class="ctl"></span></div>
+          </div></div>
+        </div>
+        <div class="row-cap">行宽钳制 880px，扫视线不再被拉断</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 令牌对照表 ═══════════ -->
+<section class="cmp">
+  <div class="cmp-head"><h2>令牌对照表（含对比度）</h2><span class="n">spec §3–§9</span></div>
+  <div class="panel">
+    <div class="panel-body" style="padding:0 12px 12px">
+      <table class="tokens">
+        <thead><tr><th>token</th><th>现状</th><th>提案</th><th>对比度(vs 面)</th><th>说明</th></tr></thead>
+        <tbody id="tokenRows"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  ui-foundation-clarity-preview · 与 src/styles/tokens.css 对齐的预览子集 · 对比度由页面内 WCAG 相对亮度公式实时计算 · 全部交互仅影响预览页,不改动产品代码
+</footer>
+
+<script>
+function $(id){ return document.getElementById(id) }
+
+/* ── WCAG 对比度 ── */
+function lum(hex){
+  hex = hex.replace('#','')
+  if (hex.length === 3) hex = hex.split('').map(function(c){return c+c}).join('')
+  var n = parseInt(hex,16), r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255
+  function f(c){ return c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4) }
+  return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b)
+}
+function contrast(a,b){
+  var la=lum(a), lb=lum(b), hi=Math.max(la,lb), lo=Math.min(la,lb)
+  return (hi+0.05)/(lo+0.05)
+}
+
+/* 填入所有 data-ratio 读数 */
+document.querySelectorAll('[data-ratio]').forEach(function(el){
+  var pair = el.dataset.ratio.split('|')
+  var r = contrast(pair[0], pair[1])
+  el.textContent = r.toFixed(2) + ':1'
+  el.style.color = pair[0] === 'e6e6e6' ? '' : (r >= 4.5 ? 'var(--success)' : 'var(--danger)')
+})
+
+/* S4 的 AA 判定徽章 */
+document.querySelectorAll('[data-aa]').forEach(function(el){
+  var parts = el.dataset.aa.split('|')
+  var r = contrast(parts[0], parts[1])
+  var pass = parts[2] === 'hover' ? r >= 1.2 : r >= 4.5
+  el.innerHTML = '<span class="ratio-badge ' + (pass ? 'ok' : 'bad') + '">' +
+    (parts[2] === 'hover' ? (r>=1.2?'≥1.2 可见':'<1.2 不可见') : (pass?'AA':'不达 AA')) + '</span>'
+  el.style.display = 'inline-block'
+})
+
+/* ── S3 暗色表面色卡 ── */
+function darkStack(el, app, subtle, content, muted, border, hover, active, label){
+  var rows = [
+    ['bg-app   ' + app, app, null],
+    ['bg-content '+content, content, app],
+    ['bg-subtle '+subtle, subtle, app],
+    ['bg-muted  '+muted, muted, app],
+    ['border    '+border, app, null, border],
+    ['hover     '+hover, hover, subtle],
+    ['active    '+active, active, subtle]
+  ]
+  var html = ''
+  rows.forEach(function(r){
+    var bg = r[1], vs = r[2], bd = r[3]
+    var cr = vs ? contrast(bg, vs) : null
+    html += '<div class="layer" style="background:'+bg+';color:#e8e8e8'+(bd?';border:1px solid '+bd:'')+'">'+
+      '<span class="lb">'+label+''+r[0]+'</span>'+
+      '<span class="rt">'+(cr ? 'vs app '+cr.toFixed(2)+':1' : '—')+'</span></div>'
+  })
+  el.innerHTML = html
+}
+darkStack($('darkBefore'), '#0f0f0f','#161616','#141414','#1e1e1e','#333333','#222222','#2e2e2e','')
+darkStack($('darkAfter'),  '#101010','#1c1c1c','#161616','#262626','#3a3a3a','#2f2f2f','#3d3d3d','')
+
+/* ── S6 右栏动画 ── */
+var railB = $('railBefore'), railA = $('railAfter')
+$('railBeforeBtn').addEventListener('click', function(){ railB.classList.toggle('on') })
+$('railAfterBtn').addEventListener('click', function(){ railA.classList.toggle('on') })
+
+/* ── S7 主题条 ── */
+function themeStrip(el, uniform){
+  var colors = ['var(--bg-app)','var(--bg-subtle)','var(--bg-muted)','var(--border)','var(--accent)','var(--ink)']
+  el.innerHTML = ''
+  colors.forEach(function(c, i){
+    var d = document.createElement('div')
+    d.className = 'tp ' + (uniform ? 'tp-uniform' : (i===0?'tp-mixed':'tp-uniform'))
+    d.style.background = c
+    d.style.color = (i===5) ? 'var(--bg-app)' : 'transparent'
+    d.textContent = uniform ? 'U' : (i===0?'无':'U')
+    el.appendChild(d)
+  })
+}
+themeStrip($('stripBefore'), false)
+themeStrip($('stripAfter'), true)
+var themePlaying = false
+$('themePlay').addEventListener('click', function(){
+  themePlaying = !themePlaying
+  // 局部主题:只切换 S7 色块的实际颜色
+  var palettes = themePlaying
+    ? ['#0f0f0f','#161616','#1e1e1e','#333333','#ffb300','#f0f0f0']
+    : ['#ffffff','#F6F5F3','#f1f1f1','#e0e0e0','#c2410c','#111111']
+  ;['stripBefore','stripAfter'].forEach(function(id){
+    var nodes = $(id).children
+    for (var i=0;i<nodes.length;i++){
+      nodes[i].style.background = palettes[i]
+      nodes[i].style.color = i===5 ? (themePlaying?'#f0f0f0':'#111111') : 'transparent'
+      if (id==='stripBefore' && i===0){
+        nodes[i].style.transition = 'none'   // 现状:第一个面无 transition → 瞬切
+      }
+    }
+  })
+})
+
+/* ── 全局主题 ── */
+$('themeBtn').addEventListener('click', function(){
+  var dark = document.documentElement.classList.toggle('dark')
+  try{ localStorage.setItem('fc-preview-theme', dark?'dark':'light') }catch(e){}
+})
+try{
+  if (localStorage.getItem('fc-preview-theme') === 'dark') document.documentElement.classList.add('dark')
+}catch(e){}
+
+/* ── 令牌对照表 ── */
+var TOKENS = [
+  ['--accent-subtle(亮)','#f0f0f0','#dfdfdf','vs 白 1.33 ｜ vs 侧栏 1.22','hover 底'],
+  ['--accent-active(亮)','#e6e6e6','#d3d3d3','vs 白 1.50 ｜ vs hover 1.12','选中底'],
+  ['--text-tertiary(亮)','#757575','#6a6a6a','5.41 / 4.96 / 4.79','全表面 AA'],
+  ['--bg-app(暗)','#0f0f0f','#101010','—','基面'],
+  ['--bg-content(暗)','#141414','#161616','vs app 1.05','主列介于中间'],
+  ['--bg-subtle(暗)','#161616','#1c1c1c','vs app 1.12','侧栏比主列亮'],
+  ['--bg-muted(暗)','#1e1e1e','#262626','vs app 1.26','气泡/代码容器'],
+  ['--border(暗)','#333333','#3a3a3a','vs app 1.67','边框可见'],
+  ['--border-strong(暗)','#454545','#4d4d4d','vs app 2.25','输入外框'],
+  ['--accent-subtle(暗)','#222222','#2f2f2f','vs app 1.42','hover(GitHub 级)'],
+  ['--accent-active(暗)','#2e2e2e','#3d3d3d','vs app 1.75','选中'],
+  ['Button primary','#3a3a3a','不变','—','36 处不动'],
+  ['Button brand','—','bg-accent / on-accent','亮:橙底白字;暗:#ffb300+近黑','仅发送/空状态 CTA'],
+  ['focusField','outline-none','+ ring-ink/25 2px','—','键盘焦点可见'],
+  ['--duration-panel','—','220ms','—','右栏宽度过渡(例外③)'],
+  ['data-theme-switching','—','150ms 全局过渡','—','主题切换原子化'],
+  ['sidebar default','300px','280px','—','T5 折中'],
+  ['settings body','无 max-w','880px','—','行宽钳制']
+]
+var rowsHtml = ''
+TOKENS.forEach(function(r){
+  var isAdd = r[1]==='—' || r[1]==='不变'
+  rowsHtml += '<tr><td class="tok">'+r[0]+'</td>'+
+    '<td class="mono">'+r[1]+'</td>'+
+    '<td class="mono" style="color:var(--accent)">'+r[2]+'</td>'+
+    '<td class="ratio">'+r[3]+'</td>'+
+    '<td style="color:var(--ink-2)">'+r[4]+'</td></tr>'
+})
+$('tokenRows').innerHTML = rowsHtml
+</script>
+</body>
+</html>

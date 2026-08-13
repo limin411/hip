@@ -25,6 +25,7 @@ export function ChangesView() {
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
   const diffViewMode = useUiStore((s) => s.diffViewMode)
   const diffContext = useUiStore((s) => s.diffContext)
+  const diffGroupByStatus = useUiStore((s) => s.diffGroupByStatus)
   const activeTab = useUiStore((s) => s.activeTab)
   const rootRef = useRef<HTMLDivElement>(null)
   const [focusedPath, setFocusedPath] = useState<string | null>(null)
@@ -291,6 +292,15 @@ export function ChangesView() {
             onSummaryCollapseAll={() => setAllCollapsed(true)}
             onSummaryExpandAll={() => setAllCollapsed(false)}
             onSummaryRefresh={() => sessionService.requestDiff(sessionId)}
+            groupByStatus={diffGroupByStatus}
+            onHunkJump={(p, idx) => {
+              const fileEl = document.getElementById(`diff-file-${p}`)
+              const el = fileEl?.querySelectorAll<HTMLElement>('[data-testid="diff-hunk-header"]')[idx]
+              if (!el) return
+              document.querySelectorAll('.hunk-flash').forEach((n) => n.classList.remove('hunk-flash'))
+              el.classList.add('hunk-flash')
+              el.scrollIntoView({ block: 'nearest' })
+            }}
           />
         )}
       </div>

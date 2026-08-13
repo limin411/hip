@@ -329,6 +329,10 @@ interface UiState {
   diffContext: number | 'full'
   setDiffContext: (c: number | 'full') => void
 
+  /** T17：更改列表按状态（A/M/D/R）分组显示。 */
+  diffGroupByStatus: boolean
+  setDiffGroupByStatus: (v: boolean) => void
+
   ignoreWhitespace: boolean
   setIgnoreWhitespace: (v: boolean) => void
 
@@ -487,6 +491,9 @@ export const useUiStore = create<UiState>()(
 
       diffContext: 'full',
       setDiffContext: (c) => set((s) => (s.diffContext === c ? s : { diffContext: c })),
+
+      diffGroupByStatus: false,
+      setDiffGroupByStatus: (v) => set((s) => (s.diffGroupByStatus === v ? s : { diffGroupByStatus: v })),
 
       ignoreWhitespace: false,
       setIgnoreWhitespace: (v) => set((s) => (s.ignoreWhitespace === v ? s : { ignoreWhitespace: v })),

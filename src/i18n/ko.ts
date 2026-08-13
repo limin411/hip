@@ -636,7 +636,8 @@ export const ko = {
       "hunkLabel": "변경 헝크",
       "rowAdded": "추가된 줄",
       "rowDeleted": "삭제된 줄",
-      "rowContext": "컨텍스트 줄"
+      "rowContext": "컨텍스트 줄",
+      "minimap": "변경 분포"
     },
     "changes": "변경 사항",
     "branch": {
@@ -684,6 +685,7 @@ export const ko = {
       "explainHunk": "agent에게 이 변경 설명 요청",
       "explainHunkPrompt": "이 코드 변경을 설명해 주세요 ({{path}}):\n\n{{text}}",
       "explainInjected": "설명 요청을 입력란에 추가했습니다",
+      "groupByStatus": "상태별 그룹화",
       "panelTooNarrow": "패널이 너무 좁아 분할 보기 불가",
       "backToUncommitted": "커밋되지 않은 변경으로 돌아가기",
       "commitDiffError": "커밋 변경사항을 불러올 수 없음",

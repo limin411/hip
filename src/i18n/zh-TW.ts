@@ -644,6 +644,7 @@ export const zhTW = {
       "rowAdded": "新增列",
       "rowDeleted": "刪除列",
       "rowContext": "上下文列",
+      "minimap": "變更分佈",
     },
     "changes": "更改",
     "branch": {
@@ -691,6 +692,7 @@ export const zhTW = {
       "explainHunk": "請 agent 解釋此變更",
       "explainHunkPrompt": "請解釋以下程式碼變更（{{path}}）：\n\n{{text}}",
       "explainInjected": "解釋請求已填入輸入框",
+      "groupByStatus": "按狀態分組",
       "panelTooNarrow": "面板過窄，無法並排顯示",
       "backToUncommitted": "返回未提交",
       "commitDiffError": "無法載入提交改動",

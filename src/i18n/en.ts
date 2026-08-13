@@ -610,6 +610,7 @@ export const en = {
         rowAdded: 'Added line',
         rowDeleted: 'Deleted line',
         rowContext: 'Context line',
+        minimap: 'Change distribution',
       },
       changes: 'Changes',
       branch: {
@@ -657,6 +658,7 @@ export const en = {
         explainHunk: 'Ask agent to explain this change',
         explainHunkPrompt: 'Explain this code change ({{path}}):\n\n{{text}}',
         explainInjected: 'Explanation request added to the composer',
+        groupByStatus: 'Group by status',
         panelTooNarrow: 'Panel too narrow for split view',
         backToUncommitted: 'Back to uncommitted',
         commitDiffError: 'Could not load commit diff',

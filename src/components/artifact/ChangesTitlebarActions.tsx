@@ -37,6 +37,8 @@ export function ChangesTitlebarActions() {
   const setDiffViewMode = useUiStore((s) => s.setDiffViewMode)
   const diffContext = useUiStore((s) => s.diffContext)
   const setDiffContext = useUiStore((s) => s.setDiffContext)
+  const diffGroupByStatus = useUiStore((s) => s.diffGroupByStatus)
+  const setDiffGroupByStatus = useUiStore((s) => s.setDiffGroupByStatus)
   const ignoreWhitespace = useUiStore((s) => s.ignoreWhitespace)
   const setIgnoreWhitespace = useUiStore((s) => s.setIgnoreWhitespace)
   const running = useDomainStore((s) => {
@@ -298,6 +300,16 @@ export function ChangesTitlebarActions() {
           >
             <span>{t('artifact.changesView.ignoreWhitespace')}</span>
             {ignoreWhitespace ? (
+              <Check size={13} className="shrink-0 text-accent" aria-hidden />
+            ) : null}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setDiffGroupByStatus(!diffGroupByStatus)}
+            data-testid="changes-menu-group-status"
+            className="justify-between gap-4"
+          >
+            <span>{t('artifact.changesView.groupByStatus')}</span>
+            {diffGroupByStatus ? (
               <Check size={13} className="shrink-0 text-accent" aria-hidden />
             ) : null}
           </DropdownMenuItem>

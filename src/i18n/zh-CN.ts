@@ -603,6 +603,7 @@ export const zhCN = {
         rowAdded: '新增行',
         rowDeleted: '删除行',
         rowContext: '上下文行',
+        minimap: '变更分布',
       },
       changes: '更改',
       branch: {
@@ -650,6 +651,7 @@ export const zhCN = {
         explainHunk: '请 agent 解释此改动',
         explainHunkPrompt: '请解释以下代码改动（{{path}}）：\n\n{{text}}',
         explainInjected: '解释请求已填入输入框',
+        groupByStatus: '按状态分组',
         panelTooNarrow: '面板过窄，无法并排显示',
         backToUncommitted: '返回未提交',
         commitDiffError: '无法加载提交改动',

@@ -511,6 +511,15 @@ function SplitHunks({
   )
 }
 
+/** T16：hunk 分布 minimap 色点（add=success / del=danger / 混合=warning）。 */
+function hunkDotColor(h: DiffHunk): string {
+  const adds = h.lines.some((l) => l.type === 'add')
+  const dels = h.lines.some((l) => l.type === 'del')
+  if (adds && dels) return 'rgb(var(--warning-rgb))'
+  if (dels) return 'rgb(var(--danger-rgb))'
+  return 'rgb(var(--success-rgb))'
+}
+
 function FileDiff({
   file,
   expanded,
@@ -533,6 +542,8 @@ function FileDiff({
   onCollapseFull,
   expandable,
   onExpandContext,
+  narrow = false,
+  onHunkJump,
   chrome,
 }: {
   file: DiffFile
@@ -556,6 +567,9 @@ function FileDiff({
   onCollapseFull?: (path: string) => void
   expandable?: boolean
   onExpandContext?: (path: string, dir: 'up' | 'down') => void
+  /** T16：窄面板隐藏 minimap。 */
+  narrow?: boolean
+  onHunkJump?: (path: string, hunkIndex: number) => void
   chrome: CodeBlockChromePalette | null
 }) {
   const { t } = useTranslation()
@@ -563,6 +577,21 @@ function FileDiff({
   const shown = expanded ?? file
   const isExpanded = !!expanded
   const isCollapsed = !!collapsed
+  // T16：长文件（估算 >400 行）且 hunk ≥3 时显示分布 minimap；窄面板隐藏。
+  const estLines =
+    file.hunks.length > 0
+      ? (file.hunks[file.hunks.length - 1]!.newStart ?? 0) +
+        (file.hunks[file.hunks.length - 1]!.newLines ?? 0) -
+        1
+      : 0
+  const showMinimap = !isCollapsed && !narrow && estLines > 400 && file.hunks.length >= 3
+  const minimapHunks = showMinimap
+    ? file.hunks
+        .map((h, i) => ({ h, i }))
+        .filter((_, k) =>
+          file.hunks.length > 16 ? k % Math.ceil(file.hunks.length / 16) === 0 : true,
+        )
+    : []
   return (
     <div id={`diff-file-${file.path}`} className="border-b border-border/80" data-testid="diff-file">
       <DeclarativeContextMenu
@@ -579,6 +608,25 @@ function FileDiff({
         data-testid="diff-file-header"
       >
         {focusedPath === file.path && <div className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-r bg-accent" />}
+        {showMinimap && (
+          <span
+            className="absolute inset-y-1 right-1 flex w-1 flex-col justify-between rounded-full bg-border/40"
+            title={t('artifact.diffView.minimap')}
+            data-testid="diff-minimap"
+          >
+            {minimapHunks.map(({ h, i }) => (
+              <button
+                key={i}
+                type="button"
+                className="h-1 w-full rounded-full"
+                style={{ backgroundColor: hunkDotColor(h) }}
+                title={`@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@`}
+                onClick={() => onHunkJump?.(file.path, i)}
+                data-testid={`diff-minimap-hunk-${i}`}
+              />
+            ))}
+          </span>
+        )}
         <span
           className="flex min-w-0 flex-1 items-center gap-1.5 text-meta leading-none"
           data-expanded={isCollapsed ? 'false' : 'true'}
@@ -920,6 +968,8 @@ export function DiffDisplay({
   onSummaryExpandAll,
   onSummaryRefresh,
   refreshing = false,
+  groupByStatus = false,
+  onHunkJump,
 }: {
   files: DiffFile[]
   summary?: DiffSummary
@@ -959,6 +1009,10 @@ export function DiffDisplay({
   onSummaryCollapseAll?: () => void
   onSummaryExpandAll?: () => void
   onSummaryRefresh?: () => void
+  /** T17：按状态（A/M/D/R）分组显示，组间保持路径排序。 */
+  groupByStatus?: boolean
+  /** T16：minimap 色点点击 → 跳转到该 hunk（flash + 滚动）。 */
+  onHunkJump?: (path: string, hunkIndex: number) => void
 }) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -1007,32 +1061,56 @@ export function DiffDisplay({
           refreshing={refreshing}
         />
       )}
-      {files.map((file, i) => (
-        <FileDiff
-          key={`${file.path}-${i}`}
-          file={file}
-          expanded={expanded?.[file.path]}
-          collapsed={collapsed?.[file.path]}
-          viewMode={viewMode}
-          sessionId={sessionId}
-          cwd={cwd}
-          showFileIcons={showFileIcons}
-          focusedPath={focusedPath}
-          running={running}
-          discardOpenPath={discardOpenPath}
-          discardPending={discardPending}
-          onDiscardOpen={onDiscardOpen}
-          onDiscardConfirm={onDiscardConfirm}
-          onOpenInFiles={onOpenInFiles}
-          onReviewFile={onReviewFile}
-          onCopyPath={onCopyPath}
-          onToggleCollapse={onToggleCollapse}
-          onShowFull={onShowFull}
-          onCollapseFull={onCollapseFull}
-          expandable={canExpandContext?.(file.path) ?? false}
-          onExpandContext={onExpandContext}
-          chrome={chrome}
-        />
+      {/* T17：按状态分组时渲染组头（A/M/D/R），组内保持原顺序 */}
+      {(groupByStatus
+        ? (['added', 'modified', 'deleted', 'renamed'] as const)
+            .map((status) => ({ status, groupFiles: files.filter((f) => f.status === status) }))
+            .filter((g) => g.groupFiles.length > 0)
+        : [{ status: null as DiffFileStatus | null, groupFiles: files }]
+      ).map((g, gi) => (
+        <Fragment key={g.status ?? 'all'}>
+          {g.status && (
+            <div
+              className="flex items-center gap-1.5 bg-surface-muted/40 px-3 py-1 text-caption font-medium text-ink-tertiary"
+              data-testid="diff-group-header"
+            >
+              <span className={cn('rounded-md px-1.5 py-px text-caption font-medium', STATUS_CHIP[g.status].cls)}>
+                {STATUS_CHIP[g.status].letter}
+              </span>
+              {t(STATUS_CHIP[g.status].key)}
+              <span className="tabular-nums">· {g.groupFiles.length}</span>
+            </div>
+          )}
+          {g.groupFiles.map((file, i) => (
+            <FileDiff
+              key={`${file.path}-${gi}-${i}`}
+              file={file}
+              expanded={expanded?.[file.path]}
+              collapsed={collapsed?.[file.path]}
+              viewMode={viewMode}
+              sessionId={sessionId}
+              cwd={cwd}
+              showFileIcons={showFileIcons}
+              focusedPath={focusedPath}
+              running={running}
+              discardOpenPath={discardOpenPath}
+              discardPending={discardPending}
+              onDiscardOpen={onDiscardOpen}
+              onDiscardConfirm={onDiscardConfirm}
+              onOpenInFiles={onOpenInFiles}
+              onReviewFile={onReviewFile}
+              onCopyPath={onCopyPath}
+              onToggleCollapse={onToggleCollapse}
+              onShowFull={onShowFull}
+              onCollapseFull={onCollapseFull}
+              expandable={canExpandContext?.(file.path) ?? false}
+              onExpandContext={onExpandContext}
+              narrow={narrow}
+              onHunkJump={onHunkJump}
+              chrome={chrome}
+            />
+          ))}
+        </Fragment>
       ))}
       {filterQuery && files.length === 0 && (
         <div className="px-3 py-6 text-center text-meta text-ink-tertiary" data-testid="diff-filter-empty">

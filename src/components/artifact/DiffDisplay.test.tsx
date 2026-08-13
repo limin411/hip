@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import type { DiffFile } from '@hip/protocol'
+import type React from 'react'
 import { DiffDisplay } from './DiffDisplay'
 import { clearContextProviders } from '@/components/context-menu'
 import { copyText } from '@/ipc/clipboard'
@@ -28,7 +29,7 @@ vi.mock('react-i18next', async (importOriginal) => {
         }
         // 轻量插值：{{key}} → 值（模板文本带占位符时）
         return vars
-          ? Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(`{{${k}}}`, String(v)), key)
+          ? Object.entries(vars).reduce((s, [k, v]) => s.split(`{{${k}}}`).join(String(v)), key)
           : key
       },
     }),
@@ -515,6 +516,108 @@ describe('DiffDisplay class polish', () => {
       expect.stringContaining('src/b.ts'),
     )
     expect(insertComposerText).toHaveBeenCalledWith(expect.stringContaining('@@ -1,1 +1,1 @@'))
+  })
+
+  it('T16: minimap shows for long multi-hunk expanded files and jumps to hunks', () => {
+    const longFile: DiffFile = {
+      ...file,
+      path: 'src/long.ts',
+      hunks: [
+        { oldStart: 1, oldLines: 2, newStart: 1, newLines: 2, header: '', lines: [
+          { type: 'del', content: 'a', oldNo: 1, newNo: null },
+          { type: 'add', content: 'b', oldNo: null, newNo: 1 },
+        ] },
+        { oldStart: 200, oldLines: 1, newStart: 200, newLines: 1, header: '', lines: [
+          { type: 'add', content: 'c', oldNo: null, newNo: 200 },
+        ] },
+        { oldStart: 500, oldLines: 1, newStart: 500, newLines: 1, header: '', lines: [
+          { type: 'del', content: 'd', oldNo: 500, newNo: null },
+        ] },
+      ],
+    }
+    const onJump = vi.fn()
+    render(
+      <DiffDisplay
+        files={[longFile]}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+        onHunkJump={onJump}
+      />,
+    )
+    // 展开文件：估算 500 行 + 3 hunk → minimap 3 色点
+    const minimap = screen.getByTestId('diff-minimap')
+    expect(minimap.querySelectorAll('button')).toHaveLength(3)
+    const dot = screen.getByTestId('diff-minimap-hunk-1')
+    expect(dot.getAttribute('style')).toContain('rgb(var(--success-rgb))')
+    fireEvent.click(dot)
+    expect(onJump).toHaveBeenCalledWith('src/long.ts', 1)
+  })
+
+  it('T16: minimap hidden when collapsed, short, or narrow', () => {
+    const longFile: DiffFile = {
+      ...file,
+      path: 'src/long.ts',
+      hunks: [
+        { oldStart: 1, oldLines: 2, newStart: 1, newLines: 2, header: '', lines: [
+          { type: 'del', content: 'a', oldNo: 1, newNo: null },
+          { type: 'add', content: 'b', oldNo: null, newNo: 1 },
+        ] },
+        { oldStart: 200, oldLines: 1, newStart: 200, newLines: 1, header: '', lines: [
+          { type: 'add', content: 'c', oldNo: null, newNo: 200 },
+        ] },
+        { oldStart: 500, oldLines: 1, newStart: 500, newLines: 1, header: '', lines: [
+          { type: 'del', content: 'd', oldNo: 500, newNo: null },
+        ] },
+      ],
+    }
+    const renderWith = (extra?: Partial<React.ComponentProps<typeof DiffDisplay>>) =>
+      render(
+        <DiffDisplay
+          files={[longFile]}
+          viewMode="unified"
+          sessionId="s1"
+          onToggleCollapse={() => {}}
+          {...extra}
+        />,
+      )
+    renderWith({ collapsed: { 'src/long.ts': true } })
+    expect(screen.queryByTestId('diff-minimap')).toBeNull()
+    cleanup()
+    renderWith({ narrow: true })
+    expect(screen.queryByTestId('diff-minimap')).toBeNull()
+    cleanup()
+    renderWith({ files: [file] }) // 短文件（1 hunk）
+    expect(screen.queryByTestId('diff-minimap')).toBeNull()
+  })
+
+  it('T17: groupByStatus renders group headers and preserves order within groups', () => {
+    const files: DiffFile[] = [
+      { ...file, path: 'a.ts', status: 'modified' },
+      { ...file, path: 'b.ts', status: 'added' },
+      { ...file, path: 'c.ts', status: 'modified' },
+      { ...file, path: 'd.ts', status: 'deleted' },
+    ]
+    render(
+      <DiffDisplay
+        files={files}
+        viewMode="unified"
+        sessionId="s1"
+        onToggleCollapse={() => {}}
+        groupByStatus
+      />,
+    )
+    const headers = screen.getAllByTestId('diff-group-header')
+    expect(headers).toHaveLength(3) // A / M / D（无 renamed）
+    expect(headers[0]).toHaveTextContent('A')
+    expect(headers[1]).toHaveTextContent('M')
+    // 组内顺序保持；组间 A → M → D
+    const paths = screen.getAllByTestId('diff-file-header').map((h) => h.textContent ?? '')
+    const aIdx = paths.findIndex((p) => p.includes('b.ts'))
+    const mIdx = paths.findIndex((p) => p.includes('a.ts'))
+    const dIdx = paths.findIndex((p) => p.includes('d.ts'))
+    expect(aIdx).toBeLessThan(mIdx)
+    expect(mIdx).toBeLessThan(dIdx)
   })
 
   it('applies code block color to diff code area', () => {

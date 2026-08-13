@@ -421,7 +421,7 @@ export function AppLayout() {
 
           <Panel
             ref={rightPanelRef}
-            defaultSize={26}
+            defaultSize={0}
             minSize={railMinPct}
             maxSize={65}
             collapsible

@@ -134,6 +134,10 @@
      深色档用原型深色板（更亮更饱和的绿/红），不随全局 success/danger 走。 */
   --diff-add-rgb: 47 125 64;
   --diff-del-rgb: 198 59 59;
+  /* diff 行底色透明度：浅色底 13%/19% 已是可见浅绿；深底上低 alpha 混合后近黑，
+     深色档提升到 22%/28%（chrome 深色代码块容器同值）。 */
+  --diff-bg-a: 0.13;
+  --diff-hover-a: 0.19;
   --on-btn-primary-rgb: 250 250 250;
   --effort-max-rgb: 124 58 237;
   /*
@@ -272,6 +276,8 @@ html[data-platform="linux"] {
   /* diff 专用主色：原型深色板 #4caf50 / #ff5252（changes-diff-clarity spec） */
   --diff-add-rgb: 76 175 80;
   --diff-del-rgb: 255 82 82;
+  --diff-bg-a: 0.22;
+  --diff-hover-a: 0.28;
   --on-btn-primary-rgb: 20 20 20;
   --effort-max-rgb: 167 139 250;
 }
@@ -669,4 +675,20 @@ a:hover {
 .hunk-flash {
   background-color: color-mix(in srgb, var(--accent) 20%, transparent) !important;
   transition: background-color 1.2s ease-out !important;
+}
+
+/* changes-diff-clarity T1: diff 变更行底色。alpha 走变量：深底上低 alpha
+   混合后近黑（13% #4caf50 叠 #0d1117 = rgb(21,37,25)），深色档/深色代码块
+   提升到 22%/28%；word diff 36% 在深底可辨，不变。 */
+.diff-add-bg {
+  background: rgb(var(--diff-add-rgb) / var(--diff-bg-a, 0.13));
+}
+.diff-add-bg:hover {
+  background: rgb(var(--diff-add-rgb) / var(--diff-hover-a, 0.19));
+}
+.diff-del-bg {
+  background: rgb(var(--diff-del-rgb) / var(--diff-bg-a, 0.13));
+}
+.diff-del-bg:hover {
+  background: rgb(var(--diff-del-rgb) / var(--diff-hover-a, 0.19));
 }

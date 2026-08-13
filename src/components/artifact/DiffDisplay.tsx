@@ -49,15 +49,13 @@ function DiffFileTypeIcon({ path, size = 14 }: { path: string; size?: number }) 
 /** 变更块内位置：first/mid/last/single（单行块），null = 上下文行。 */
 type BlockPos = 'first' | 'mid' | 'last' | 'single' | null
 
-/** 行级视觉：13% 底色 + hover 19%（T1，对齐预览原型）。色条用 border-left 3px（T1）：
- *  inset shadow 绘制在子元素背景之下，会被行号列底纹遮挡——border 在内容之外不受影响。
- *  所有行（含 ctx）保留 border-l-[3px] 占位，行号列对齐；颜色走内联（--diff-* 变量，随主题/代码块明度覆盖）。 */
+/** 行级视觉：底色 13%（深色档 22%）+ hover（T1，对齐预览原型；alpha 走 --diff-bg-a/--diff-hover-a）。
+ *  色条用 border-left 3px（T1）：inset shadow 绘制在子元素背景之下，会被行号列底纹遮挡——
+ *  border 在内容之外不受影响。所有行（含 ctx）保留 border-l-[3px] 占位，行号列对齐；
+ *  颜色走内联（--diff-* 变量，随主题/代码块明度覆盖）。 */
 function lineStyle(t: DiffLineType, pos: BlockPos = null): string {
   if (t === 'ctx') return 'border-l-[3px] border-transparent'
-  const tint =
-    t === 'add'
-      ? 'bg-diff-add/[0.13] hover:bg-diff-add/[0.19]'
-      : 'bg-diff-del/[0.13] hover:bg-diff-del/[0.19]'
+  const tint = t === 'add' ? 'diff-add-bg' : 'diff-del-bg'
   return cn(tint, 'border-l-[3px]', blockPosCls(pos))
 }
 
@@ -791,10 +789,13 @@ function FileDiff({
                     backgroundColor: chrome.background,
                     borderColor: chrome.border,
                     color: chrome.text,
-                    // diff 主色按代码块明度选档（原型深浅色板），覆盖应用主题档
+                    // diff 主色按代码块明度选档（原型深浅色板），覆盖应用主题档；
+                    // 深色代码块同步提升底色 alpha（深底上 13% 混合后近黑）
                     ...({
                       '--diff-add-rgb': chrome === CODE_BLOCK_CHROME.dark ? '76 175 80' : '47 125 64',
                       '--diff-del-rgb': chrome === CODE_BLOCK_CHROME.dark ? '255 82 82' : '198 59 59',
+                      '--diff-bg-a': chrome === CODE_BLOCK_CHROME.dark ? '0.22' : '0.13',
+                      '--diff-hover-a': chrome === CODE_BLOCK_CHROME.dark ? '0.28' : '0.19',
                     } as React.CSSProperties),
                   }
                 : undefined

@@ -708,14 +708,14 @@ describe('DiffDisplay class polish', () => {
     expect(rows[0]!.className).not.toMatch(/bg-(success|danger|diff)/)
     expect(rows[0]!.style.boxShadow).toBe('')
     // del 行：13% 底色 + 左侧 3px 主色色条（border，不被行号列遮挡）+ 块首圆角/间距
-    expect(rows[1]!.className).toContain('bg-diff-del/[0.13]')
+    expect(rows[1]!.className).toContain('diff-del-bg')
     expect(rows[1]!.className).toContain('border-l-[3px]')
     expect(rows[1]!.style.borderLeftColor).toBe('rgb(var(--diff-del-rgb))')
     expect(rows[1]!.className).toContain('rounded-t-[6px]')
     expect(rows[1]!.className).toContain('mt-[3px]')
     expect(rows[1]!.style.boxShadow).toBe('inset 0 0 0 1px rgb(var(--diff-del-rgb) / 0.24)')
     // add 行：success 侧 + 块末圆角/间距
-    expect(rows[2]!.className).toContain('bg-diff-add/[0.13]')
+    expect(rows[2]!.className).toContain('diff-add-bg')
     expect(rows[2]!.style.borderLeftColor).toBe('rgb(var(--diff-add-rgb))')
     expect(rows[2]!.className).toContain('rounded-b-[6px]')
     expect(rows[2]!.className).toContain('mb-[3px]')

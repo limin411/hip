@@ -111,7 +111,7 @@ jobs:
           name: hip-macos-${{ steps.collect.outputs.triple }}
           path: dist-ci/macos/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 14
 
   package-windows:
     name: package-windows
@@ -197,4 +197,73 @@ jobs:
           name: hip-windows-${{ steps.collect.outputs.triple }}
           path: dist-ci/windows/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 14
+
+  # Tag-only: attach the platform installers to a GitHub Release.
+  publish-release:
+    name: publish-release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [package-macos, package-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hip-*
+          path: artifacts
+
+      - name: Stage assets and notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-release
+          find artifacts -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.tar.gz' \) -print -exec cp -v {} dist-release/ \;
+          ls -lh dist-release/
+          count="$(find dist-release -type f | wc -l | tr -d ' ')"
+          if [ "${count}" -lt 2 ]; then
+            echo "error: expected macOS + Windows assets, found ${count}" >&2
+            find artifacts -type f -print >&2 || true
+            exit 1
+          fi
+          (cd dist-release && sha256sum * > SHA256SUMS.txt)
+          cat dist-release/SHA256SUMS.txt
+
+          tag="${GITHUB_REF_NAME}"
+          ver="${tag#v}"
+          python3 - "${ver}" <<'PY'
+          import pathlib, re, sys
+          ver = sys.argv[1]
+          text = pathlib.Path("CHANGELOG.md").read_text()
+          m = re.search(rf"^## \[{re.escape(ver)}\].*?(?=^## |\Z)", text, re.M | re.S)
+          body = m.group(0).strip() if m else f"hip v{ver}"
+          warning = (
+              "> **Packaging:** GitHub Actions built these installers on this tag. "
+              "macOS CI builds are **unsigned** (`HIP_SKIP_SIGN=1`); Gatekeeper may block the app "
+              "until you allow it in System Settings → Privacy & Security. "
+              "Windows SmartScreen may warn on the unsigned NSIS installer.\n\n"
+          )
+          pathlib.Path("release-notes.md").write_text(warning + body + "\n")
+          PY
+          cat release-notes.md
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          mapfile -t files < <(find dist-release -type f | sort)
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release edit "${tag}" --title "${tag}" --notes-file release-notes.md
+            gh release upload "${tag}" "${files[@]}" --clobber
+          else
+            gh release create "${tag}" "${files[@]}" \
+              --title "${tag}" \
+              --notes-file release-notes.md
+          fi
+          gh release view "${tag}"

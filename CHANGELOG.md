@@ -7,10 +7,39 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-20
+
+First public GitHub Release. Pushing tag `v1.0.1` builds macOS and Windows
+installers in GitHub Actions and attaches them to the Release.
+
+**macOS CI packages are unsigned** (`HIP_SKIP_SIGN=1`). Gatekeeper will likely
+block the app until you allow it in System Settings → Privacy & Security.
+Windows SmartScreen may also warn on the unsigned NSIS installer.
+
 ### Added
 
 - Product screenshots (Chat / Code / session / Settings / Documents) and a short
   in-app operation tour in README locales (`docs/images/`).
+- **Composer voice dictation** (local [whisper.cpp](https://github.com/ggml-org/whisper.cpp)):
+  opt-in in Settings → Voice (default off). Model download + status check for
+  tiny/base/small under `~/.hip/models/whisper/`; mic appears only when enabled.
+  **Release packages bundle `whisper-cli` by default** (`yarn package:macos` /
+  `package:windows`; opt out with `HIP_BUNDLE_WHISPER=0`). Models are still not
+  shipped — download in Settings. Dev can use Homebrew or `scripts/make-whisper-bin.sh`.
+  Audio stays on-device; no cloud ASR.
+- Open-source contributor docs (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
+  `SECURITY.md`, GitHub issue/PR templates)
+- Example config: `docs/examples/hip.toml.example`
+- Release notes: `docs/release.md`
+- **Extension registry** for plugin / skill / MCP conflict resolution:
+  - Skill precedence: project > user > plugin > builtin (aligned with Settings / Tauri)
+  - MCP: hip.toml id wins (including `enabled = false` name veto); capability
+    fingerprint demotes duplicate packages/URLs unless `allowDuplicate = true`
+  - Tauri injects `HIP_SKILLS_DIR`; sidecar falls back to `HIP_DATA_DIR/skills` or `~/.hip/skills`
+  - Plugin skills/MCP stamp `pluginId` / `scope: 'plugin'` for provenance
+  - WS `extension:inspect` / `extension:preflight`; Settings conflict banner with remediations
+  - Settings consume registry snapshot (shadowed badges); preflight enable modal
+  - CLI: `hip extension inspect [--cwd] [--json]`
 
 ### Changed
 
@@ -75,34 +104,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
   drag-to-close keep their live (un-animated) behavior; `prefers-reduced-motion`
   collapses the animation via the global motion freeze.
 
-### Added
-
-- **Composer voice dictation** (local [whisper.cpp](https://github.com/ggml-org/whisper.cpp)):
-  opt-in in Settings → Voice (default off). Model download + status check for
-  tiny/base/small under `~/.hip/models/whisper/`; mic appears only when enabled.
-  **Release packages bundle `whisper-cli` by default** (`yarn package:macos` /
-  `package:windows`; opt out with `HIP_BUNDLE_WHISPER=0`). Models are still not
-  shipped — download in Settings. Dev can use Homebrew or `scripts/make-whisper-bin.sh`.
-  Audio stays on-device; no cloud ASR.
-- Apache License 2.0 (`LICENSE`, `NOTICE`) and open-source contributor docs
-  (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, GitHub issue/PR templates)
-- Example config: `docs/examples/hip.toml.example`
-- Release notes: `docs/release.md`
-- **Extension registry** for plugin / skill / MCP conflict resolution:
-  - Skill precedence: project > user > plugin > builtin (aligned with Settings / Tauri)
-  - MCP: hip.toml id wins (including `enabled = false` name veto); capability
-    fingerprint demotes duplicate packages/URLs unless `allowDuplicate = true`
-  - Tauri injects `HIP_SKILLS_DIR`; sidecar falls back to `HIP_DATA_DIR/skills` or `~/.hip/skills`
-  - Plugin skills/MCP stamp `pluginId` / `scope: 'plugin'` for provenance
-  - WS `extension:inspect` / `extension:preflight`; Settings conflict banner with remediations
-  - Settings consume registry snapshot (shadowed badges); preflight enable modal
-  - CLI: `hip extension inspect [--cwd] [--json]`
-
-## [1.0.1] - 2026-07-25
-
 ### Notes
 
-- Current package / Tauri product version at the time open-source scaffolding was added.
 - Detailed historical notes for earlier development were not maintained in this file;
   see git history on `main` / `dev.1.0.1` for prior work.
 

@@ -18,16 +18,17 @@ How maintainers cut a **hip** desktop release. Product version today is coordina
 
 ## CI packaging (GitHub Actions)
 
-Workflow [`.github/workflows/build.yml`](../.github/workflows/build.yml) builds **production-layout** packages on every PR / push to `main`/`master`/`dev` and on `v*` tags:
+Workflow [`.github/workflows/build.yml`](../.github/workflows/build.yml) builds **production-layout** packages on every PR / push to `main`/`master`/`dev` and on `v*` tags. Tag builds (`v*`) also run `publish-release`, which creates the GitHub Release and attaches the installers.
 
 | Job | Runner | Output artifact |
 |-----|--------|-----------------|
 | `package-macos` | `macos-latest` | `hip-macos-<triple>` — `.dmg` + `hip.app.tar.gz` |
 | `package-windows` | `windows-latest` | `hip-windows-<triple>` — NSIS `.exe` |
+| `publish-release` | `ubuntu-latest` | GitHub Release on `v*` tags (installers + `SHA256SUMS.txt`) |
 
-Both jobs run `yarn package:macos` / `yarn package:windows` (prod sidecar + real launcher, not the dev shell wrapper).
+Packaging jobs run `yarn package:macos` / `yarn package:windows` (prod sidecar + real launcher, not the dev shell wrapper).
 
-**macOS CI is unsigned:** `HIP_SKIP_SIGN=1` so runners without a Developer ID can still produce a bundle. Those DMGs are for CI verification only — Gatekeeper will reject them on other Macs. Ship releases only from a signed local `yarn package:macos` (or a future secrets-backed job).
+**macOS CI is unsigned:** `HIP_SKIP_SIGN=1` so runners without a Developer ID can still produce a bundle. GitHub Releases currently attach those CI artifacts — Gatekeeper will reject the DMG on other Macs until the user allows the app. A signed local `yarn package:macos` (or a future secrets-backed job) is still the path for Developer ID–signed builds.
 
 **Whisper engine:**
 
@@ -125,10 +126,20 @@ See also `src-tauri/resources/whisper/README.md` for the full scenario matrix an
 
 ## GitHub Release checklist
 
-1. Push the release commit / tag (`vX.Y.Z`).
-2. Create a GitHub Release from the tag; paste CHANGELOG section.
-3. Attach `.dmg` / Windows installer (and checksums if you generate them).
-4. Verify download + first-run on a clean machine when possible.
+Pushing an annotated tag `vX.Y.Z` runs [`.github/workflows/build.yml`](../.github/workflows/build.yml):
+`package-macos` + `package-windows` (whisper bundled), then `publish-release` creates
+the GitHub Release and attaches `.dmg`, `hip.app.tar.gz`, the Windows NSIS `.exe`,
+and `SHA256SUMS.txt`.
+
+**macOS CI is unsigned** (`HIP_SKIP_SIGN=1`). Gatekeeper will reject those DMGs on
+other Macs unless the user allows the app. Signed local `yarn package:macos` is
+still the path if you have a Developer ID.
+
+1. Bump versions + move `[Unreleased]` → `[X.Y.Z]` in `CHANGELOG.md`.
+2. Commit on the release branch (`chore: release vX.Y.Z`).
+3. Tag and push: `git tag -a vX.Y.Z -m "hip vX.Y.Z" && git push origin vX.Y.Z`.
+4. Wait for the **Build** workflow; the Release page should list the installers.
+5. Verify download + first-run on a clean machine when possible.
 
 ## Smoke after packaging
 

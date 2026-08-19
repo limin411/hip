@@ -1,12 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Folder, Pencil, Plus, Server, Trash2, Plug } from 'lucide-react'
+import { Folder, Pencil, Plus, Server, Trash2, Plug, Search, SearchX } from 'lucide-react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import type { HostGroup, TerminalHost } from '@/ipc/terminalHosts'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
-import { sortGroupsByName } from '@/lib/hostGroupUi'
+import {
+  filterHostsByQuery,
+  hostListTotalPages,
+  paginateHosts,
+  sortGroupsByName,
+} from '@/lib/hostGroupUi'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Pagination } from '@/components/ui/Pagination'
 import { cn } from '@/lib/utils'
 
 export interface HostGroupListProps {
@@ -68,6 +75,9 @@ export function HostGroupList({
   }, [sortedGroups])
 
   const [selectedKey, setSelectedKey] = useState<string>(() => sortedGroups[0]?.id ?? UNGROUPED_KEY)
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const listRef = useRef<HTMLDivElement>(null)
 
   // Keep selection valid when groups/hosts change.
   useEffect(() => {
@@ -85,6 +95,35 @@ export function HostGroupList({
   const selectedGroupIdForAdd =
     selectedKey === UNGROUPED_KEY ? null : selectedKey
 
+  const hasQuery = query.trim().length > 0
+  const filteredHosts = useMemo(
+    () => filterHostsByQuery(selectedHosts, query),
+    [selectedHosts, query],
+  )
+  const totalPages = hostListTotalPages(filteredHosts.length)
+  const safePage = Math.min(page, totalPages)
+  const pagedHosts = useMemo(
+    () => paginateHosts(filteredHosts, safePage),
+    [filteredHosts, safePage],
+  )
+
+  const setQueryAndResetPage = (value: string) => {
+    setQuery(value)
+    setPage(1)
+  }
+
+  useEffect(() => {
+    setPage(1)
+  }, [selectedKey])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  useEffect(() => {
+    listRef.current?.scrollTo?.({ top: 0 })
+  }, [safePage, selectedKey, query])
+
   return (
     <PanelGroup
       direction="horizontal"
@@ -93,7 +132,51 @@ export function HostGroupList({
     >
       <Panel defaultSize={76} minSize={30} className="min-h-0">
         <div className="flex h-full min-h-0 flex-col" data-testid="host-group-detail">
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                className="pl-8"
+                value={query}
+                onChange={(e) => setQueryAndResetPage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Escape' || !query) return
+                  e.preventDefault()
+                  setQueryAndResetPage('')
+                }}
+                placeholder={t('terminals.hostSearchPlaceholder')}
+                aria-label={t('terminals.hostSearchPlaceholder')}
+                data-testid="host-search"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            {hasQuery ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-testid="host-search-clear"
+                onClick={() => setQueryAndResetPage('')}
+              >
+                {t('terminals.hostSearchClear')}
+              </Button>
+            ) : null}
+            {selectedHosts.length > 0 || hasQuery ? (
+              <span
+                className="shrink-0 tabular-nums text-caption text-ink-tertiary"
+                data-testid="host-list-count"
+              >
+                {t('terminals.hostItemCount', { count: filteredHosts.length })}
+              </span>
+            ) : null}
+          </div>
+          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-3">
             {selectedHosts.length === 0 ? (
               <EmptyState
                 icon={Folder}
@@ -114,9 +197,23 @@ export function HostGroupList({
                     : undefined
                 }
               />
+            ) : filteredHosts.length === 0 ? (
+              <EmptyState
+                icon={SearchX}
+                tier="professional"
+                title={t('terminals.hostSearchEmpty')}
+                description={t('terminals.hostSearchEmptyHint')}
+                className="py-10"
+                data-testid="host-search-empty"
+                action={{
+                  label: t('terminals.hostSearchClear'),
+                  onClick: () => setQueryAndResetPage(''),
+                  'data-testid': 'host-search-empty-clear',
+                }}
+              />
             ) : (
               <ul className="flex flex-col gap-1" data-testid="host-list">
-                {selectedHosts.map((h) => (
+                {pagedHosts.map((h) => (
                   <li key={h.id}>
                     <HostRow
                       host={h}
@@ -147,6 +244,23 @@ export function HostGroupList({
               </ul>
             )}
           </div>
+          {filteredHosts.length > 0 && totalPages > 1 ? (
+            <div
+              className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-surface-subtle px-3 py-2"
+              data-testid="host-list-pagination"
+            >
+              <span className="text-caption text-ink-secondary">
+                {t('terminals.hostPageInfo', { page: safePage, total: totalPages })}
+              </span>
+              <Pagination
+                currentPage={safePage}
+                totalPages={totalPages}
+                onChange={setPage}
+                previousLabel={t('terminals.previousPage')}
+                nextLabel={t('terminals.nextPage')}
+              />
+            </div>
+          ) : null}
         </div>
       </Panel>
 

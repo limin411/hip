@@ -9,6 +9,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Relicensed the project from Apache License 2.0 to the MIT License (`LICENSE`,
+  `NOTICE`, package manifests, and contributor docs).
 - **Terminal ops assistant is builtin-hip-only** (`src/components/terminals/TerminalAgentPanel.tsx`):
   - ACP/external agents are no longer first-class in the ops composer — the agent
     picker is gone and new terminal chats always run the built-in hip agent

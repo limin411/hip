@@ -246,4 +246,4 @@ SQLite가 진실 공급원입니다; `~/.hip/memories/`는 마크다운 내보�
 
 Copyright 2026 ljm
 
-이 프로젝트는 [Apache License, Version 2.0](./LICENSE) 하에 배포됩니다.
+이 프로젝트는 [MIT License](./LICENSE) 하에 배포됩니다.

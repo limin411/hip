@@ -302,4 +302,4 @@ See [CHANGELOG.md](./CHANGELOG.md). Maintainer release steps: [docs/release.md](
 
 Copyright 2026 ljm
 
-Licensed under the [Apache License, Version 2.0](./LICENSE).
+Licensed under the [MIT License](./LICENSE).

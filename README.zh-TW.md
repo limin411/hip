@@ -232,4 +232,4 @@ SQLite 為權威資料來源；`~/.hip/memories/` 存放 Markdown 匯出鏡像�
 
 Copyright 2026 ljm
 
-本專案採用 [Apache License, Version 2.0](./LICENSE) 開源協議。
+本專案採用 [MIT License](./LICENSE) 開源協議。

@@ -247,4 +247,4 @@ SQLiteが情報源です。`~/.hip/memories/` にはMarkdownエクスポート�
 
 Copyright 2026 ljm
 
-本プロジェクトは [Apache License, Version 2.0](./LICENSE) の下で公開されています。
+本プロジェクトは [MIT License](./LICENSE) の下で公開されています。

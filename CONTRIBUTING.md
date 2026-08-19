@@ -112,7 +112,7 @@ Prefer short, imperative subjects (this repo often uses Conventional Commits):
 ```
 fix(work-items): keep modal open when picking dates
 test(e2e): exercise DateField via pointerdown
-chore: relicense project as Apache-2.0
+chore: relicense project as MIT
 ```
 
 ## Reporting bugs
@@ -127,7 +127,7 @@ Use the **Bug report** issue template. Include:
 
 ## License
 
-Contributions are licensed under the project [Apache License 2.0](./LICENSE).  
+Contributions are licensed under the project [MIT License](./LICENSE).  
 Copyright for the project is held as described in [`NOTICE`](./NOTICE) (Copyright 2026 ljm), unless a contribution agreement says otherwise.
 
 ## Questions

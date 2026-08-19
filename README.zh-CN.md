@@ -259,4 +259,4 @@ SQLite 为权威数据源；`~/.hip/memories/` 存放 Markdown 导出镜像。
 
 Copyright 2026 ljm
 
-本项目采用 [Apache License, Version 2.0](./LICENSE) 开源协议。
+本项目采用 [MIT License](./LICENSE) 开源协议。

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./public/logo.svg" alt="hip マスコット" width="88" />
+</p>
+
 # hip
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | **日本語** | [한국어](./README.ko.md)
@@ -12,6 +16,48 @@
 未公開の場合は下記の開発手順でソースからビルドしてください。
 
 各UIタブは独立したセッションです。製品デフォルトは **Supervisor ReAct** ループです。エージェントはツールを使用し、`task` / `dispatch_agent` / `task_batch` を介して委譲するタイミングを決定します。通常のターンでは **Planner → Coder → Reviewer** パイプラインは強制されません。
+
+## スクリーンショット
+
+<p align="center">
+  <img src="./docs/images/chat-surface.webp" alt="hip Chat の新規会話" width="920" />
+</p>
+
+<p align="center"><sub>Chat — 新規会話。各タブは独立したセッションです。</sub></p>
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-surface.webp" alt="hip Code サーフェス" />
+      <br />
+      <sub>Code — プロジェクトフォルダを選んでタスクを送信</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-session.webp" alt="hip Code セッション（ツールとファイルレール）" />
+      <br />
+      <sub>Code セッション — Supervisor のツールとファイルレール</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="./docs/images/settings-models.webp" alt="hip 設定 · モデル構成" />
+      <br />
+      <sub>Settings → Model Configuration — プロバイダと API キー</sub>
+    </td>
+    <td align="center" valign="top">
+      <img src="./docs/images/knowledge-home.webp" alt="hip ドキュメント" />
+      <br />
+      <sub>Documents — ローカルのノート、ページ、テーブル</sub>
+    </td>
+  </tr>
+</table>
+
+## 使ってみる
+
+1. **プロバイダキーを追加** — **Settings → Model Configuration**。キーは `~/.hip/config/auth.json`（mode `0600`）に保存されます。
+2. **Chat または Code を開始** — Chat は軽量な会話。Code では先に **Choose project folder**（既定権限 **edit**、プロジェクトサンドボックス）。
+3. **タスクを送信** — Supervisor がツールを使い、`task` / `dispatch_agent` / `task_batch` で委譲できます。ファイルレールと **Changes** タブを確認してください。
+4. **近くにメモを残す** — **Documents** は同じワークスペース横のローカル知識ベース（ページとテーブル）です。
 
 ## ハイライト
 

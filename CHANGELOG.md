@@ -7,6 +7,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Product screenshots (Chat / Code / session / Settings / Documents) and a short
+  in-app operation tour in README locales (`docs/images/`).
+
 ### Changed
 
 - Relicensed the project from Apache License 2.0 to the MIT License (`LICENSE`,

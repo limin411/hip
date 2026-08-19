@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./public/logo.svg" alt="hip mascot" width="88" />
+</p>
+
 # hip
 
 **English** | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)
@@ -15,10 +19,45 @@ Until a release is attached, build from source (see [Development setup](#develop
 
 ## Screenshots
 
-<!-- Maintainers: add product screenshots under docs/images/ and link them here.
-     Example: ![Code surface](./docs/images/code-surface.png) -->
+<p align="center">
+  <img src="./docs/images/chat-surface.webp" alt="hip Chat — new conversation with mascot and composer" width="920" />
+</p>
 
-_Screenshots coming soon — contributions welcome._
+<p align="center"><sub>Chat — start a conversation. Each tab is its own session.</sub></p>
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-surface.webp" alt="hip Code surface — pick a project folder" />
+      <br />
+      <sub>Code — bind a project folder, then send a task</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-session.webp" alt="hip Code session — supervisor tools and files rail" />
+      <br />
+      <sub>Code session — supervisor tools plus the files rail</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="./docs/images/settings-models.webp" alt="hip Settings — Model Configuration" />
+      <br />
+      <sub>Settings → Model Configuration — providers and API keys</sub>
+    </td>
+    <td align="center" valign="top">
+      <img src="./docs/images/knowledge-home.webp" alt="hip Documents — local notes and tables" />
+      <br />
+      <sub>Documents — local-first notes, pages, and tables</sub>
+    </td>
+  </tr>
+</table>
+
+## Quick tour
+
+1. **Add a provider key** — **Settings → Model Configuration**. Keys are stored in `~/.hip/config/auth.json` (mode `0600`).
+2. **Start Chat or Code** — Chat is a lighter conversation. Code asks you to **Choose project folder** (default permission: **edit**, project sandbox).
+3. **Send a task** — the supervisor uses tools and can delegate with `task` / `dispatch_agent` / `task_batch`. Watch the files rail and the **Changes** tab.
+4. **Keep notes nearby** — **Documents** is a local knowledge base (pages and tables) next to the same workspace.
 
 ## Highlights
 

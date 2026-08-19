@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./public/logo.svg" alt="hip 吉祥物" width="88" />
+</p>
+
 # hip
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | **繁體中文** | [日本語](./README.ja.md) | [한국어](./README.ko.md)
@@ -12,6 +16,48 @@
 若尚無附件，請依下文從原始碼建置。
 
 每個 UI 分頁是獨立工作階段。產品預設是 **Supervisor ReAct** 迴路——智能體使用工具，並在需要時透過 `task` / `dispatch_agent` / `task_batch` 委派。一般回合**不會**強制 Planner → Coder → Reviewer 流水線。
+
+## 畫面預覽
+
+<p align="center">
+  <img src="./docs/images/chat-surface.webp" alt="hip Chat 新工作階段" width="920" />
+</p>
+
+<p align="center"><sub>Chat — 新工作階段。每個分頁是獨立工作階段。</sub></p>
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-surface.webp" alt="hip Code 工作台" />
+      <br />
+      <sub>Code — 選擇專案資料夾後傳送任務</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-session.webp" alt="hip Code 工作階段：工具與檔案欄" />
+      <br />
+      <sub>Code 工作階段 — Supervisor 工具與檔案欄</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="./docs/images/settings-models.webp" alt="hip 設定 · 模型設定" />
+      <br />
+      <sub>設定 → 模型設定 — 供應商與 API Key</sub>
+    </td>
+    <td align="center" valign="top">
+      <img src="./docs/images/knowledge-home.webp" alt="hip 文件管理" />
+      <br />
+      <sub>文件 — 本機筆記、頁面與表格</sub>
+    </td>
+  </tr>
+</table>
+
+## 操作示例
+
+1. **新增供應商金鑰** — **設定 → 模型設定**。金鑰存在 `~/.hip/config/auth.json`（權限 `0600`）。
+2. **開始 Chat 或 Code** — Chat 是較輕的對話面；Code 需先 **選擇專案資料夾**（預設權限 **edit**，專案沙箱）。
+3. **傳送任務** — Supervisor 會使用工具，並可透過 `task` / `dispatch_agent` / `task_batch` 委派。留意右側檔案欄與 **Changes** 分頁。
+4. **就近做筆記** — **文件** 是同一工作區旁的本機知識庫（頁面與表格）。
 
 ## 核心能力
 

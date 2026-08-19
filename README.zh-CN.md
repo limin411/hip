@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./public/logo.svg" alt="hip 吉祥物" width="88" />
+</p>
+
 # hip
 
 [English](./README.md) | **简体中文** | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)
@@ -12,6 +16,48 @@
 若尚无附件，请按下文「开发环境」从源码构建。
 
 每个 UI 标签页是独立会话。产品默认是 **Supervisor ReAct** 回路——智能体使用工具，并在需要时通过 `task` / `dispatch_agent` / `task_batch` 委派。普通轮次**不会**强制 Planner → Coder → Reviewer 流水线。
+
+## 界面预览
+
+<p align="center">
+  <img src="./docs/images/chat-surface.webp" alt="hip Chat 新会话" width="920" />
+</p>
+
+<p align="center"><sub>Chat — 新会话。每个标签页是独立会话。</sub></p>
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-surface.webp" alt="hip Code 工作台" />
+      <br />
+      <sub>Code — 选择项目文件夹后发送任务</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-session.webp" alt="hip Code 会话：工具与文件栏" />
+      <br />
+      <sub>Code 会话 — Supervisor 工具与文件栏</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="./docs/images/settings-models.webp" alt="hip 设置 · 模型配置" />
+      <br />
+      <sub>设置 → 模型配置 — 供应商与 API Key</sub>
+    </td>
+    <td align="center" valign="top">
+      <img src="./docs/images/knowledge-home.webp" alt="hip 文档管理" />
+      <br />
+      <sub>文档 — 本地笔记、页面与表格</sub>
+    </td>
+  </tr>
+</table>
+
+## 操作示例
+
+1. **添加供应商密钥** — **设置 → 模型配置**。密钥保存在 `~/.hip/config/auth.json`（权限 `0600`）。
+2. **开始 Chat 或 Code** — Chat 是更轻的会话面；Code 需要先 **选择项目文件夹**（默认权限 **edit**，项目沙箱）。
+3. **发送任务** — Supervisor 会使用工具，并可通过 `task` / `dispatch_agent` / `task_batch` 委派。关注右侧文件栏和 **Changes** 标签。
+4. **就近记笔记** — **文档** 是同一工作区旁的本地知识库（页面与表格）。
 
 ## 核心能力
 

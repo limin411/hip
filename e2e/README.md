@@ -69,6 +69,9 @@ yarn test:e2e --spec e2e/specs/write-to-changes.spec.ts
 # Custom grep
 E2E_GREP=@panel yarn test:e2e
 E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
+
+# README product screenshots (writes docs/images/*.webp; skipped unless HIP_DOCS_SHOTS=1)
+HIP_DOCS_SHOTS=1 E2E_GREP=@docs-shots yarn test:e2e --spec e2e/specs/docs-screenshots.spec.ts
 ```
 
 ## Timeouts (tiers)
@@ -99,6 +102,7 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@msm` | make-stock-money long-task dogfood pack | **no** (live; needs `HIP_EVAL_MSM_PATH`) |
 | `@longrun` | multi-phase long engineering tasks (subset of `@msm`) | **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
+| `@docs-shots` | README product screenshots (`docs/images/*.webp`) | **no** — skipped unless `HIP_DOCS_SHOTS=1` |
 
 ### make-stock-money dogfood
 

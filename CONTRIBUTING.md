@@ -46,6 +46,8 @@ API keys are stored in `~/.hip/config/auth.json` (mode `0600`).
 
 Optional config reference (no secrets): [`docs/examples/hip.toml.example`](./docs/examples/hip.toml.example).
 
+Product screenshots live in [`docs/images/`](./docs/images/). Recapture (maintainer): `HIP_DOCS_SHOTS=1 E2E_GREP=@docs-shots yarn test:e2e --spec e2e/specs/docs-screenshots.spec.ts`.
+
 ### Useful commands
 
 | Command | Purpose |

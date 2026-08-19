@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./public/logo.svg" alt="hip 마스코트" width="88" />
+</p>
+
 # hip
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | **한국어**
@@ -12,6 +16,48 @@
 아직 없다면 아래 개발 절차로 소스에서 빌드하세요.
 
 각 UI 탭은 독립적인 세션입니다. 제품 기본값은 **Supervisor ReAct** 루프입니다 — 에이전트가 도구를 사용하고 `task` / `dispatch_agent` / `task_batch`를 통해 위임 시기를 결정합니다. 일반적인 턴은 Planner → Coder → Reviewer 파이프라인을 **강제하지 않습니다**.
+
+## 스크린샷
+
+<p align="center">
+  <img src="./docs/images/chat-surface.webp" alt="hip Chat 새 대화" width="920" />
+</p>
+
+<p align="center"><sub>Chat — 새 대화. 각 탭은 독립 세션입니다.</sub></p>
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-surface.webp" alt="hip Code 화면" />
+      <br />
+      <sub>Code — 프로젝트 폴더를 고른 뒤 작업을 보냅니다</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="./docs/images/code-session.webp" alt="hip Code 세션 — 도구와 파일 레일" />
+      <br />
+      <sub>Code 세션 — Supervisor 도구와 파일 레일</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="./docs/images/settings-models.webp" alt="hip 설정 · 모델 구성" />
+      <br />
+      <sub>Settings → Model Configuration — 제공자와 API 키</sub>
+    </td>
+    <td align="center" valign="top">
+      <img src="./docs/images/knowledge-home.webp" alt="hip 문서" />
+      <br />
+      <sub>Documents — 로컬 노트, 페이지, 테이블</sub>
+    </td>
+  </tr>
+</table>
+
+## 사용 흐름
+
+1. **제공자 키 추가** — **Settings → Model Configuration**. 키는 `~/.hip/config/auth.json`(mode `0600`)에 저장됩니다.
+2. **Chat 또는 Code 시작** — Chat은 가벼운 대화입니다. Code는 먼저 **Choose project folder**(기본 권한 **edit**, 프로젝트 샌드박스).
+3. **작업 전송** — Supervisor가 도구를 쓰고 `task` / `dispatch_agent` / `task_batch`로 위임할 수 있습니다. 파일 레일과 **Changes** 탭을 확인하세요.
+4. **옆에 메모** — **Documents**는 같은 워크스페이스 옆의 로컬 지식 베이스(페이지와 테이블)입니다.
 
 ## 주요 기능
 

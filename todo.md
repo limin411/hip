@@ -14,9 +14,9 @@ Items below still need **maintainer input** before the public launch story is co
 
 ### 2. Product screenshots / GIF
 
-- [ ] Capture 2–4 images (suggested: Code surface, Chat, Settings/providers, agent run).
-- [ ] Save under `docs/images/` (see `docs/images/README.md`).
-- [ ] Wire filenames into `README.md` (and optionally locale READMEs) under **Screenshots**.
+- [x] Capture 2–4 images (suggested: Code surface, Chat, Settings/providers, agent run).
+- [x] Save under `docs/images/` (see `docs/images/README.md`).
+- [x] Wire filenames into `README.md` (and optionally locale READMEs) under **Screenshots**.
 
 ### 3. Releases & version narrative
 

@@ -89,13 +89,14 @@ Agent-oriented notes for this repo: [`AGENTS.md`](./AGENTS.md), [`CLAUDE.md`](./
 
 ## Branch and PR workflow
 
-1. Branch from the active development branch (**`dev`**) unless maintainers ask otherwise.  
-   Stable history may live on **`main`**; CI runs on both.
+1. Branch from the current development line (today: **`dev.1.0.1`**). There is no
+   `dev` branch. Stable / GitHub default is **`main`**. CI runs on `main`, `dev`,
+   and `dev.*`.
 2. Keep diffs **surgical** — no drive-by refactors or unrelated formatting.
 3. Match existing code style (TypeScript, Rust, TOML). See [`.editorconfig`](./.editorconfig).
 4. Add or update tests when behavior changes.
 5. If you edit `packages/product-content/**`, run `yarn product:content` and commit regenerated embeds.
-6. Open a PR against `dev` (or the branch maintainers specify). Fill in the PR template.
+6. Open a PR against `dev.1.0.1` (or the branch maintainers specify). Fill in the PR template.
 
 ### PR checklist (summary)
 

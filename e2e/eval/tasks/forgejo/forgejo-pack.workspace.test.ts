@@ -18,11 +18,8 @@ import {
 import type { PreparedWorkspace } from '../../types.js'
 
 const packDir = path.dirname(fileURLToPath(import.meta.url))
-const FORGEJO =
-  process.env.HIP_EVAL_FORGEJO_PATH ||
-  '/Users/lijiamin/data/code-repository/project-go/forgejo'
-
-const hasForgejo = fs.existsSync(FORGEJO)
+const FORGEJO = process.env.HIP_EVAL_FORGEJO_PATH
+const hasForgejo = Boolean(FORGEJO && fs.existsSync(FORGEJO))
 
 describe.skipIf(!hasForgejo)('forgejo pack workspace isolation (unpaid)', () => {
   let ws: PreparedWorkspace | undefined
@@ -40,6 +37,7 @@ describe.skipIf(!hasForgejo)('forgejo pack workspace isolation (unpaid)', () => 
   })
 
   it('loads pack and prepares worktree without mutating primary', () => {
+    if (!FORGEJO) throw new Error('HIP_EVAL_FORGEJO_PATH required')
     process.env.HIP_EVAL_FORGEJO_PATH = FORGEJO
     const { pack, tasks } = loadPack(packDir)
     expect(pack.id).toBe('forgejo')

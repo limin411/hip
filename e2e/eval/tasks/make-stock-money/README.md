@@ -8,10 +8,10 @@ Design context: `docs/design/2026-08-05-long-engineering-task-spec.md`.
 
 ## Repo
 
-| Env | Default (this machine) |
-|-----|------------------------|
-| `HIP_EVAL_MSM_PATH` | `/Users/lijiamin/data/code-repository/project-rust/make-stock-money` |
-| `HIP_EVAL_MSM_BASE_SHA` | optional pin; pack defaults to a known good SHA |
+| Env | Notes |
+|-----|--------|
+| `HIP_EVAL_MSM_PATH` | Required. Local checkout of the eval target repo. |
+| `HIP_EVAL_MSM_BASE_SHA` | Optional pin; pack defaults to a known good SHA. |
 
 ```bash
 # one-shot env

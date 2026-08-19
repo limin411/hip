@@ -33,6 +33,6 @@
   "metadata": {
     "pack": "forgejo",
     "bug": "TruncateRunes ignores limit",
-    "repo_default": "/Users/lijiamin/data/code-repository/project-go/forgejo"
+    "repo_default": "$HIP_EVAL_FORGEJO_PATH"
   }
 }

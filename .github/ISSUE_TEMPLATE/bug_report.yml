@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for filing a bug. **Do not** include API keys or `~/.hip/config/auth.json` contents.
-        Security issues → [SECURITY.md](https://github.com/limin411/hip/blob/dev/SECURITY.md).
+        Security issues → [SECURITY.md](https://github.com/limin411/hip/blob/main/SECURITY.md).
 
   - type: input
     id: version

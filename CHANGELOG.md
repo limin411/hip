@@ -11,6 +11,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 - Relicensed the project from Apache License 2.0 to the MIT License (`LICENSE`,
   `NOTICE`, package manifests, and contributor docs).
+- Open-source prep: removed maintainer-local filesystem paths from eval/dogfood
+  scripts and docs; CI now also runs on `dev.*` (the current development line
+  is `dev.1.0.1`, not `dev`).
 - **Terminal ops assistant is builtin-hip-only** (`src/components/terminals/TerminalAgentPanel.tsx`):
   - ACP/external agents are no longer first-class in the ops composer — the agent
     picker is gone and new terminal chats always run the built-in hip agent
@@ -96,7 +99,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 - Current package / Tauri product version at the time open-source scaffolding was added.
 - Detailed historical notes for earlier development were not maintained in this file;
-  see git history on `dev` / `main` for prior work.
+  see git history on `main` / `dev.1.0.1` for prior work.
 
 [Unreleased]: https://github.com/limin411/hip/compare/v1.0.1...HEAD
 [1.0.1]: https://github.com/limin411/hip/releases/tag/v1.0.1

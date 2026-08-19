@@ -1,7 +1,7 @@
 # hip 视觉与动效提升方案 —— 参考 beautifului.dev
 
 > 系列：`ui-enhancement-bui` ｜ 配套：`ui-enhancement-bui-preview.html`（高保真对照预览，浏览器直接打开）
-> 参考素材：`/Users/lijiamin/Downloads/beautifului.dev`（beautifului.dev 19 个 AI 原生组件的原生 HTML 移植版）
+> 参考素材：beautifului.dev（19 个 AI 原生组件的原生 HTML 移植版）
 > 当前基线：`DESIGN.md`（Flat Solid / 纯 fade / 无阴影 / 无位移缩放）与 `src/styles/tokens.css`
 
 ---

@@ -3,11 +3,15 @@
 # Usage: eval "$(scripts/hip-eval-bootstrap-msm.sh)"
 set -euo pipefail
 
-DEFAULT_PATH="/Users/lijiamin/data/code-repository/project-rust/make-stock-money"
-MSM_PATH="${HIP_EVAL_MSM_PATH:-$DEFAULT_PATH}"
+MSM_PATH="${HIP_EVAL_MSM_PATH:-}"
 
-if [[ ! -d "$MSM_PATH" ]]; then
-  echo "make-stock-money path not found: $MSM_PATH" >&2
+if [[ -z "${MSM_PATH}" ]]; then
+  echo "Set HIP_EVAL_MSM_PATH to your make-stock-money checkout." >&2
+  exit 1
+fi
+
+if [[ ! -d "${MSM_PATH}" ]]; then
+  echo "make-stock-money path not found: ${MSM_PATH}" >&2
   echo "Set HIP_EVAL_MSM_PATH to your checkout." >&2
   exit 1
 fi

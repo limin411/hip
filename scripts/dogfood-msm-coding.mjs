@@ -26,9 +26,7 @@ const repoRoot = path.resolve(__dirname, '..')
 const packDir = path.join(repoRoot, 'e2e/eval/tasks/make-stock-money')
 const scenariosDir = path.join(packDir, 'scenarios')
 
-const msm =
-  process.env.HIP_EVAL_MSM_PATH ||
-  '/Users/lijiamin/data/code-repository/project-rust/make-stock-money'
+const msm = process.env.HIP_EVAL_MSM_PATH
 
 function parseArgs(argv) {
   const out = { task: null, scenario: null, list: false }
@@ -65,6 +63,11 @@ if (args.list) {
 
 if (!args.task && !args.scenario) {
   console.error('pass --task <id> or --scenario <name> (or --list)')
+  process.exit(2)
+}
+
+if (!msm) {
+  console.error('Set HIP_EVAL_MSM_PATH to your make-stock-money checkout.')
   process.exit(2)
 }
 

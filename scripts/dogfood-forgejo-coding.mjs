@@ -14,9 +14,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
-const forgejo =
-  process.env.HIP_EVAL_FORGEJO_PATH ||
-  '/Users/lijiamin/data/code-repository/project-go/forgejo'
+const forgejo = process.env.HIP_EVAL_FORGEJO_PATH
+if (!forgejo) {
+  console.error('Set HIP_EVAL_FORGEJO_PATH to your Forgejo checkout.')
+  process.exit(2)
+}
 const outDir =
   process.env.OUT_DIR ||
   path.join(os.tmpdir(), `forgejo-coding-eval-${Date.now()}`)

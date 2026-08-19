@@ -31,8 +31,10 @@ Items below still need **maintainer input** before the public launch story is co
 
 ### 5. Branch policy
 
-- [ ] Confirm default contribution target: docs assume **PRs → `dev`**, stable **`main`**.
-- [ ] If policy differs, update `CONTRIBUTING.md` + issue template links that point at `dev`.
+- [x] Docs now match the actual branches: PRs → **`dev.1.0.1`**, GitHub default **`main`**.
+      Issue templates link to `main`. CI also matches `dev.*`.
+- [ ] Optional later: introduce a long-lived `dev` branch, or merge `dev.1.0.1` into `main`
+      before the public launch so visitors see MIT + current docs.
 
 ## Nice to have (post-launch)
 

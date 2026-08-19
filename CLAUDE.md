@@ -54,7 +54,7 @@ Store 依赖纪律由 `yarn check:store-deps` 守护。
 
 ## Long-task dogfood target
 
-- Repo: `/Users/lijiamin/data/code-repository/project-rust/make-stock-money` (`HIP_EVAL_MSM_PATH`)
+- Repo: a local make-stock-money checkout via `HIP_EVAL_MSM_PATH`
 - Pack: `e2e/eval/tasks/make-stock-money/`
 - Unpaid gate: `yarn test:longrun-unit` or `yarn test:longrun-gate`
 - Live: `eval "$(scripts/hip-eval-bootstrap-msm.sh)"` then `yarn dogfood:msm -- --list`

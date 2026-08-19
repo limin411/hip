@@ -6,7 +6,7 @@ Uses **worktree isolation** (`workspace.strategy=worktree`) so the primary tree 
 ## Prerequisites
 
 ```bash
-export HIP_EVAL_FORGEJO_PATH=/Users/lijiamin/data/code-repository/project-go/forgejo
+export HIP_EVAL_FORGEJO_PATH=/path/to/forgejo
 # optional override of base pin
 # export HIP_EVAL_FORGEJO_BASE_SHA=$(git -C "$HIP_EVAL_FORGEJO_PATH" rev-parse HEAD)
 ```

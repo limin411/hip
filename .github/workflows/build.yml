@@ -7,10 +7,10 @@ name: Build
 
 on:
   push:
-    branches: [main, master, dev]
+    branches: [main, master, dev, 'dev.*']
     tags: ["v*"]
   pull_request:
-    branches: [main, master, dev]
+    branches: [main, master, dev, 'dev.*']
   workflow_dispatch:
     inputs:
       bundle_whisper:

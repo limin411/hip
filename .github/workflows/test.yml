@@ -2,9 +2,9 @@ name: Test
 
 on:
   push:
-    branches: [main, master, dev]
+    branches: [main, master, dev, 'dev.*']
   pull_request:
-    branches: [main, master, dev]
+    branches: [main, master, dev, 'dev.*']
   schedule:
     # Nightly unpaid full desktop e2e (UTC 16:00 ≈ Asia/Shanghai 00:00).
     - cron: "0 16 * * *"

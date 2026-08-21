@@ -7,6 +7,7 @@ import {
   hasPromptTail,
   isDangerousCommand,
   isInteractiveTuiCommand,
+  isLikelySubShell,
   wrapForEc,
   wrapForFence,
   FENCE_END,
@@ -20,6 +21,38 @@ describe('completion heuristic', () => {
     expect(hasPromptTail('root@box:/var/www#')).toBe(true)
     expect(hasPromptTail('done')).toBe(false)
     expect(hasPromptTail('')).toBe(false)
+  })
+})
+
+describe('sub-shell detection', () => {
+  it('detects mysql prompt', () => {
+    expect(isLikelySubShell('mysql> ')).toBe(true)
+    expect(isLikelySubShell('some output\nmysql> ')).toBe(true)
+  })
+  it('detects MariaDB prompt', () => {
+    expect(isLikelySubShell('MariaDB [testdb]> ')).toBe(true)
+  })
+  it('detects python prompt', () => {
+    expect(isLikelySubShell('>>> ')).toBe(true)
+    expect(isLikelySubShell('Hello\n>>> ')).toBe(true)
+  })
+  it('detects redis prompt', () => {
+    expect(isLikelySubShell('redis> ')).toBe(true)
+  })
+  it('detects pdb prompt', () => {
+    expect(isLikelySubShell('(Pdb) ')).toBe(true)
+  })
+  it('detects IPython prompt', () => {
+    expect(isLikelySubShell('In [42]: ')).toBe(true)
+  })
+  it('does not false-positive on normal bash prompts', () => {
+    expect(isLikelySubShell('user@host:~$ ')).toBe(false)
+    expect(isLikelySubShell('root@host# ')).toBe(false)
+    expect(isLikelySubShell('$ ')).toBe(false)
+    expect(isLikelySubShell('')).toBe(false)
+  })
+  it('does not false-positive on redirect operators', () => {
+    expect(isLikelySubShell('hello > ')).toBe(false)
   })
 })
 

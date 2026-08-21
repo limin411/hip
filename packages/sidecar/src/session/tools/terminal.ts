@@ -186,14 +186,16 @@ export function buildTerminalTools(opts: TerminalToolOpts): StructuredToolInterf
         'queues (30s cap) instead of failing; a queued_timed_out error means the previous ' +
         'command held the terminal — retry later or ask the user. ' +
         'Prefer non-interactive flags (-y, --noconfirm, DEBIAN_FRONTEND=noninteractive). ' +
-        'Commands ending in exit/exec are incompatible with the fence (the marker never prints); set fence:false for them.',
+        'Commands ending in exit/exec are incompatible with the fence (the marker never prints); set fence:false for them. ' +
+        'When the terminal is inside an interactive sub-shell (mysql, python, node, redis-cli, psql, etc.), the bridge ' +
+        'auto-detects the sub-shell prompt and skips the fence automatically; you do NOT need to set fence:false manually.',
       schema: z.object({
         command: z.string().describe('single shell command to run (no trailing newline)'),
         reason: z.string().optional().describe('why this command is needed (shown in the approval prompt)'),
         wait_ms: z.number().optional().describe('max milliseconds to wait for output (default 15000, max 120000)'),
         poll: z.boolean().optional().describe('poll the terminal ring before returning (default true)'),
         wrapEc: z.boolean().optional().describe('legacy __HIP_EC wrapper; prefer the default fence'),
-        fence: z.boolean().optional().describe('invisible OSC-633 completion fence (default true); set false for exit/exec-ending commands'),
+        fence: z.boolean().optional().describe('invisible OSC-633 completion fence (default true); set false for exit/exec-ending commands. Auto-disabled when the bridge detects a sub-shell prompt (mysql>, >>>, redis>, etc.).'),
       }),
     },
   )

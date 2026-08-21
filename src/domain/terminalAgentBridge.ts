@@ -43,6 +43,17 @@ export function hasPromptTail(output: string): boolean {
   return /[$#%>]\s*$/.test(last)
 }
 
+/**
+ * Detect if the terminal is currently inside a non-bash interactive sub-shell
+ * (mysql, python, redis-cli, etc.). The OSC-633 fence uses bash `printf`
+ * syntax that these sub-shells cannot parse, so the fence must be skipped.
+ */
+export function isLikelySubShell(output: string): boolean {
+  const lines = output.replace(/\r/g, '').split('\n')
+  const last = lines[lines.length - 1] ?? ''
+  return /^\s*(?:mysql>\s*|MariaDB\s*\[.*?\]>\s*|>>>\s*|redis>\s*|\(Pdb\)\s*|In\s*\[\d+\]:\s*)/.test(last)
+}
+
 export function clipExecOutput(text: string, cap = EXEC_OUTPUT_CAP): string {
   if (text.length <= cap) return text
   return text.slice(0, cap) + `\n…(output truncated to ${Math.round(cap / 1024)}KB)`
@@ -261,7 +272,6 @@ async function runFlight(
   send: (m: ClientMessage) => void,
 ): Promise<void> {
   const { sessionId, callId, command, waitMs } = msg
-  const useFence = msg.fence !== false
   const wrapEc = msg.wrapEc === true
 
   // Interactive TUIs are no longer rejected (T2): the agent may start vim/htop/
@@ -269,6 +279,14 @@ async function runFlight(
   const tuiLaunch = isInteractiveTuiCommand(command)
 
   const ring0 = useTerminalStore.getState().getSession(tmId)
+
+  // Auto-detect sub-shells (mysql, python, node, redis, etc.): the OSC-633
+  // fence uses bash `printf` syntax that these sub-shells cannot parse, so
+  // skip the fence and fall back to prompt-tail completion detection.
+  const tailOutput = ring0
+    ? useTerminalStore.getState().getRingSince(tmId, Math.max(0, ring0.trimOffset + ring0.ring.length - 512)).output
+    : ''
+  const useFence = msg.fence !== false && !isLikelySubShell(tailOutput)
   const startCursor = ring0 ? ring0.trimOffset + ring0.ring.length : 0
   const startGeneration = ring0?.generation ?? 0
   const deadline = Date.now() + waitMs

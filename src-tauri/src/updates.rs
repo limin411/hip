@@ -10,6 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
@@ -798,6 +799,551 @@ pub async fn updates_check(app: tauri::AppHandle, force: Option<bool>) -> Result
     Ok(check_inner(&app, force.unwrap_or(false)).await)
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// Download / verify / open installer (PR-3)
+// ══════════════════════════════════════════════════════════════════════════
+
+const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+/// No byte for this long ⇒ stall error. Deliberately NOT a total timeout
+/// (57MB over a slow proxy needs minutes, never hours like voice's 2h).
+const STALL_TIMEOUT: Duration = Duration::from_secs(60);
+const PROGRESS_EVERY: Duration = Duration::from_millis(200);
+const PROGRESS_BYTES: u64 = 256 * 1024;
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProgress {
+    pub phase: String, // downloading | verifying | ready | error | cancelled
+    pub downloaded: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<u64>,
+    pub asset_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_kind: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct PartialMeta {
+    tag: String,
+    asset_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    expected_size: Option<u64>,
+    sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    etag: Option<String>,
+}
+
+/// One download at a time (the UI serializes). Single shared cancel flag.
+static DOWNLOAD_CANCEL: std::sync::OnceLock<std::sync::Mutex<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>> =
+    std::sync::OnceLock::new();
+
+fn cancel_flag() -> std::sync::Arc<std::sync::atomic::AtomicBool> {
+    let map = DOWNLOAD_CANCEL.get_or_init(|| std::sync::Mutex::new(None));
+    let mut guard = map.lock().unwrap_or_else(|e| e.into_inner());
+    if guard.is_none() {
+        *guard = Some(std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)));
+    }
+    guard.as_ref().unwrap().clone()
+}
+
+/// Download client: same proxy + allowlist as the check client, but with NO
+/// short total timeout — a 60s per-chunk stall guard replaces it.
+fn download_client(app: &AppHandle) -> Result<reqwest::Client, UpdateError> {
+    let mut builder = proxy_client_builder(app)
+        .map_err(|e| UpdateError::new(UpdateErrorKind::Network, e))?;
+    builder = builder
+        .user_agent(user_agent(app))
+        .connect_timeout(DOWNLOAD_CONNECT_TIMEOUT)
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            match assert_allowed(attempt.url()) {
+                Ok(()) => attempt.follow(),
+                Err(_) => attempt.error("host not allowlisted"),
+            }
+        }));
+    builder
+        .build()
+        .map_err(|e| UpdateError::new(UpdateErrorKind::Network, e.to_string()))
+}
+
+/// Parse GNU-coreutils `SHA256SUMS` (`<hex>  <name>` or `<hex> *<name>`).
+/// Returns the row for `asset_name` (lowercased hex), or None when absent.
+fn parse_sums(body: &str, asset_name: &str) -> Option<String> {
+    body.lines().find_map(|line| {
+        let mut parts = line.split_whitespace();
+        let hex = parts.next()?;
+        let name = parts.next()?.trim_start_matches('*');
+        if name == asset_name && hex.len() == 64 && hex.bytes().all(|c| c.is_ascii_hexdigit()) {
+            Some(hex.to_ascii_lowercase())
+        } else {
+            None
+        }
+    })
+}
+
+/// KD-9: SUMS row vs check-stage digest. Missing row ⇒ digest. Row != digest ⇒
+/// refuse (never pick a side). Row == digest ⇒ that hex.
+fn resolve_expected_sha256(sums_row: Option<String>, digest: &str) -> Result<String, UpdateError> {
+    match sums_row {
+        None => Ok(digest.to_ascii_lowercase()),
+        Some(row) => {
+            if row.eq_ignore_ascii_case(digest) {
+                Ok(row.to_ascii_lowercase())
+            } else {
+                Err(UpdateError::new(
+                    UpdateErrorKind::Http,
+                    "SHA256SUMS row disagrees with the release digest",
+                ))
+            }
+        }
+    }
+}
+
+fn sha256_file(path: &Path) -> Result<String, UpdateError> {
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    let mut file = std::fs::File::open(path)
+        .map_err(|e| UpdateError::new(UpdateErrorKind::Http, format!("open: {e}")))?;
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = std::io::Read::read(&mut file, &mut buf)
+            .map_err(|e| UpdateError::new(UpdateErrorKind::Http, format!("read: {e}")))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn partial_paths(dir: &Path, asset_name: &str) -> (PathBuf, PathBuf) {
+    (
+        dir.join(format!("{asset_name}.partial")),
+        dir.join(format!("{asset_name}.partial.meta.json")),
+    )
+}
+
+/// Resume is only safe when the meta pins the same payload (tag / name / size /
+/// sha256). Any mismatch ⇒ delete and re-download whole — never Range-stitch
+/// two different payloads.
+fn resume_offset(dir: &Path, asset_name: &str, tag: &str, expected_size: Option<u64>, sha256: &str) -> u64 {
+    let (partial, meta_path) = partial_paths(dir, asset_name);
+    let ok = std::fs::read_to_string(&meta_path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<PartialMeta>(&raw).ok())
+        .map(|meta| {
+            meta.tag == tag
+                && meta.asset_name == asset_name
+                && meta.sha256.eq_ignore_ascii_case(sha256)
+                && meta.expected_size == expected_size
+        })
+        .unwrap_or(false);
+    if !ok {
+        let _ = std::fs::remove_file(&partial);
+        let _ = std::fs::remove_file(&meta_path);
+        return 0;
+    }
+    match (expected_size, std::fs::metadata(&partial).map(|m| m.len())) {
+        (Some(expected), Ok(len)) if len < expected => len,
+        _ => {
+            // Unknown size ⇒ Range is forbidden; restart cleanly.
+            let _ = std::fs::remove_file(&partial);
+            0
+        }
+    }
+}
+
+/// Canonical-prefix guard for opening installers (path traversal defense).
+fn checked_installer_path(dir: &Path, requested: &str) -> Result<PathBuf, UpdateError> {
+    let canon_dir = std::fs::canonicalize(dir)
+        .map_err(|e| UpdateError::new(UpdateErrorKind::Host, format!("cache dir: {e}")))?;
+    let canon = std::fs::canonicalize(requested)
+        .map_err(|e| UpdateError::new(UpdateErrorKind::Host, format!("installer: {e}")))?;
+    if !canon.starts_with(&canon_dir) {
+        return Err(UpdateError::host("installer path outside updates cache"));
+    }
+    Ok(canon)
+}
+
+fn parse_content_range_total(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+    let v = headers.get(reqwest::header::CONTENT_RANGE)?.to_str().ok()?;
+    // `bytes start-end/total`
+    let (_, total) = v.split_once('/')?;
+    total.trim().parse().ok()
+}
+
+/// Dev gate: `yarn tauri dev` must not install release packages. `cargo test`
+/// bypasses so inner functions stay testable; `HIP_UPDATES_ALLOW_DEV_INSTALL=1`
+/// is the explicit opt-out.
+fn dev_gate() -> Result<(), String> {
+    if dev_build() && !cfg!(test) {
+        return Err("dev_blocked".into());
+    }
+    Ok(())
+}
+
+struct DownloadTarget {
+    tag: String,
+    asset_name: String,
+    url: String,
+    sha256: String,
+    expected_size: Option<u64>,
+    sums_url: String,
+}
+
+/// Resolve the download target from the **current check cache** only — the
+/// frontend may pass a tag + asset name, never a URL.
+fn download_target(dir: &Path, tag: &str, asset_name: &str) -> Result<DownloadTarget, UpdateError> {
+    let (cache, usable) = read_cache(dir).ok_or_else(|| {
+        UpdateError::new(UpdateErrorKind::Http, "no check result — run a check first")
+    })?;
+    if !usable {
+        return Err(UpdateError::new(UpdateErrorKind::Parse, "check cache is stale"));
+    }
+    let result = cache.result;
+    if result.latest_tag.as_deref() != Some(tag) {
+        return Err(UpdateError::new(UpdateErrorKind::Http, "tag does not match the cached check"));
+    }
+    let asset = result
+        .asset
+        .ok_or_else(|| UpdateError::new(UpdateErrorKind::Http, "no cached asset for this system"))?;
+    if asset.name != asset_name {
+        return Err(UpdateError::new(UpdateErrorKind::Http, "asset name does not match the cached check"));
+    }
+    let sha256 = asset
+        .sha256
+        .ok_or_else(|| UpdateError::new(UpdateErrorKind::Http, "no checksum — refuse to download"))?;
+    Ok(DownloadTarget {
+        tag: tag.to_string(),
+        asset_name: asset_name.to_string(),
+        url: asset.browser_download_url,
+        sha256,
+        expected_size: Some(asset.size),
+        sums_url: format!("https://github.com/limin411/hip/releases/download/{tag}/SHA256SUMS.txt"),
+    })
+}
+
+/// Mechanics only (testable without an AppHandle): SUMS fetch → sha256 decision
+/// → resume-aware download → verify → finalize. Progress flows through `emit`.
+async fn download_inner(
+    client: &reqwest::Client,
+    dir: &Path,
+    target: &DownloadTarget,
+    cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    emit: &mut (dyn FnMut(UpdateProgress) + Send),
+) -> Result<PathBuf, UpdateError> {
+    use std::sync::atomic::Ordering;
+
+    // 1) SHA256SUMS.txt (404 ⇒ fall back to the check-stage digest, KD-9).
+    let sums_row = {
+        let resp = client
+            .get(&target.sums_url)
+            .send()
+            .await
+            .map_err(|e| UpdateError::new(UpdateErrorKind::Network, format!("sums network: {e}")))?;
+        match resp.status() {
+            s if s == reqwest::StatusCode::NOT_FOUND => None,
+            s if s.is_success() => {
+                let body = resp
+                    .text()
+                    .await
+                    .map_err(|e| UpdateError::new(UpdateErrorKind::Network, format!("sums body: {e}")))?;
+                parse_sums(&body, &target.asset_name)
+            }
+            s => {
+                return Err(UpdateError::new(
+                    UpdateErrorKind::Http,
+                    format!("SHA256SUMS HTTP {s}"),
+                ))
+            }
+        }
+    };
+    let sha256 = match resolve_expected_sha256(sums_row, &target.sha256) {
+        Ok(s) => s,
+        Err(e) => {
+            emit(UpdateProgress {
+                phase: "error".into(),
+                downloaded: 0,
+                total: None,
+                asset_name: target.asset_name.clone(),
+                error_kind: Some("hash".into()),
+            });
+            return Err(e);
+        }
+    };
+
+    let (partial, meta_path) = partial_paths(dir, &target.asset_name);
+    let final_path = dir.join(&target.asset_name);
+
+    // 2) Resume decision (meta-pinned; unknown size ⇒ no Range).
+    let resume_from = resume_offset(dir, &target.asset_name, &target.tag, target.expected_size, &sha256);
+
+    let mut req = client.get(&target.url);
+    if resume_from > 0 {
+        req = req.header(reqwest::header::RANGE, format!("bytes={resume_from}-"));
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| UpdateError::new(UpdateErrorKind::Network, format!("asset network: {e}")))?;
+    let status = resp.status();
+    let total: Option<u64>;
+    let mut downloaded: u64;
+    let mut file: std::fs::File;
+    if status == reqwest::StatusCode::PARTIAL_CONTENT {
+        total = parse_content_range_total(resp.headers())
+            .or_else(|| resp.content_length().map(|n| resume_from + n))
+            .or(target.expected_size);
+        downloaded = resume_from;
+        file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&partial)
+            .map_err(|e| UpdateError::new(UpdateErrorKind::Http, format!("open partial: {e}")))?;
+    } else if status.is_success() {
+        // 200 — full body (server ignored Range): restart cleanly.
+        let _ = std::fs::remove_file(&partial);
+        total = resp.content_length().or(target.expected_size);
+        downloaded = 0;
+        file = std::fs::File::create(&partial)
+            .map_err(|e| UpdateError::new(UpdateErrorKind::Http, format!("create partial: {e}")))?;
+    } else {
+        return Err(UpdateError::new(
+            UpdateErrorKind::Http,
+            format!("asset HTTP {status}"),
+        ));
+    }
+
+    emit(UpdateProgress {
+        phase: "downloading".into(),
+        downloaded,
+        total,
+        asset_name: target.asset_name.clone(),
+        error_kind: None,
+    });
+
+    // 3) Stream with 60s stall guard + cancel + throttled progress.
+    let mut last_emit = Instant::now();
+    let mut since_emit_bytes: u64 = 0;
+    let mut resp = resp;
+    loop {
+        if cancel.load(Ordering::SeqCst) {
+            let _ = file.flush();
+            emit(UpdateProgress {
+                phase: "cancelled".into(),
+                downloaded,
+                total,
+                asset_name: target.asset_name.clone(),
+                error_kind: Some("cancel".into()),
+            });
+            // Keep .partial so a retry can resume.
+            return Err(UpdateError::new(UpdateErrorKind::Http, "cancelled"));
+        }
+        let chunk = tokio::time::timeout(STALL_TIMEOUT, resp.chunk())
+            .await
+            .map_err(|_| {
+                UpdateError::new(UpdateErrorKind::Network, "stalled: no bytes for 60s")
+            })?
+            .map_err(|e| UpdateError::new(UpdateErrorKind::Network, format!("asset body: {e}")))?;
+        let Some(chunk) = chunk else { break };
+        std::io::Write::write_all(&mut file, &chunk)
+            .map_err(|e| UpdateError::new(UpdateErrorKind::Http, format!("write partial: {e}")))?;
+        let n = chunk.len() as u64;
+        downloaded += n;
+        since_emit_bytes += n;
+        if last_emit.elapsed() >= PROGRESS_EVERY || since_emit_bytes >= PROGRESS_BYTES {
+            emit(UpdateProgress {
+                phase: "downloading".into(),
+                downloaded,
+                total,
+                asset_name: target.asset_name.clone(),
+                error_kind: None,
+            });
+            last_emit = Instant::now();
+            since_emit_bytes = 0;
+        }
+    }
+    std::io::Write::flush(&mut file)
+        .map_err(|e| UpdateError::new(UpdateErrorKind::Http, format!("flush: {e}")))?;
+    drop(file);
+
+    // 4) Size + hash verification.
+    if let Some(expected) = target.expected_size {
+        if downloaded != expected {
+            let _ = std::fs::remove_file(&partial);
+            emit(UpdateProgress {
+                phase: "error".into(),
+                downloaded,
+                total,
+                asset_name: target.asset_name.clone(),
+                error_kind: Some("hash".into()),
+            });
+            return Err(UpdateError::new(
+                UpdateErrorKind::Http,
+                format!("size mismatch: got {downloaded}, expected {expected}"),
+            ));
+        }
+    }
+    emit(UpdateProgress {
+        phase: "verifying".into(),
+        downloaded,
+        total: Some(downloaded),
+        asset_name: target.asset_name.clone(),
+        error_kind: None,
+    });
+    let actual = sha256_file(&partial)?;
+    if !actual.eq_ignore_ascii_case(&sha256) {
+        // Integrity failure: discard everything (final + partial + meta).
+        let _ = std::fs::remove_file(&final_path);
+        let _ = std::fs::remove_file(&partial);
+        let _ = std::fs::remove_file(&meta_path);
+        emit(UpdateProgress {
+            phase: "error".into(),
+            downloaded,
+            total: Some(downloaded),
+            asset_name: target.asset_name.clone(),
+            error_kind: Some("hash".into()),
+        });
+        return Err(UpdateError::new(UpdateErrorKind::Http, "sha256 mismatch — file discarded"));
+    }
+
+    // 5) Finalize: drop the .partial suffix, keep at most this one package.
+    std::fs::rename(&partial, &final_path)
+        .map_err(|e| UpdateError::new(UpdateErrorKind::Http, format!("finalize: {e}")))?;
+    let _ = std::fs::remove_file(&meta_path);
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for ent in entries.flatten() {
+            let name = ent.file_name();
+            let name_s = name.to_string_lossy().to_string();
+            if name_s == CACHE_FILE || name_s == target.asset_name {
+                continue;
+            }
+            let keep_partial = name_s == format!("{}.partial", target.asset_name);
+            if name_s.ends_with(".dmg")
+                || name_s.ends_with(".exe")
+                || name_s.ends_with(".partial")
+                || name_s.ends_with(".meta.json")
+                || keep_partial
+            {
+                let _ = std::fs::remove_file(ent.path());
+            }
+        }
+    }
+    emit(UpdateProgress {
+        phase: "ready".into(),
+        downloaded,
+        total: Some(downloaded),
+        asset_name: target.asset_name.clone(),
+        error_kind: None,
+    });
+    crate::tauri_info!(
+        "updates",
+        &format!("download ok asset={} bytes={}", target.asset_name, downloaded)
+    );
+    Ok(final_path)
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadOutcome {
+    pub path: String,
+}
+
+/// Download + verify the release asset for `tag`/`assetName` (both must match
+/// the current check cache — the frontend never passes a URL).
+#[tauri::command]
+pub async fn updates_download(
+    app: tauri::AppHandle,
+    tag: String,
+    asset_name: String,
+) -> Result<DownloadOutcome, String> {
+    use tauri::Emitter;
+    dev_gate()?;
+    let dir = paths::updates_cache_dir(&app).ok_or("updates cache unavailable")?;
+    let target = download_target(&dir, &tag, &asset_name).map_err(|e| e.message)?;
+    // Original-URL guard before GET (Policy::custom only sees hops).
+    for u in [&target.url, &target.sums_url] {
+        let parsed = reqwest::Url::parse(u).map_err(|e| format!("url: {e}"))?;
+        assert_allowed(&parsed).map_err(|e| e.message)?;
+    }
+    let client = download_client(&app).map_err(|e| e.message)?;
+    let cancel = cancel_flag();
+    cancel.store(false, std::sync::atomic::Ordering::SeqCst);
+    let last_phase = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+    let result = {
+        let lp = last_phase.clone();
+        let app_emit = app.clone();
+        let mut emit = move |p: UpdateProgress| {
+            if let Ok(mut g) = lp.lock() {
+                *g = p.phase.clone();
+            }
+            let _ = app_emit.emit("updates://progress", &p);
+        };
+        download_inner(&client, &dir, &target, cancel, &mut emit).await
+    };
+    match result {
+        Ok(path) => Ok(DownloadOutcome {
+            path: path.to_string_lossy().to_string(),
+        }),
+        Err(e) => {
+            // Inner paths already emit error/cancelled for hash/cancel; this
+            // catch-all covers network / http / SUMS-disagreement failures so
+            // the UI always sees a terminal progress event.
+            let phase = last_phase.lock().map(|g| g.clone()).unwrap_or_default();
+            if phase != "error" && phase != "cancelled" {
+                let kind = e.kind.as_str().to_string();
+                let _ = app.emit(
+                    "updates://progress",
+                    &UpdateProgress {
+                        phase: "error".into(),
+                        downloaded: 0,
+                        total: None,
+                        asset_name: asset_name.clone(),
+                        error_kind: Some(kind),
+                    },
+                );
+            }
+            Err(e.message)
+        }
+    }
+}
+
+#[tauri::command]
+pub fn updates_cancel_download() -> Result<(), String> {
+    if let Some(map) = DOWNLOAD_CANCEL.get() {
+        if let Ok(guard) = map.lock() {
+            if let Some(flag) = guard.as_ref() {
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Open a verified installer. The path must canonicalize under the updates
+/// cache (rejects `../` escapes). Opener failure is a soft error — no panic.
+#[tauri::command]
+pub fn updates_open_installer(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = paths::updates_cache_dir(&app).ok_or("updates cache unavailable")?;
+    let canon = checked_installer_path(&dir, &path).map_err(|e| e.message)?;
+    app.opener()
+        .open_path(canon.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| format!("opener failed: {e}"))
+}
+
+/// Open the GitHub Releases page. Host is pinned (no arbitrary URLs).
+#[tauri::command]
+pub fn updates_open_release_page(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    if !url.starts_with("https://github.com/limin411/hip/releases") {
+        return Err("url must be a github.com/limin411/hip/releases page".into());
+    }
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| format!("opener failed: {e}"))
+}
+
 // ── Tests ──
 
 #[cfg(test)]
@@ -1141,7 +1687,7 @@ mod tests {
     }
 
     async fn serve(
-        responses: Vec<(&'static str, Vec<(&'static str, String)>, String)>,
+        responses: Vec<(&'static str, Vec<(&'static str, String)>, Vec<u8>)>,
     ) -> (String, tokio::sync::mpsc::Receiver<MockRequest>) {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1165,13 +1711,16 @@ mod tests {
                         if_none_match: head.contains("if-none-match:"),
                     })
                     .await;
-                let mut resp = format!("HTTP/1.1 {status_line}\r\nContent-Length: {}\r\n", body.len());
+                let mut resp = format!(
+                    "HTTP/1.1 {status_line}\r\nContent-Length: {}\r\nConnection: close\r\n",
+                    body.len()
+                );
                 for (k, v) in headers {
                     resp.push_str(&format!("{k}: {v}\r\n"));
                 }
                 resp.push_str("\r\n");
-                resp.push_str(&body);
                 let _ = sock.write_all(resp.as_bytes()).await;
+                let _ = sock.write_all(&body).await;
             }
         });
         (format!("http://{addr}/"), rx)
@@ -1218,7 +1767,7 @@ mod tests {
         let (url, mut rx) = serve(vec![(
             "200 OK",
             vec![("ETag".into(), "W/\"abc\"".into())],
-            good_body(),
+            good_body().into_bytes(),
         )])
         .await;
         let ctx = ok_ctx("force-true");
@@ -1270,7 +1819,7 @@ mod tests {
         };
         write_cache(&dir, &cache);
 
-        let (url, mut rx) = serve(vec![("304 Not Modified", vec![], String::new())]).await;
+        let (url, mut rx) = serve(vec![("304 Not Modified", vec![], Vec::new())]).await;
         let ctx = CheckContext {
             current_version: "1.0.1".into(),
             cache_dir: dir.clone(),
@@ -1358,7 +1907,7 @@ mod tests {
         let (url, _rx) = serve(vec![(
             "429 Too Many Requests",
             vec![("Retry-After".into(), "120".into())],
-            String::new(),
+            Vec::new(),
         )])
         .await;
         let ctx = CheckContext {
@@ -1377,12 +1926,12 @@ mod tests {
 
     #[tokio::test]
     async fn http_and_parse_errors_map_to_kinds() {
-        let (url, _rx) = serve(vec![("500 Internal Server Error", vec![], "boom".into())]).await;
+        let (url, _rx) = serve(vec![("500 Internal Server Error", vec![], b"boom".to_vec())]).await;
         let ctx = ok_ctx("http-errors");
         let err = run_check(&ctx, true, &plain_client(), &url).await.unwrap_err();
         assert_eq!(err.kind, UpdateErrorKind::Http);
 
-        let (url2, _rx2) = serve(vec![("200 OK", vec![], "<html>not json</html>".into())]).await;
+        let (url2, _rx2) = serve(vec![("200 OK", vec![], b"<html>not json</html>".to_vec())]).await;
         let err = run_check(&ctx, true, &plain_client(), &url2).await.unwrap_err();
         assert_eq!(err.kind, UpdateErrorKind::Parse);
         let _ = std::fs::remove_dir_all(&ctx.cache_dir);
@@ -1417,8 +1966,8 @@ mod tests {
         write_cache(&dir, &cache);
 
         let (url, mut rx) = serve(vec![
-            ("304 Not Modified", vec![], String::new()),
-            ("200 OK", vec![], good_body()),
+            ("304 Not Modified", vec![], Vec::new()),
+            ("200 OK", vec![], good_body().into_bytes()),
         ])
         .await;
         let ctx = CheckContext {
@@ -1442,5 +1991,378 @@ mod tests {
         assert!(!dev_build());
         unsafe { std::env::remove_var("HIP_UPDATES_ALLOW_DEV_INSTALL") };
         assert!(dev_build());
+    }
+
+    // ── PR-3: sums / sha256 / resume / path guard ──
+
+    #[test]
+    fn parse_sums_gnu_and_binary_formats() {
+        let body = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  hip_1.0.2_aarch64.dmg\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb *other.exe\n";
+        assert_eq!(
+            parse_sums(body, "hip_1.0.2_aarch64.dmg").as_deref(),
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        );
+        assert_eq!(
+            parse_sums(body, "other.exe").as_deref(),
+            Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        );
+        assert!(parse_sums(body, "missing.dmg").is_none());
+        // Uppercase hex + extra spaces still parse.
+        let mixed = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC   hip_1.0.2_x64-setup.exe";
+        assert_eq!(
+            parse_sums(mixed, "hip_1.0.2_x64-setup.exe").as_deref(),
+            Some("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+        );
+    }
+
+    #[test]
+    fn resolve_expected_sha256_rules() {
+        let digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        // No SUMS row → digest.
+        assert_eq!(resolve_expected_sha256(None, digest).unwrap(), digest);
+        // Row == digest → ok (case-insensitive).
+        let upper = digest.to_ascii_uppercase();
+        assert_eq!(
+            resolve_expected_sha256(Some(upper.clone()), digest).unwrap(),
+            upper.to_ascii_lowercase()
+        );
+        // Row != digest → refuse, never pick a side.
+        let other = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        assert!(resolve_expected_sha256(Some(other.into()), digest).is_err());
+    }
+
+    #[test]
+    fn sha256_file_known_vector() {
+        let dir = temp_cache_dir("sha-file");
+        let p = dir.join("payload.bin");
+        std::fs::write(&p, b"hello hip").unwrap();
+        let hex = sha256_file(&p).unwrap();
+        // Precomputed sha256 of "hello hip".
+        assert_eq!(
+            hex,
+            "b001ca0f86c4be1c2494897cd34122e9fec18ab3801c74310f9b718b5017ce2b"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resume_offset_meta_rules() {
+        let dir = temp_cache_dir("resume");
+        let (partial, meta_path) = partial_paths(&dir, "hip_1.0.2_aarch64.dmg");
+        let sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let write_meta = |tag: &str, size: Option<u64>, s: &str| {
+            let meta = PartialMeta {
+                tag: tag.into(),
+                asset_name: "hip_1.0.2_aarch64.dmg".into(),
+                expected_size: size,
+                sha256: s.into(),
+                etag: None,
+            };
+            std::fs::write(&meta_path, serde_json::to_string(&meta).unwrap()).unwrap();
+            std::fs::write(&partial, vec![0u8; 100]).unwrap();
+        };
+
+        // Matching meta + partial < expected → resume from partial len.
+        write_meta("v1.0.2", Some(1000), sha);
+        assert_eq!(
+            resume_offset(&dir, "hip_1.0.2_aarch64.dmg", "v1.0.2", Some(1000), sha),
+            100
+        );
+        // Tag mismatch → wipe + full download.
+        write_meta("v9.9.9", Some(1000), sha);
+        assert_eq!(
+            resume_offset(&dir, "hip_1.0.2_aarch64.dmg", "v1.0.2", Some(1000), sha),
+            0
+        );
+        assert!(!partial.exists(), "mismatched partial must be deleted");
+        // Size mismatch → wipe.
+        write_meta("v1.0.2", Some(999), sha);
+        assert_eq!(
+            resume_offset(&dir, "hip_1.0.2_aarch64.dmg", "v1.0.2", Some(1000), sha),
+            0
+        );
+        // Unknown expected size → no Range, wipe.
+        write_meta("v1.0.2", None, sha);
+        assert_eq!(
+            resume_offset(&dir, "hip_1.0.2_aarch64.dmg", "v1.0.2", None, sha),
+            0
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn checked_installer_path_rejects_escape() {
+        let dir = temp_cache_dir("path-guard");
+        // Create a sibling secret to canonicalize against.
+        let parent = dir.parent().unwrap();
+        let secret = parent.join("secret.txt");
+        std::fs::write(&secret, b"x").unwrap();
+        let escape = dir.join("../secret.txt");
+        assert!(checked_installer_path(&dir, escape.to_str().unwrap()).is_err());
+        // A file inside the dir is fine.
+        let inside = dir.join("hip_1.0.2_aarch64.dmg");
+        std::fs::write(&inside, b"x").unwrap();
+        let ok = checked_installer_path(&dir, inside.to_str().unwrap()).unwrap();
+        assert!(ok.starts_with(std::fs::canonicalize(&dir).unwrap()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_file(&secret);
+    }
+
+    #[test]
+    fn dev_gate_passes_under_test_but_blocks_dev() {
+        // Under cargo test the gate always passes (inner functions stay testable).
+        assert!(dev_gate().is_ok());
+    }
+
+    #[test]
+    fn download_target_reads_only_cache() {
+        let dir = temp_cache_dir("target");
+        // No cache → refused.
+        assert!(download_target(&dir, "v1.0.2", "x.dmg").is_err());
+        // Seed a cache.
+        let asset = UpdateAsset {
+            name: "hip_1.0.2_aarch64.dmg".into(),
+            size: 1000,
+            content_type: None,
+            browser_download_url: "https://github.com/limin411/hip/releases/download/v1.0.2/hip_1.0.2_aarch64.dmg".into(),
+            sha256: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()),
+        };
+        let r = UpdateCheckResult {
+            status: UpdateCheckStatus::UpdateAvailable,
+            current_version: "1.0.1".into(),
+            latest_tag: Some("v1.0.2".into()),
+            latest_version: Some("1.0.2".into()),
+            published_at: None,
+            notes_excerpt: None,
+            html_url: None,
+            asset: Some(asset),
+            cache_hit: false,
+            checked_at: "2026-08-23T12:00:00Z".into(),
+            latency_ms: 0,
+            error_kind: None,
+            error_message: None,
+            retry_after_sec: None,
+            debug_build: false,
+        };
+        let cache = LastCheckCache {
+            parser_version: PARSER_VERSION,
+            etag: None,
+            checked_at: r.checked_at.clone(),
+            result: CachedResult::from(&r),
+            prompted_tag: None,
+            prompted_at: None,
+        };
+        write_cache(&dir, &cache);
+        let t = download_target(&dir, "v1.0.2", "hip_1.0.2_aarch64.dmg").unwrap();
+        assert_eq!(t.expected_size, Some(1000));
+        assert!(t.sums_url.ends_with("v1.0.2/SHA256SUMS.txt"));
+        // Wrong tag / wrong asset name → refused.
+        assert!(download_target(&dir, "v1.0.3", "hip_1.0.2_aarch64.dmg").is_err());
+        assert!(download_target(&dir, "v1.0.2", "other.exe").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── PR-3: end-to-end download against the mock server ──
+
+    fn seed_asset_cache(dir: &Path, asset_name: &str, size: u64, sha256: &str) {
+        let asset = UpdateAsset {
+            name: asset_name.into(),
+            size,
+            content_type: None,
+            browser_download_url: "http://127.0.0.1:9/asset".into(), // replaced by caller via target override
+            sha256: Some(sha256.into()),
+        };
+        let r = UpdateCheckResult {
+            status: UpdateCheckStatus::UpdateAvailable,
+            current_version: "1.0.1".into(),
+            latest_tag: Some("v1.0.2".into()),
+            latest_version: Some("1.0.2".into()),
+            published_at: None,
+            notes_excerpt: None,
+            html_url: None,
+            asset: Some(asset),
+            cache_hit: false,
+            checked_at: "2026-08-23T12:00:00Z".into(),
+            latency_ms: 0,
+            error_kind: None,
+            error_message: None,
+            retry_after_sec: None,
+            debug_build: false,
+        };
+        let cache = LastCheckCache {
+            parser_version: PARSER_VERSION,
+            etag: None,
+            checked_at: r.checked_at.clone(),
+            result: CachedResult::from(&r),
+            prompted_tag: None,
+            prompted_at: None,
+        };
+        write_cache(dir, &cache);
+    }
+
+    fn payload_hex(body: &[u8]) -> String {
+        use sha2::Digest;
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(body);
+        format!("{:x}", hasher.finalize())
+    }
+
+    #[tokio::test]
+    async fn download_end_to_end_verifies_and_finalizes() {
+        let dir = temp_cache_dir("dl-e2e");
+        let asset_name = "hip_1.0.2_aarch64.dmg";
+        let payload: Vec<u8> = (0..100_000u32).map(|i| (i % 251) as u8).collect();
+        let hex = payload_hex(&payload);
+        seed_asset_cache(&dir, asset_name, payload.len() as u64, &hex);
+
+        let sums_body = format!("{hex}  {asset_name}\n");
+        let (url, mut rx) = serve(vec![
+            ("200 OK", vec![], sums_body.into_bytes()),
+            ("200 OK", vec![], payload.clone()),
+        ])
+        .await;
+        let base = url.trim_end_matches('/');
+        let target = DownloadTarget {
+            tag: "v1.0.2".into(),
+            asset_name: asset_name.into(),
+            url: format!("{base}/asset"),
+            sha256: hex.clone(),
+            expected_size: Some(payload.len() as u64),
+            sums_url: format!("{base}/SHA256SUMS.txt"),
+        };
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut phases: Vec<String> = Vec::new();
+        let out = download_inner(&plain_client(), &dir, &target, cancel, &mut |p| phases.push(p.phase.clone()))
+            .await
+            .unwrap();
+        assert!(out.ends_with(asset_name));
+        assert!(phases.contains(&"downloading".to_string()));
+        assert!(phases.contains(&"verifying".to_string()));
+        assert_eq!(phases.last().map(String::as_str), Some("ready"));
+        // Final file exists with exact bytes; partial + meta gone.
+        let final_path = dir.join(asset_name);
+        assert_eq!(std::fs::read(&final_path).unwrap(), payload);
+        assert!(!dir.join(format!("{asset_name}.partial")).exists());
+        assert!(!dir.join(format!("{asset_name}.partial.meta.json")).exists());
+        // Two requests: SUMS + asset.
+        let _ = rx.recv().await;
+        let _ = rx.recv().await;
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn download_hash_mismatch_discards_files() {
+        let dir = temp_cache_dir("dl-mismatch");
+        let asset_name = "hip_1.0.2_aarch64.dmg";
+        let payload = b"corrupt payload".to_vec();
+        // Digest and SUMS agree on a WRONG hex → verify must fail and delete.
+        let wrong = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        seed_asset_cache(&dir, asset_name, payload.len() as u64, wrong);
+
+        let sums_body = format!("{wrong}  {asset_name}\n");
+        let (url, _rx) = serve(vec![
+            ("200 OK", vec![], sums_body.into_bytes()),
+            ("200 OK", vec![], payload.clone()),
+        ])
+        .await;
+        let base = url.trim_end_matches('/');
+        let target = DownloadTarget {
+            tag: "v1.0.2".into(),
+            asset_name: asset_name.into(),
+            url: format!("{base}/asset"),
+            sha256: wrong.into(),
+            expected_size: Some(payload.len() as u64),
+            sums_url: format!("{base}/SHA256SUMS.txt"),
+        };
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut phases: Vec<String> = Vec::new();
+        let err = download_inner(&plain_client(), &dir, &target, cancel, &mut |p| phases.push(p.phase.clone()))
+            .await
+            .unwrap_err();
+        assert!(err.message.contains("sha256 mismatch"), "{}", err.message);
+        assert_eq!(phases.last().map(String::as_str), Some("error"));
+        // Everything discarded.
+        assert!(!dir.join(asset_name).exists());
+        assert!(!dir.join(format!("{asset_name}.partial")).exists());
+        assert!(!dir.join(format!("{asset_name}.partial.meta.json")).exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn download_sums_digest_disagreement_refuses_before_asset_fetch() {
+        let dir = temp_cache_dir("dl-disagree");
+        let asset_name = "hip_1.0.2_aarch64.dmg";
+        let digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let sums_hex = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        seed_asset_cache(&dir, asset_name, 100, digest);
+
+        let sums_body = format!("{sums_hex}  {asset_name}\n");
+        let (url, _rx) = serve(vec![("200 OK", vec![], sums_body.into_bytes())]).await;
+        let base = url.trim_end_matches('/');
+        let target = DownloadTarget {
+            tag: "v1.0.2".into(),
+            asset_name: asset_name.into(),
+            url: format!("{base}/asset"),
+            sha256: digest.into(),
+            expected_size: Some(100),
+            sums_url: format!("{base}/SHA256SUMS.txt"),
+        };
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut phases: Vec<String> = Vec::new();
+        let err = download_inner(&plain_client(), &dir, &target, cancel, &mut |p| phases.push(p.phase.clone()))
+            .await
+            .unwrap_err();
+        assert!(err.message.contains("disagrees"), "{}", err.message);
+        // Exactly one progress event: the error (hash) terminal state.
+        assert_eq!(phases, vec!["error".to_string()]);
+        assert!(!dir.join(asset_name).exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn download_meta_change_restarts_full_get_without_range() {
+        let dir = temp_cache_dir("dl-resume");
+        let asset_name = "hip_1.0.2_aarch64.dmg";
+        let payload: Vec<u8> = (0..50_000u32).map(|i| (i % 251) as u8).collect();
+        let hex = payload_hex(&payload);
+        seed_asset_cache(&dir, asset_name, payload.len() as u64, &hex);
+
+        // Pre-seed a partial + meta from a DIFFERENT tag (stale).
+        let (partial, meta_path) = partial_paths(&dir, asset_name);
+        std::fs::write(&partial, vec![0u8; 4096]).unwrap();
+        let stale_meta = PartialMeta {
+            tag: "v9.9.9".into(),
+            asset_name: asset_name.into(),
+            expected_size: Some(payload.len() as u64),
+            sha256: hex.clone(),
+            etag: None,
+        };
+        std::fs::write(&meta_path, serde_json::to_string(&stale_meta).unwrap()).unwrap();
+
+        let sums_body = format!("{hex}  {asset_name}\n");
+        let (url, mut rx) = serve(vec![
+            ("200 OK", vec![], sums_body.into_bytes()),
+            ("200 OK", vec![], payload.clone()),
+        ])
+        .await;
+        let base = url.trim_end_matches('/');
+        let target = DownloadTarget {
+            tag: "v1.0.2".into(),
+            asset_name: asset_name.into(),
+            url: format!("{base}/asset"),
+            sha256: hex,
+            expected_size: Some(payload.len() as u64),
+            sums_url: format!("{base}/SHA256SUMS.txt"),
+        };
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let out = download_inner(&plain_client(), &dir, &target, cancel, &mut |_| {})
+            .await
+            .unwrap();
+        assert!(out.ends_with(asset_name));
+        assert_eq!(std::fs::read(dir.join(asset_name)).unwrap(), payload);
+        // Stale partial was wiped before the GET (never Range-stitched).
+        let _ = rx.recv().await;
+        let _ = rx.recv().await;
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hip · 设置 — IM 连接器 · 双向对话（交互预览）</title>
+<style>
+/* ═══════════ 设计令牌（对齐 src/styles/tokens.css）═══════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F6F5F3; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --ink:#111111; --ink-2:#5e5e5e; --ink-3:#757575;
+  --accent:#c2410c; --accent-hover:#9a3412; --accent-strong:#7c2d12;
+  --accent-subtle:#f0f0f0; --accent-active:#e6e6e6; --on-accent:#fff;
+  --success:#2f7d40; --danger:#c63b3b; --warning:#9a5d10;
+  --btn-primary:#3a3a3a; --btn-primary-hover:#2e2e2e; --on-btn-primary:#fafafa;
+  --overlay:rgba(17,17,17,.28);
+  --dur:100ms; --ease:cubic-bezier(.2,0,0,1);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --font:-apple-system,BlinkMacSystemFont,"Inter","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+  --r-sm:6px; --r-md:10px; --r-lg:14px;
+}
+html[data-theme="dark"]{
+  --bg-app:#0f0f0f; --bg-subtle:#161616; --bg-muted:#1e1e1e; --bg-content:#141414;
+  --border:#333333; --border-strong:#454545;
+  --ink:#f0f0f0; --ink-2:#b3b3b3; --ink-3:#8a8a8a;
+  --accent:#ffb300; --accent-hover:#ffc233; --accent-strong:#ffcc80;
+  --accent-subtle:#222222; --accent-active:#2e2e2e; --on-accent:#111111;
+  --success:#5aad5e; --danger:#e85a5a; --warning:#e6a23c;
+  --btn-primary:#e0e0e0; --btn-primary-hover:#ececec; --on-btn-primary:#141414;
+  --overlay:rgba(0,0,0,.52);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-app);color:var(--ink)}
+body{font-family:var(--font);font-size:13px;line-height:1.5;padding-bottom:72px;-webkit-font-smoothing:antialiased}
+button,input{font-family:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+code,.mono{font-family:var(--mono)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── 顶栏 ── */
+.topbar{position:sticky;top:0;z-index:80;background:var(--bg-app);border-bottom:1px solid var(--border);padding:10px 0}
+.topbar .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.topbar h1{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.topbar .sub{color:var(--ink-3);font-size:11.5px}
+.spacer{flex:1}
+.chip-btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:var(--r-sm);padding:5px 11px;font-size:12px;color:var(--ink-2);transition:background-color var(--dur),color var(--dur),border-color var(--dur)}
+.chip-btn:hover{background:var(--accent-subtle);color:var(--ink)}
+.chip-btn.on{background:var(--accent-subtle);color:var(--ink);font-weight:600;border-color:var(--border-strong)}
+
+/* ── 要点 ── */
+.points{display:flex;gap:10px;margin:14px auto 8px;flex-wrap:wrap}
+.point{flex:1;min-width:200px;border:1px solid var(--border);border-radius:var(--r-md);padding:9px 12px;background:var(--bg-subtle)}
+.point b{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:650;margin-bottom:3px}
+.point b .n{font-size:9.5px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:1px 5px}
+.point p{font-size:11.5px;color:var(--ink-2);line-height:1.55}
+.point p code{font-size:10.5px;background:var(--accent-subtle);border-radius:3px;padding:0 4px;color:var(--ink)}
+
+h2.sec{font-size:15px;font-weight:650;letter-spacing:-.01em;margin:32px 0 4px;display:flex;align-items:center;gap:8px}
+h2.sec .tag{font-size:9.5px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:1px 6px}
+p.note{font-size:11.5px;color:var(--ink-3);margin-bottom:12px}
+
+/* ═══════════ 设置页框架 ═══════════ */
+.settings-shell{display:flex;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-top:12px;background:var(--bg-content);min-height:600px}
+.sidebar{width:196px;flex-shrink:0;border-right:1px solid var(--border);padding:14px 10px;background:var(--bg-subtle)}
+.side-group{font-size:10.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;padding:12px 10px 5px}
+.side-item{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:var(--r-sm);font-size:12.5px;color:var(--ink-2);text-align:left;transition:background-color var(--dur)}
+.side-item:hover{background:var(--accent-active)}
+.side-item.active{background:var(--accent-subtle);color:var(--ink);font-weight:600}
+.main{flex:1;padding:22px 26px;min-width:0}
+
+/* ── 页头 ── */
+.page-head h3{font-size:17px;font-weight:650;letter-spacing:-.01em}
+.page-head .desc{font-size:12px;color:var(--ink-3);margin-top:4px;max-width:600px}
+.page-head .warnline{font-size:11.5px;color:var(--ink-2);margin-top:8px;display:flex;gap:6px;align-items:flex-start}
+
+/* ── 待授权区块 ── */
+.parked-box{border:1px solid var(--border);border-radius:var(--r-md);margin-top:14px;overflow:hidden;background:var(--bg-subtle)}
+.parked-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12.5px;font-weight:650}
+.parked-head .cnt{font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:999px;padding:1px 7px}
+.parked-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--border);font-size:12px}
+.parked-row:first-of-type{border-top:0}
+.parked-row .who{flex:1;min-width:0}
+.parked-row .who small{display:block;color:var(--ink-3);font-size:10.5px}
+.pill{border-radius:var(--r-sm);padding:3px 10px;font-size:11.5px;font-weight:600}
+.pill.allow{background:var(--btn-primary);color:var(--on-btn-primary)}
+.pill.deny{border:1px solid var(--border);color:var(--ink-2)}
+
+/* ── 连接器卡片网格 ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:18px}
+.card{border:1px solid var(--border);border-radius:var(--r-md);background:var(--bg-content);overflow:hidden;display:flex;flex-direction:column}
+.card-head{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.logo{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
+.logo.feishu{background:#2f6fed}.logo.wecom{background:#1e7d43}.logo.dingtalk{background:#1677ff}
+.card-head .t{font-size:13px;font-weight:650}
+.card-head .s{font-size:11px;color:var(--ink-3)}
+.card-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;flex:1}
+.instance{border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 11px;background:var(--bg-subtle);display:flex;flex-direction:column;gap:8px}
+.instance .line1{display:flex;align-items:center;gap:8px}
+.instance .name{font-size:12.5px;font-weight:600;min-width:0;flex:1}
+.instance .name small{display:block;font-weight:400;color:var(--ink-3);font-size:10.5px}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot.off{background:var(--ink-3);opacity:.45}
+.dot.connecting{background:var(--warning)}
+.dot.ok{background:var(--success)}
+.dot.error{background:var(--danger)}
+.badge{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:4px;flex-shrink:0}
+.badge.err{background:rgba(198,59,59,.12);color:var(--danger)}
+.line2{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--ink-3)}
+.perm{display:flex;align-items:center;gap:5px}
+.perm select{border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-content);color:var(--ink-2);font-size:11px;padding:2px 6px;font-family:inherit}
+.barrier{font-size:10.5px;color:var(--ink-3);background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 9px;line-height:1.5}
+.empty{font-size:11.5px;color:var(--ink-3);padding:4px 2px;line-height:1.6}
+.add-btn{width:100%;border:1px dashed var(--border-strong);border-radius:var(--r-sm);padding:8px;font-size:12px;color:var(--ink-2);transition:all var(--dur)}
+.add-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-subtle)}
+.smallbtn{font-size:11px;color:var(--ink-2);padding:3px 7px;border-radius:var(--r-sm);border:1px solid var(--border);transition:all var(--dur)}
+.smallbtn:hover{color:var(--ink);border-color:var(--border-strong);background:var(--bg-muted)}
+.smallbtn.danger:hover{color:var(--danger);border-color:var(--danger)}
+
+/* ── 开关 ── */
+.switch{position:relative;width:30px;height:17px;border-radius:999px;background:var(--border-strong);transition:background-color var(--dur);flex-shrink:0}
+.switch.on{background:var(--accent)}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform var(--dur)}
+.switch.on::after{transform:translateX(13px)}
+
+/* ── 弹窗 ── */
+.modal-veil{position:fixed;inset:0;background:var(--overlay);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding-top:7vh}
+.modal{width:520px;max-width:calc(100vw - 32px);max-height:82vh;overflow:auto;background:var(--bg-content);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal-head{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-content)}
+.modal-head .t{font-size:14px;font-weight:650;flex:1}
+.x{color:var(--ink-3);padding:3px;border-radius:var(--r-sm)}
+.x:hover{background:var(--bg-muted);color:var(--ink)}
+.modal-body{padding:16px;display:flex;flex-direction:column;gap:13px}
+.steps{border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden}
+.step{display:flex;gap:10px;padding:10px 12px;border-top:1px solid var(--border)}
+.step:first-child{border-top:0}
+.step .n{width:18px;height:18px;border-radius:50%;background:var(--accent-subtle);color:var(--accent-strong);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step .tx{font-size:11.5px;color:var(--ink-2);line-height:1.55}
+.step .tx b{color:var(--ink)}
+.step .tx .goto{color:var(--accent);cursor:pointer}
+.field label{display:block;font-size:11.5px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+.field input{width:100%;border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 10px;font-size:12.5px;background:var(--bg-content);color:var(--ink);font-family:var(--mono)}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-subtle)}
+.field .hint{font-size:10.5px;color:var(--ink-3);margin-top:4px}
+.modal-foot{display:flex;align-items:center;gap:10px;padding:13px 16px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--bg-content)}
+.btn{border-radius:var(--r-sm);padding:7px 14px;font-size:12.5px;font-weight:600;transition:all var(--dur)}
+.btn.primary{background:var(--btn-primary);color:var(--on-btn-primary)}
+.btn.primary:hover{background:var(--btn-primary-hover)}
+.btn.ghost{border:1px solid var(--border);color:var(--ink-2)}
+.btn.ghost:hover{background:var(--bg-muted);color:var(--ink)}
+.feedback{font-size:11.5px;padding:8px 11px;border-radius:var(--r-sm);display:none;align-items:flex-start;gap:7px}
+.feedback.show{display:flex}
+.feedback.ok{background:rgba(47,125,64,.1);color:var(--success)}
+.feedback.fail{background:rgba(198,59,59,.1);color:var(--danger)}
+.spin{width:12px;height:12px;border:2px solid var(--border-strong);border-top-color:var(--accent);border-radius:50%;animation:sp 700ms linear infinite;flex-shrink:0}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ── IM 对话与 HITL 卡片示意 ── */
+.chatmock{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--bg-content)}
+.chatmock .cap{font-size:10.5px;font-weight:700;color:var(--ink-3);padding:7px 12px;background:var(--bg-subtle);border-bottom:1px solid var(--border)}
+.chatmock .msgs{padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--bg-subtle)}
+.bubble{max-width:85%;padding:8px 11px;border-radius:10px;font-size:12px;line-height:1.55}
+.bubble.in{align-self:flex-start;background:var(--bg-content);border:1px solid var(--border);border-top-left-radius:3px}
+.bubble.out{align-self:flex-end;background:var(--accent-subtle);border:1px solid var(--border);border-top-right-radius:3px}
+.bubble .meta{font-size:10px;color:var(--ink-3);margin-bottom:2px}
+.hitl{border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-content);padding:11px 13px;align-self:flex-start;max-width:88%}
+.hitl .h{font-size:12px;font-weight:650;display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.hitl .body{font-size:11.5px;color:var(--ink-2);line-height:1.55;margin-bottom:9px}
+.hitl .body code{font-size:10.5px;background:var(--bg-subtle);border-radius:3px;padding:0 5px}
+.hitl .btns{display:flex;gap:6px;flex-wrap:wrap}
+.hitl .btns button{border-radius:var(--r-sm);padding:4px 10px;font-size:11px;font-weight:600}
+.hb-allow{background:var(--success);color:#fff}
+.hb-always{border:1px solid var(--success);color:var(--success)}
+.hb-reject{border:1px solid var(--danger);color:var(--danger)}
+.done-tag{font-size:10.5px;color:var(--ink-3);border:1px dashed var(--border-strong);border-radius:var(--r-sm);padding:4px 8px;align-self:flex-start}
+
+/* ── 会话列表徽章 ── */
+.sessline{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 10px;margin-top:8px;background:var(--bg-subtle);font-size:12px}
+.sessline .pname{font-size:10px;font-weight:700;color:#fff;border-radius:4px;padding:1px 5px}
+.pname.feishu{background:#2f6fed}.pname.wecom{background:#1e7d43}.pname.dingtalk{background:#1677ff}
+
+/* ── toast ── */
+.toast{position:fixed;right:18px;bottom:18px;z-index:200;background:var(--bg-content);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:0 8px 28px rgba(0,0,0,.18);padding:10px 14px;font-size:12px;display:none;align-items:center;gap:8px;max-width:380px}
+.toast.show{display:flex}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap row">
+  <h1>IM 连接器 · 双向对话交互预览</h1><span class="sub">spec: im-connectors-spec.md · plan: im-connectors-plan.md</span>
+  <span class="spacer"></span>
+  <button class="chip-btn" id="themeBtn" onclick="toggleTheme()">深色模式</button>
+</div></div>
+
+<div class="wrap">
+
+  <!-- 要点 -->
+  <div class="points">
+    <div class="point"><b><span class="n">双向</span>IM ⇄ hip 对话</b><p>IM 发消息 → 智能体执行 → 自动回复。三平台官方<b>长连接</b>，本机免公网 IP、免回调加解密。</p></div>
+    <div class="point"><b><span class="n">HITL</span>卡片确认</b><p>需要授权时 IM 收交互卡片：允许一次 / 总是允许 / 拒绝，点按钮即生效，桌面端同步清除。</p></div>
+    <div class="point"><b><span class="n">安全</span>默认最严</b><p>授权名单默认空 = 无人可对话；未授权进「待授权」；权限模式默认 confirm（全部走卡片确认）。</p></div>
+    <div class="point"><b><span class="n">网关</span>在 sidecar</b><p>凭证存 <code>im-connectors.json</code>（0600）；hip 退出即 IM 离线；Rust 零改动。</p></div>
+  </div>
+
+  <!-- ═══ 设置页 ═══ -->
+  <h2 class="sec">设置 · Agents · <span class="tag">新页</span>IM 连接器</h2>
+  <p class="note">v1 目标页面：三平台卡片（准入门槛如实标注）+ 待授权管理。点「连接」打开分步接入弹窗；点状态徽章模拟状态切换。</p>
+
+  <div class="settings-shell">
+    <nav class="sidebar">
+      <div class="side-group">基础</div>
+      <button class="side-item">通用</button>
+      <button class="side-item">版本与更新</button>
+      <button class="side-item">窗口与后台</button>
+      <button class="side-item">模型</button>
+      <div class="side-group">智能体</div>
+      <button class="side-item">智能体</button>
+      <button class="side-item">MCPs</button>
+      <button class="side-item">技能</button>
+      <button class="side-item">插件</button>
+      <button class="side-item">Hooks</button>
+      <button class="side-item active">IM 连接器 <span class="badge" style="margin-left:auto;background:var(--accent-subtle);color:var(--accent-strong)">新</span></button>
+    </nav>
+    <div class="main">
+      <div class="page-head">
+        <h3>IM 连接器</h3>
+        <p class="desc">连接飞书 / 企业微信 / 钉钉的官方机器人，在 IM 里直接给 hip 派活并接收回复；授权确认以交互卡片完成。平台侧需创建应用/机器人（门槛见各卡片）。</p>
+        <p class="warnline">⚠ hip 退出后 IM 机器人即离线；连接器数据与密钥仅存本机（<code>im-connectors.json</code>，0600）。</p>
+      </div>
+
+      <!-- 待授权 -->
+      <div class="parked-box" id="parkedBox">
+        <div class="parked-head">⏳ 待授权 <span class="cnt">2</span><span style="font-size:11px;color:var(--ink-3)">这些人在 IM 里找了你的机器人，允许后才能对话</span></div>
+        <div class="parked-row" id="parkRow1">
+          <div class="who">李四<small>飞书 · 单聊 · 今天 16:02 · 首次消息「帮我看下这个报错」</small></div>
+          <button class="pill allow" onclick="allowPark(this)">允许</button>
+          <button class="pill deny" onclick="denyPark(this)">拒绝</button>
+        </div>
+        <div class="parked-row" id="parkRow2">
+          <div class="who">产品讨论群（@机器人）<small>企业微信 · 群聊 · 今天 15:41</small></div>
+          <button class="pill allow" onclick="allowPark(this)">允许</button>
+          <button class="pill deny" onclick="denyPark(this)">拒绝</button>
+        </div>
+      </div>
+
+      <!-- 平台卡片 -->
+      <div class="grid">
+        <!-- 飞书：已连接 -->
+        <div class="card">
+          <div class="card-head"><span class="logo feishu">飞</span><div><div class="t">飞书</div><div class="s">自建应用机器人 · 长连接（官方 SDK）</div></div></div>
+          <div class="card-body">
+            <div class="instance">
+              <div class="line1">
+                <span class="dot ok" id="fsDot"></span>
+                <div class="name">我的飞书机器人<small>cli_xxxx · 已连接</small></div>
+                <div class="switch on" onclick="this.classList.toggle('on')"></div>
+                <button class="smallbtn" onclick="openModal('feishu')">编辑</button>
+                <button class="smallbtn danger">删除</button>
+              </div>
+              <div class="line2">
+                <span class="perm">权限模式
+                  <select><option selected>confirm · 卡片确认</option><option>auto · 直接执行</option></select>
+                </span>
+                <button class="smallbtn" onclick="toast('📨 测试消息已发送到你的飞书单聊')">发送测试消息</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 企微：空态 -->
+        <div class="card">
+          <div class="card-head"><span class="logo wecom">企</span><div><div class="t">企业微信</div><div class="s">智能机器人 · 长连接（openws.work.weixin.qq.com）</div></div></div>
+          <div class="card-body">
+            <div class="empty">尚未连接。在企微管理后台创建<b>智能机器人</b>并开启「API 模式 → 长连接」，获取 BotID 与 Secret。</div>
+            <div class="barrier">⛩ 准入：需企业微信管理后台权限（企业管理员）。长连接免公网、免加解密，30s 心跳。</div>
+            <button class="add-btn" onclick="openModal('wecom')">+ 连接企微机器人</button>
+          </div>
+        </div>
+
+        <!-- 钉钉：空态 -->
+        <div class="card">
+          <div class="card-head"><span class="logo dingtalk">钉</span><div><div class="t">钉钉</div><div class="s">企业内部应用机器人 · Stream 模式</div></div></div>
+          <div class="card-body">
+            <div class="empty">尚未连接。在钉钉开发者后台创建<b>企业内部应用</b>，开通机器人能力并选择 Stream 模式，获取 ClientID / ClientSecret。</div>
+            <div class="barrier">⛩ 准入：需钉钉企业开发者权限；应用需发布。</div>
+            <button class="add-btn" onclick="openModal('dingtalk')">+ 连接钉钉机器人</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ IM 对话 + HITL 示意 ═══ -->
+      <h2 class="sec">连上之后：IM 里这样对话 <span class="tag">示意</span></h2>
+      <p class="note">入站消息桥接进 hip 会话（桌面端同步可见，带平台徽章）；回复自动发回；HITL 走卡片。点卡片按钮体验回流。</p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+        <div class="chatmock" style="flex:1;min-width:340px">
+          <div class="cap">飞书 · 群聊「运维告警群」</div>
+          <div class="msgs">
+            <div class="bubble in"><div class="meta">张三 · 16:40</div>帮我看下昨天构建失败的报错，顺手修掉</div>
+            <div class="bubble out" id="replyBubble"><div class="meta">hip · 16:42</div>收到。已定位：<code>tsc</code> 类型错误 3 处，正在修复并回归测试…</div>
+            <div class="hitl" id="hitlCard">
+              <div class="h">🔐 hip 需要你的授权</div>
+              <div class="body">智能体请求执行命令：<code>rm -rf ./dist && yarn build</code><br>会话：修复构建报错（IM） · 来源：飞书 张三</div>
+              <div class="btns" id="hitlBtns">
+                <button class="hb-allow" onclick="hitlDone(this,'已允许执行')">允许一次</button>
+                <button class="hb-always" onclick="hitlDone(this,'本次会话总是允许')">总是允许</button>
+                <button class="hb-reject" onclick="hitlDone(this,'已拒绝')">拒绝</button>
+              </div>
+            </div>
+            <div class="bubble out" id="finalBubble" style="display:none"><div class="meta">hip · 16:45</div>✅ 修复完成，回归测试通过。改动已提交，见桌面端 diff。</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:300px">
+          <div class="chatmock">
+            <div class="cap">hip 桌面端 · 会话列表（自动出现）</div>
+            <div style="padding:10px">
+              <div class="sessline"><span class="pname feishu">飞书</span><b>运维告警群</b><span style="color:var(--ink-3);font-size:11px">（IM）· 进行中</span></div>
+              <div class="sessline" style="border-style:dashed"><span class="pname wecom">企微</span><b>李四</b><span style="color:var(--ink-3);font-size:11px">（IM）· 待授权</span></div>
+              <div class="sessline" style="border-style:dashed"><span class="pname dingtalk">钉钉</span><b>产品讨论群</b><span style="color:var(--ink-3);font-size:11px">（IM）· 空闲</span></div>
+            </div>
+          </div>
+          <p class="note" style="margin-top:10px">IM 会话与桌面会话同一套生命周期：权限确认、暂停恢复、错误状态双向一致（<code>permission:resolved</code> 广播）。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 接入弹窗 ═══ -->
+<div class="modal-veil" id="veil" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="logo feishu" id="mLogo">飞</span>
+      <span class="t" id="mTitle">连接飞书机器人</span>
+      <button class="x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>分步接入</label>
+        <div class="steps" id="mSteps">
+          <div class="step"><span class="n">1</span><div class="tx">前往 <b class="goto">飞书开放平台</b> → 创建<b>企业自建应用</b>（个人开发者可注册）→ 添加「机器人」能力。</div></div>
+          <div class="step"><span class="n">2</span><div class="tx">「事件与回调」→ 订阅方式选 <b>使用长连接接收事件</b>；订阅事件：<code>im.message.receive_v1</code>、<code>card.action.trigger</code>。</div></div>
+          <div class="step"><span class="n">3</span><div class="tx">创建应用版本并<b>发布</b>（企业内自用），把机器人拉进你要对话的群。</div></div>
+          <div class="step"><span class="n">4</span><div class="tx">回到这里粘贴 <b>App ID / App Secret</b>（应用详情页「凭证与基础信息」）。</div></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>名称</label>
+        <input type="text" id="fName" placeholder="例如：我的飞书机器人">
+      </div>
+      <div class="field">
+        <label>App ID</label>
+        <input type="text" id="fK1" placeholder="cli_xxxxxxxxx">
+      </div>
+      <div class="field">
+        <label>App Secret <span style="font-weight:400;color:var(--ink-3)">（凭证，仅存本机 0600 文件，不回显）</span></label>
+        <input type="password" id="fK2" placeholder="已设置（留空则不修改）">
+      </div>
+      <div class="feedback ok show" id="fbOk">✅ 已连接。测试消息已发到你的飞书单聊，请查收。</div>
+      <div class="feedback fail" id="fbFail">⚠ 凭证无效（app_secret 校验失败）。请核对 App Secret 是否复制完整。</div>
+      <div class="feedback" id="fbLoad" style="display:none;align-items:center"><span class="spin"></span> 正在连接并发送测试消息…</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn primary" onclick="saveConnector()">保存并连接</button>
+      <button class="btn ghost" onclick="closeModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ toast ═══ -->
+<div class="toast" id="toast"><span id="toastIcon">📨</span><span id="toastText"></span></div>
+
+<script>
+function toggleTheme(){
+  const h=document.documentElement,d=h.dataset.theme==='dark'?'light':'dark';
+  h.dataset.theme=d;document.getElementById('themeBtn').textContent=d==='dark'?'浅色模式':'深色模式';
+}
+const PLAT={
+  feishu:{l:'飞',t:'连接飞书机器人',steps:[
+    ['1','前往 <b class="goto">飞书开放平台</b> → 创建<b>企业自建应用</b>（个人开发者可注册）→ 添加「机器人」能力。'],
+    ['2','「事件与回调」→ 订阅方式选 <b>使用长连接接收事件</b>；订阅事件：<code>im.message.receive_v1</code>、<code>card.action.trigger</code>。'],
+    ['3','创建应用版本并<b>发布</b>（企业内自用），把机器人拉进你要对话的群。'],
+    ['4','回到这里粘贴 <b>App ID / App Secret</b>（应用详情页「凭证与基础信息」）。']],
+    k1:'App ID',k1p:'cli_xxxxxxxxx',k2:'App Secret'},
+  wecom:{l:'企',t:'连接企微机器人',steps:[
+    ['1','企业微信<b>管理后台</b> → 应用管理 → 创建<b>智能机器人</b>。'],
+    ['2','机器人设置 → <b>API 模式</b> → 选择<b>长连接</b>方式，获取 <b>BotID</b> 与 <b>Secret</b>（长连接专用）。'],
+    ['3','把机器人添加进目标群，或让成员单聊机器人。'],
+    ['4','回到这里粘贴 BotID / Secret。']],
+    k1:'BotID',k1p:'',k2:'Secret（长连接专用）'},
+  dingtalk:{l:'钉',t:'连接钉钉机器人',steps:[
+    ['1','<b>钉钉开发者后台</b> → 创建<b>企业内部应用</b>。'],
+    ['2','应用能力 → 添加「机器人」，消息接收模式选 <b>Stream 模式</b>，保存发布。'],
+    ['3','获取 <b>ClientID（AppKey）</b> 与 <b>ClientSecret</b>。'],
+    ['4','回到这里粘贴两组凭证。']],
+    k1:'ClientID (AppKey)',k1p:'',k2:'ClientSecret'},
+};
+function openModal(platform){
+  const p=PLAT[platform];
+  document.getElementById('mLogo').textContent=p.l;
+  document.getElementById('mTitle').textContent=p.t;
+  document.getElementById('mSteps').innerHTML=p.steps.map(s=>
+    '<div class="step"><span class="n">'+s[0]+'</span><div class="tx">'+s[1]+'</div></div>').join('');
+  document.getElementById('fK1').placeholder=p.k1p;
+  document.getElementById('fK1').previousElementSibling.innerHTML=p.k1;
+  document.getElementById('fK2').placeholder='已设置（留空则不修改）';
+  document.getElementById('fK2').previousElementSibling.innerHTML=p.k2+' <span style="font-weight:400;color:var(--ink-3)">（凭证，仅存本机 0600 文件，不回显）</span>';
+  document.getElementById('fName').value=platform==='feishu'?'我的飞书机器人':'';
+  document.getElementById('veil').style.display='flex';
+  resetTest();
+}
+function closeModal(){document.getElementById('veil').style.display='none';resetTest()}
+function resetTest(){
+  ['fbOk','fbFail'].forEach(id=>document.getElementById(id).classList.remove('show'));
+  document.getElementById('fbLoad').style.display='none';
+}
+function saveConnector(){
+  document.getElementById('fbLoad').style.display='flex';
+  setTimeout(()=>{
+    document.getElementById('fbLoad').style.display='none';
+    document.getElementById('fbOk').classList.add('show');
+    setTimeout(()=>{closeModal();toast('✅ 已连接：机器人已在线')},700);
+  },900);
+}
+function allowPark(btn){
+  const row=btn.closest('.parked-row');row.remove();
+  updateCnt();toast('✅ 已授权，对方现在可以对话了');
+}
+function denyPark(btn){
+  const row=btn.closest('.parked-row');row.remove();
+  updateCnt();toast('已拒绝');
+}
+function updateCnt(){
+  const box=document.getElementById('parkedBox');
+  const rows=box.querySelectorAll('.parked-row');
+  const cnt=box.querySelector('.cnt');
+  cnt.textContent=rows.length;
+  if(rows.length===0){box.style.display='none';toast('待授权列表已清空')}
+}
+function hitlDone(btn,msg){
+  const card=document.getElementById('hitlCard');
+  const btns=document.getElementById('hitlBtns');
+  btns.innerHTML='<div class="done-tag">✅ '+msg+' · 卡片已更新 · 桌面端同步清除</div>';
+  card.style.borderStyle='dashed';
+  setTimeout(()=>{document.getElementById('finalBubble').style.display='block';toast('🟢 授权已回流：会话继续执行')},800);
+}
+let toastTimer;
+function toast(text,icon){
+  const el=document.getElementById('toast');
+  document.getElementById('toastText').textContent=text;
+  document.getElementById('toastIcon').textContent=icon||'📨';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2600);
+}
+</script>
+</body>
+</html>

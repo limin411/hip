@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hip · 通用设置 — 版本与自动检查更新（交互预览）</title>
+<style>
+/* ═══════════ 设计令牌（对齐 src/styles/tokens.css）═══════════ */
+:root{
+  --bg-app:#ffffff; --bg-subtle:#F6F5F3; --bg-muted:#f1f1f1; --bg-content:#ffffff;
+  --border:#e0e0e0; --border-strong:#c9c9c9;
+  --ink:#111111; --ink-2:#5e5e5e; --ink-3:#757575;
+  --accent:#c2410c; --accent-hover:#9a3412; --accent-strong:#7c2d12;
+  --accent-subtle:#f0f0f0; --accent-active:#e6e6e6; --on-accent:#fff;
+  --success:#2f7d40; --danger:#c63b3b; --warning:#9a5d10;
+  --btn-primary:#3a3a3a; --btn-primary-hover:#2e2e2e; --on-btn-primary:#fafafa;
+  --overlay:rgba(17,17,17,.28);
+  --dur:100ms; --ease:cubic-bezier(.2,0,0,1);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --font:-apple-system,BlinkMacSystemFont,"Inter","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+  --r-sm:6px; --r-md:10px; --r-lg:14px;
+}
+html[data-theme="dark"]{
+  --bg-app:#0f0f0f; --bg-subtle:#161616; --bg-muted:#1e1e1e; --bg-content:#141414;
+  --border:#333333; --border-strong:#454545;
+  --ink:#f0f0f0; --ink-2:#b3b3b3; --ink-3:#8a8a8a;
+  --accent:#ffb300; --accent-hover:#ffc233; --accent-strong:#ffcc80;
+  --accent-subtle:#222222; --accent-active:#2e2e2e; --on-accent:#111111;
+  --success:#5aad5e; --danger:#e85a5a; --warning:#e6a23c;
+  --btn-primary:#e0e0e0; --btn-primary-hover:#ececec; --on-btn-primary:#141414;
+  --overlay:rgba(0,0,0,.52);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-app);color:var(--ink)}
+body{font-family:var(--font);font-size:13px;line-height:1.5;padding-bottom:72px;-webkit-font-smoothing:antialiased}
+button,input{font-family:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+code,.mono{font-family:var(--mono)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── 顶栏 ── */
+.topbar{position:sticky;top:0;z-index:80;background:var(--bg-app);border-bottom:1px solid var(--border);padding:10px 0}
+.topbar .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.topbar h1{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.topbar .sub{color:var(--ink-3);font-size:11.5px}
+.spacer{flex:1}
+.chip-btn{border:1px solid var(--border);background:var(--bg-subtle);border-radius:var(--r-sm);padding:5px 11px;font-size:12px;color:var(--ink-2);transition:background-color var(--dur),color var(--dur),border-color var(--dur)}
+.chip-btn:hover{background:var(--accent-subtle);color:var(--ink)}
+.chip-btn.on{background:var(--accent-subtle);color:var(--ink);font-weight:600;border-color:var(--border-strong)}
+
+/* ── 要点 ── */
+.points{display:flex;gap:10px;margin:14px auto 8px;flex-wrap:wrap}
+.point{flex:1;min-width:200px;border:1px solid var(--border);border-radius:var(--r-md);padding:9px 12px;background:var(--bg-subtle)}
+.point b{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:650;margin-bottom:3px}
+.point b .n{font-size:9.5px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);border-radius:4px;padding:1px 5px}
+.point p{font-size:11.5px;color:var(--ink-2);line-height:1.55}
+.point p code{font-size:10.5px;background:var(--accent-subtle);border-radius:3px;padding:0 4px;color:var(--ink)}
+
+h2.sec{font-size:15px;font-weight:650;letter-spacing:-.01em;margin:32px 0 4px;display:flex;align-items:center;gap:8px}
+h2.sec .tag{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-subtle);padding:2px 7px;border-radius:4px;letter-spacing:.04em}
+p.sec-sub{color:var(--ink-3);font-size:12px;margin-bottom:12px}
+
+.scenes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.scenes button{border:1px solid var(--border);background:var(--bg-subtle);border-radius:999px;padding:4px 12px;font-size:11.5px;color:var(--ink-2);transition:all var(--dur)}
+.scenes button:hover{color:var(--ink)}
+.scenes button.on{background:var(--accent-subtle);color:var(--ink);border-color:var(--border-strong);font-weight:600}
+
+/* ── 设置窗 ── */
+.app{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--bg-app);display:grid;grid-template-columns:220px 1fr;min-height:640px;box-shadow:none}
+.titlebar{grid-column:1/-1;height:40px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--bg-app)}
+.dots{display:flex;gap:6px;padding-left:6px}
+.dots i{width:10px;height:10px;border-radius:50%;background:var(--border-strong)}
+.dots i:nth-child(1){background:#ff5f57}
+.dots i:nth-child(2){background:#febc2e}
+.dots i:nth-child(3){background:#28c840}
+.titlebar .tt{font-size:12.5px;font-weight:600;margin-left:8px}
+.titlebar .meta{margin-left:auto;font-size:11px;color:var(--ink-3)}
+
+.side{background:var(--bg-subtle);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:8px 8px 10px}
+.g-lab{padding:6px 10px 4px;font-size:11px;font-weight:500;letter-spacing:.04em;color:var(--ink-3)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:500;color:var(--ink-2);text-align:left;transition:background-color var(--dur),color var(--dur)}
+.nav button:hover{background:var(--accent-subtle);color:var(--ink)}
+.nav button.on{background:#fff;color:var(--ink)}
+html[data-theme="dark"] .nav button.on{background:var(--accent-active)}
+.nav svg{flex-shrink:0;opacity:.9}
+.side-foot{margin-top:auto;padding-top:8px}
+.side-foot button{color:var(--ink-2)}
+
+.main{overflow:auto;background:var(--bg-content);min-height:0}
+.page-title{padding:28px 32px 12px}
+.page-title h2{font-size:16px;font-weight:650;letter-spacing:-.02em}
+
+.row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 32px}
+.row .l{min-width:0;flex:1}
+.row .lt{font-size:13px;font-weight:500}
+.row .ld{margin-top:2px;font-size:12px;color:var(--ink-3);line-height:1.55}
+.sel{display:flex;align-items:center;justify-content:space-between;gap:24px;height:32px;padding:0 10px 0 10px;min-width:120px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-app);font-size:13px;color:var(--ink-2);transition:background-color var(--dur)}
+.sel:hover{background:var(--accent-subtle);color:var(--ink)}
+.sel svg{color:var(--ink-3)}
+
+.block{padding:16px 32px;display:flex;flex-direction:column;gap:12px}
+.block-head{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.sec-kicker{padding:18px 32px 0;font-size:11px;font-weight:650;letter-spacing:.06em;color:var(--ink-3);text-transform:uppercase}
+
+/* switch */
+.sw{width:36px;height:20px;border-radius:999px;background:var(--border-strong);position:relative;transition:background-color var(--dur);flex-shrink:0}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left var(--dur) var(--ease);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+html[data-theme="dark"] .sw::after{background:#f0f0f0}
+.sw.on{background:var(--accent)}
+.sw.on::after{left:18px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border-radius:var(--r-sm);font-size:13px;font-weight:500;transition:background-color var(--dur),color var(--dur),border-color var(--dur),opacity var(--dur);white-space:nowrap}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn-primary{background:var(--btn-primary);color:var(--on-btn-primary)}
+.btn-primary:hover{background:var(--btn-primary-hover)}
+.btn-outline{border:1px solid var(--border);background:transparent;color:var(--ink)}
+.btn-outline:hover{background:var(--accent-subtle)}
+.btn-ghost{color:var(--ink);height:28px;padding:0 10px}
+.btn-ghost:hover{background:var(--accent-subtle)}
+.btn-sm{height:28px;padding:0 10px;font-size:12.5px}
+
+.ver{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;letter-spacing:.01em}
+.badge{display:inline-flex;align-items:center;gap:4px;margin-left:8px;font-size:10.5px;font-weight:600;border:1px solid var(--border);border-radius:6px;padding:1px 7px;color:var(--warning);vertical-align:middle}
+.status{font-size:12px;color:var(--ink-3);line-height:1.55}
+.status.ok{color:var(--success)}
+.status.warn{color:var(--warning)}
+.status.bad{color:var(--danger)}
+.status.info{color:var(--ink-2)}
+
+.notes{border:1px solid var(--border);border-radius:var(--r-md);background:var(--bg-subtle);padding:10px 12px;font-size:12px;color:var(--ink-2);line-height:1.55}
+.notes b{display:block;font-size:11px;color:var(--ink-3);font-weight:600;margin-bottom:4px}
+.notes a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+
+.progress{height:6px;border-radius:999px;background:var(--bg-muted);overflow:hidden}
+.progress > i{display:block;height:100%;width:0;background:var(--ink);border-radius:999px;transition:width 180ms linear}
+html[data-theme="dark"] .progress > i{background:var(--btn-primary)}
+.prog-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+.warn-box{border:1px solid color-mix(in srgb,var(--warning) 40%,var(--border));background:color-mix(in srgb,var(--warning) 8%,var(--bg-subtle));border-radius:var(--r-md);padding:10px 12px;font-size:12px;color:var(--ink-2);line-height:1.55}
+.warn-box strong{color:var(--warning);font-weight:650}
+
+.spin{width:12px;height:12px;border:1.5px solid var(--border-strong);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none !important}
+.actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:var(--overlay);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{width:min(440px,100%);background:var(--bg-app);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 20px 16px}
+.modal h3{font-size:15px;font-weight:650;margin-bottom:8px}
+.modal p{font-size:12.5px;color:var(--ink-2);line-height:1.6;margin-bottom:8px}
+.modal .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+/* toast */
+.toast{position:fixed;right:20px;bottom:20px;z-index:120;min-width:280px;max-width:360px;background:var(--bg-app);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:flex;flex-direction:column;gap:8px}
+.toast b{font-size:13px}
+.toast span{font-size:12px;color:var(--ink-2)}
+.toast .t-act{display:flex;gap:8px;justify-content:flex-end}
+
+.gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.gcard{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--bg-app)}
+.gcard .gh{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--bg-subtle);border-bottom:1px solid var(--border);font-size:11.5px;color:var(--ink-2)}
+.gcard .gb{padding:12px 14px}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--ink-2)}
+.flow .box{border:1px solid var(--border);background:var(--bg-subtle);border-radius:var(--r-sm);padding:6px 10px;font-family:var(--mono);font-size:11px;color:var(--ink)}
+.flow .ar{color:var(--ink-3)}
+
+.note-list{margin:8px 0 0 18px;color:var(--ink-2);font-size:12.5px;line-height:1.65}
+.note-list code{font-size:11px;background:var(--accent-subtle);padding:0 4px;border-radius:3px}
+
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .gallery{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="wrap">
+    <div class="row">
+      <h1>版本与自动检查更新 · 通用设置</h1>
+      <span class="sub">spec 交互预览 · 非产品代码 · 2026-08-23</span>
+      <div class="spacer"></div>
+      <button class="chip-btn" id="langBtn" type="button">中文 / EN</button>
+      <button class="chip-btn" id="themeBtn" type="button">深色</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="points">
+    <div class="point">
+      <b><span class="n">KD-1</span> 不假装静默更新</b>
+      <p>CI 产物未签名、无 <code>latest.json</code>。v1 下载安装器并打开，不 in-place 替换。</p>
+    </div>
+    <div class="point">
+      <b><span class="n">KD-2</span> 开关 = 自动检查</b>
+      <p>默认关。打开后每 24h 打 GitHub Releases；下载/安装永远要用户点一次。</p>
+    </div>
+    <div class="point">
+      <b><span class="n">KD-5</span> HTTP 走 Rust</b>
+      <p>CSP 禁止前端连 GitHub。命令层 <code>reqwest</code> + <code>[proxy]</code> + SHA-256。</p>
+    </div>
+  </div>
+
+  <h2 class="sec">设置页原型 <span class="tag">INTERACTIVE</span></h2>
+  <p class="sec-sub">点「检查更新」会演示检查动画并轮转结果；也可直接用状态芯片跳转。「立即更新」走确认框 → 进度 → 打开安装器。自动检查开关独立可点——<strong>仅当当前已是「有新版本」时</strong>拨开会弹出 toast；idle / 已最新时拨开不会假装有更新。</p>
+  <p class="sec-sub" style="margin-top:-6px">真实页顺序（本原型折叠了中间行）：语言 · 主题 · 代码块 · 文档宽度 · 密度 · 终端… · 回收站 · <strong>代理</strong> · <strong>本区块</strong> · 右键菜单。</p>
+
+  <div class="scenes" id="scenes"></div>
+
+  <div class="app" id="app">
+    <div class="titlebar">
+      <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+      <span class="tt">hip</span>
+      <span class="meta" id="winMeta">Settings · General · v1.0.1</span>
+    </div>
+    <aside class="side">
+      <div class="g-lab" data-i="gBasics">基础设置</div>
+      <div class="nav">
+        <button class="on" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/></svg>
+          <span data-i="navGeneral">通用</span>
+        </button>
+        <button type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3a4 4 0 0 1 4 4v1h1a3 3 0 0 1 0 6h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1 0-6h1V7a4 4 0 0 1 4-4z"/></svg>
+          <span data-i="navVoice">语音功能</span>
+        </button>
+        <button type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>
+          <span data-i="navWindow">窗口与后台</span>
+        </button>
+        <button type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+          <span data-i="navModel">模型配置</span>
+        </button>
+      </div>
+      <div class="g-lab" style="margin-top:8px" data-i="gAgents">智能体设置</div>
+      <div class="nav">
+        <button type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="8" r="3"/><path d="M5 19a7 7 0 0 1 14 0"/></svg>
+          <span data-i="navAgents">智能体管理</span>
+        </button>
+      </div>
+      <div class="side-foot">
+        <div class="nav">
+          <button type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M15 18l-6-6 6-6"/></svg>
+            <span data-i="navBack">返回</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="page-title"><h2 data-i="pageTitle">通用</h2></div>
+
+      <div class="row">
+        <div class="l">
+          <div class="lt" data-i="lang">界面语言</div>
+          <div class="ld" data-i="langDesc">应用界面的显示语言</div>
+        </div>
+        <button class="sel" type="button"><span>简体中文</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+      <div class="row">
+        <div class="l">
+          <div class="lt" data-i="theme">主题</div>
+          <div class="ld" data-i="themeDesc">选择应用界面的配色方案</div>
+        </div>
+        <button class="sel" type="button"><span data-i="themeSys">跟随系统</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+
+      <div class="block" style="padding-top:8px;padding-bottom:8px">
+        <div class="block-head">
+          <div class="l">
+            <div class="lt" data-i="proxy">网络代理</div>
+            <div class="ld" data-i="proxyDesc">用于智能体联网工具与本地模型下载的 HTTP(S) 代理（如 Clash）。</div>
+          </div>
+          <button class="sw" id="proxySw" type="button" role="switch" aria-checked="false" title="preview-only"></button>
+        </div>
+      </div>
+
+      <div class="sec-kicker" data-i="section">版本与更新</div>
+      <div class="ld" style="padding:4px 32px 0" data-i="source">更新来源：GitHub Releases</div>
+
+      <!-- 当前版本 -->
+      <div class="row" data-testid="settings-updates">
+        <div class="l">
+          <div class="lt" data-i="current">当前版本</div>
+          <div class="ld" data-i="currentDesc">正在运行的 hip 版本（来自应用清单，非手动填写）</div>
+        </div>
+        <div>
+          <span class="ver" id="verNum">1.0.1</span>
+          <span class="badge hidden" id="devBadge">开发构建</span>
+        </div>
+      </div>
+
+      <!-- 检查 / 状态 -->
+      <div class="block" style="padding-top:4px">
+        <div class="block-head">
+          <div class="l">
+            <div class="status info" id="statusLine">尚未检查更新</div>
+            <div class="ld" id="lastChecked"></div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-outline btn-sm" id="checkBtn" type="button">检查更新</button>
+            <button class="btn btn-primary btn-sm hidden" id="installBtn" type="button">立即更新</button>
+            <button class="btn btn-outline btn-sm hidden" id="openRelBtn" type="button">在 GitHub 打开</button>
+            <button class="btn btn-primary btn-sm hidden" id="openInstBtn" type="button">打开安装程序</button>
+          </div>
+        </div>
+        <div class="notes hidden" id="notesBox">
+          <b data-i="notesLabel">更新说明</b>
+          <div id="notesBody"></div>
+        </div>
+        <div class="warn-box hidden" id="warnBox"></div>
+        <div class="hidden" id="progBox">
+          <div class="prog-meta"><span id="progLabel">正在下载 hip_1.0.2_aarch64.dmg…</span><span id="progPct">0%</span></div>
+          <div class="progress" style="margin-top:6px"><i id="progBar"></i></div>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn btn-ghost btn-sm" id="cancelBtn" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 自动检查 -->
+      <div class="block" style="padding-top:4px;padding-bottom:28px">
+        <div class="block-head">
+          <div class="l">
+            <div class="lt" data-i="auto">自动检查更新</div>
+            <div class="ld" data-i="autoDesc">开启后每 24 小时检查一次 GitHub Releases。发现新版本会通知你；不会自动下载或安装。</div>
+          </div>
+          <button class="sw" id="autoSw" type="button" role="switch" aria-checked="false" data-testid="settings-updates-auto"></button>
+        </div>
+        <div class="ld hidden" id="autoHint" style="padding-top:0">已开启 — 下次启动约 5 秒后会检查；运行中每 24 小时最多请求一次 GitHub。</div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">状态矩阵 <span class="tag">STATIC</span></h2>
+  <p class="sec-sub">同一区块在各状态下的文案对照。上方原型是可点的；这里是评审清单。</p>
+  <div class="gallery" id="gallery"></div>
+
+  <h2 class="sec">数据流 <span class="tag">V1</span></h2>
+  <p class="sec-sub">前端不 fetch GitHub。更新源固定 <code>limin411/hip</code>。</p>
+  <div class="flow">
+    <div class="box">GeneralSettings</div><span class="ar">invoke →</span>
+    <div class="box">updates.rs</div><span class="ar">HTTPS + proxy →</span>
+    <div class="box">api.github.com/releases/latest</div><span class="ar">→</span>
+    <div class="box">~/.hip/cache/updates/</div>
+  </div>
+  <ul class="note-list">
+    <li>完整性：<code>SHA256SUMS.txt</code>，否则 API <code>digest</code>；都没有则拒绝下载。</li>
+    <li>macOS CI 未签名（<code>HIP_SKIP_SIGN=1</code>）。确认框必须写 Gatekeeper / SmartScreen，不能藏在脚注。</li>
+    <li>Intel Mac 今天没有 x64 dmg — 状态是「无匹配安装包」，不要塞 aarch64 包。</li>
+    <li><code>yarn tauri dev</code> 显示版本、允许检查、禁止安装路径。</li>
+  </ul>
+</div>
+
+<!-- confirm modal -->
+<div class="scrim hidden" id="scrim" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 id="modalTitle">下载 hip_1.0.2_aarch64.dmg？</h3>
+    <p id="modalBody"></p>
+    <div class="warn-box" id="modalWarn"></div>
+    <div class="foot">
+      <button class="btn btn-outline" id="modalCancel" type="button">取消</button>
+      <button class="btn btn-primary" id="modalOk" type="button">下载并校验</button>
+    </div>
+  </div>
+</div>
+
+<!-- toast -->
+<div class="toast hidden" id="toast">
+  <b id="toastTitle">发现新版本 v1.0.2</b>
+  <span id="toastBody">GitHub Releases 有新的安装包。不会自动下载。</span>
+  <div class="t-act">
+    <button class="btn btn-ghost btn-sm" id="toastLater" type="button">稍后</button>
+    <button class="btn btn-primary btn-sm" id="toastView" type="button">查看</button>
+  </div>
+</div>
+
+<script>
+const I18N = {
+  zh: {
+    themeBtnLight:'浅色', themeBtnDark:'深色',
+    gBasics:'基础设置', navGeneral:'通用', navVoice:'语音功能', navWindow:'窗口与后台', navModel:'模型配置',
+    gAgents:'智能体设置', navAgents:'智能体管理', navBack:'返回',
+    pageTitle:'通用', lang:'界面语言', langDesc:'应用界面的显示语言',
+    theme:'主题', themeDesc:'选择应用界面的配色方案', themeSys:'跟随系统',
+    proxy:'网络代理', proxyDesc:'用于智能体联网工具与本地模型下载的 HTTP(S) 代理（如 Clash）。',
+    section:'版本与更新', source:'更新来源：GitHub Releases',
+    current:'当前版本', currentDesc:'正在运行的 hip 版本（来自应用清单，非手动填写）',
+    devBadge:'开发构建',
+    check:'检查更新', checking:'正在检查…', install:'立即更新',
+    openRelease:'在 GitHub 打开', openInstaller:'打开安装程序', cancel:'取消',
+    auto:'自动检查更新',
+    autoDesc:'开启后每 24 小时检查一次 GitHub Releases。发现新版本会通知你；不会自动下载或安装。',
+    autoHint:'已开启 — 立即做一次检查；之后由 Rust 每小时 wake，距上次成功 ≥24h 才打 GitHub。',
+    notesLabel:'更新说明',
+    idle:'尚未检查更新',
+    upToDate:'已是最新版本',
+    available:'发现新版本 v1.0.2（2026-08-24）',
+    ahead:'当前版本新于线上（开发 / 本地构建）',
+    noAsset:'有新版本 v1.0.2，但没有适合当前系统（macOS/x86_64）的安装包',
+    errorNetwork:'无法连接 GitHub。可在上方开启网络代理后重试',
+    errorRate:'GitHub 请求过于频繁，请稍后再试',
+    errorHttp:'检查更新失败（HTTP 502）',
+    errorHost:'更新服务器地址不在允许列表（请升级 hip）',
+    errorParse:'无法解析 GitHub 返回',
+    errorHash:'安装包校验失败，已删除损坏文件',
+    noHash:'找到新版本，但 GitHub 未提供校验和，无法在应用内下载',
+    downloading:'正在下载 hip_1.0.2_aarch64.dmg…',
+    verifying:'正在校验 SHA-256…',
+    ready:'已下载并校验，可以打开安装程序',
+    last:'上次检查：刚刚',
+    notes:'### Added\n- 通用设置：当前版本、检查更新、自动检查开关。\n- 下载安装包后校验 SHA-256 并打开系统安装器。\n\nmacOS CI 包仍未签名。',
+    unsigned:'GitHub Actions 构建的 macOS 包未签名（HIP_SKIP_SIGN=1），Gatekeeper 可能拦截。Windows SmartScreen 也可能告警。下载约 57 MB，校验 SHA-256 后会打开安装程序，hip 不会自行退出。',
+    unsignedTitle:'安装包未签名',
+    confirmTitle:'下载 hip_1.0.2_aarch64.dmg？',
+    confirmOk:'下载并校验',
+    confirmBody:'将从 GitHub Releases 下载匹配当前架构的安装包，并与 SHA256SUMS.txt 比对。',
+    toastTitle:'发现新版本 v1.0.2',
+    toastBody:'GitHub Releases 有新的安装包。不会自动下载。',
+    toastView:'查看', toastLater:'稍后',
+    opened:'安装程序已打开。若 macOS 提示无法验证开发者，请到系统设置 → 隐私与安全性 允许。',
+    intelWarn:'CI 目前只发布 aarch64.dmg。不会把 Apple Silicon 包装到 Intel Mac 上。',
+    devWarn:'开发会话中不安装发行包。可打开 GitHub Releases 查看。',
+    scenes:{
+      idle:'未检查', checking:'检查中', upToDate:'已最新', available:'有新版本',
+      failed:'网络失败', autoOn:'自动检查开', downloading:'下载中', ready:'待安装',
+      intel:'Intel 无包', ahead:'本地更新', dev:'开发会话', rateLimit:'限流',
+      httpErr:'HTTP 502', hostErr:'Host 拒绝', parseErr:'解析失败', hashErr:'校验失败', noHash:'无校验和'
+    }
+  },
+  en: {
+    themeBtnLight:'Light', themeBtnDark:'Dark',
+    gBasics:'Basics', navGeneral:'General', navVoice:'Voice', navWindow:'Window & background', navModel:'Models',
+    gAgents:'Agents', navAgents:'Agents', navBack:'Back',
+    pageTitle:'General', lang:'Interface language', langDesc:'The display language of the application',
+    theme:'Theme', themeDesc:'Choose the color scheme of the app', themeSys:'System',
+    proxy:'Network proxy', proxyDesc:'HTTP(S) proxy for agent web tools and local model downloads.',
+    section:'Version & updates', source:'Source: GitHub Releases',
+    current:'Current version', currentDesc:'Running hip version from the app manifest',
+    devBadge:'Dev build',
+    check:'Check for updates', checking:'Checking…', install:'Update now',
+    openRelease:'Open on GitHub', openInstaller:'Open installer', cancel:'Cancel',
+    auto:'Automatic update checks',
+    autoDesc:'When on, hip checks GitHub Releases every 24 hours. You’ll be notified; nothing is downloaded or installed automatically.',
+    autoHint:'On — one check now; Rust wakes hourly and hits GitHub only if the last success is ≥24h old.',
+    notesLabel:'Release notes',
+    idle:'Not checked yet',
+    upToDate:'You’re up to date',
+    available:'Update available: v1.0.2 (2026-08-24)',
+    ahead:'Newer than the latest release (dev / local build)',
+    noAsset:'v1.0.2 is out, but no installer matches this system (macOS/x86_64)',
+    errorNetwork:'Couldn’t reach GitHub. Enable the network proxy above and retry',
+    errorRate:'GitHub rate limit reached. Try again later',
+    errorHttp:'Update check failed (HTTP 502)',
+    errorHost:'Update host is not on the allowlist (upgrade hip)',
+    errorParse:'Couldn’t parse the GitHub response',
+    errorHash:'Installer failed integrity check and was discarded',
+    noHash:'A newer release exists, but no checksum is available — download it from GitHub',
+    downloading:'Downloading hip_1.0.2_aarch64.dmg…',
+    verifying:'Verifying SHA-256…',
+    ready:'Downloaded and verified. Open the installer',
+    last:'Last checked: just now',
+    notes:'### Added\n- General settings: current version, check, automatic checks.\n- Download installer, verify SHA-256, open the system installer.\n\nmacOS CI builds remain unsigned.',
+    unsigned:'CI macOS builds are unsigned (HIP_SKIP_SIGN=1); Gatekeeper may block them. Windows SmartScreen may warn. About 57 MB will be downloaded, SHA-256-verified, then opened. hip will not quit itself.',
+    unsignedTitle:'Installer is unsigned',
+    confirmTitle:'Download hip_1.0.2_aarch64.dmg?',
+    confirmOk:'Download & verify',
+    confirmBody:'The matching GitHub Releases asset will be downloaded and compared to SHA256SUMS.txt.',
+    toastTitle:'hip v1.0.2 is available',
+    toastBody:'A new installer is on GitHub Releases. Nothing is downloaded automatically.',
+    toastView:'View', toastLater:'Later',
+    opened:'Installer opened. If macOS cannot verify the developer, allow it in System Settings → Privacy & Security.',
+    intelWarn:'CI currently ships aarch64.dmg only. Apple Silicon builds are not offered to Intel Macs.',
+    devWarn:'Dev session — won’t install a release build. You can open GitHub Releases.',
+    scenes:{
+      idle:'Idle', checking:'Checking', upToDate:'Up to date', available:'Update available',
+      failed:'Network error', autoOn:'Auto-check on', downloading:'Downloading', ready:'Ready',
+      intel:'No Intel asset', ahead:'Local ahead', dev:'Dev session', rateLimit:'Rate limit',
+      httpErr:'HTTP 502', hostErr:'Host denied', parseErr:'Parse error', hashErr:'Hash mismatch', noHash:'No checksum'
+    }
+  }
+};
+
+const SCENE_ORDER = ['idle','checking','upToDate','available','failed','httpErr','hostErr','parseErr','rateLimit','hashErr','noHash','autoOn','downloading','ready','intel','ahead','dev'];
+
+let lang = 'zh';
+let state = 'idle';
+let autoOn = false;
+let checkTimer = 0;
+let dlTimer = 0;
+let cycle = 0;
+const CYCLE = ['available','upToDate','failed','intel','rateLimit'];
+
+const $ = (id) => document.getElementById(id);
+const t = () => I18N[lang];
+
+function applyStaticCopy(){
+  const d = t();
+  document.querySelectorAll('[data-i]').forEach(el => {
+    const k = el.getAttribute('data-i');
+    if (d[k]) el.textContent = d[k];
+  });
+  $('devBadge').textContent = d.devBadge;
+  $('checkBtn').textContent = d.check;
+  $('installBtn').textContent = d.install;
+  $('openRelBtn').textContent = d.openRelease;
+  $('openInstBtn').textContent = d.openInstaller;
+  $('cancelBtn').textContent = d.cancel;
+  $('modalOk').textContent = d.confirmOk;
+  $('modalCancel').textContent = lang==='zh'?'取消':'Cancel';
+  $('toastView').textContent = d.toastView;
+  $('toastLater').textContent = d.toastLater;
+  $('themeBtn').textContent = document.documentElement.getAttribute('data-theme')==='dark' ? d.themeBtnLight : d.themeBtnDark;
+  $('autoHint').textContent = d.autoHint;
+  renderScenes();
+  applyState();
+}
+
+function renderScenes(){
+  const box = $('scenes');
+  box.innerHTML = '';
+  SCENE_ORDER.forEach(id => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = t().scenes[id];
+    b.className = id===state ? 'on' : '';
+    b.addEventListener('click', () => setState(id, {fromChip:true}));
+    box.appendChild(b);
+  });
+}
+
+function hideAllDynamic(){
+  ['installBtn','openRelBtn','openInstBtn','notesBox','warnBox','progBox','devBadge'].forEach(id => $(id).classList.add('hidden'));
+  $('checkBtn').classList.remove('hidden');
+  $('checkBtn').disabled = false;
+  $('statusLine').className = 'status info';
+  $('verNum').textContent = '1.0.1';
+}
+
+function setStatus(text, kind){
+  $('statusLine').textContent = text;
+  $('statusLine').className = 'status ' + (kind||'info');
+}
+
+function applyState(){
+  const d = t();
+  hideAllDynamic();
+  $('lastChecked').textContent = (state==='idle' || state==='checking') ? '' : d.last;
+  $('checkBtn').textContent = state==='checking' ? d.checking : d.check;
+  $('checkBtn').disabled = state==='checking' || state==='downloading' || state==='verifying';
+
+  if (state==='autoOn') autoOn = true;
+  $('autoSw').classList.toggle('on', autoOn);
+  $('autoSw').setAttribute('aria-checked', autoOn ? 'true' : 'false');
+  $('autoHint').classList.toggle('hidden', !autoOn);
+
+  switch(state){
+    case 'idle':
+      setStatus(d.idle, 'info');
+      break;
+    case 'checking':
+      setStatus(d.checking, 'info');
+      $('statusLine').innerHTML = '<span class="spin"></span> ' + d.checking;
+      break;
+    case 'upToDate':
+      setStatus(d.upToDate, 'ok');
+      break;
+    case 'available':
+    case 'autoOn':
+      setStatus(d.available, 'warn');
+      $('installBtn').classList.remove('hidden');
+      $('openRelBtn').classList.remove('hidden');
+      $('notesBox').classList.remove('hidden');
+      $('notesBody').textContent = d.notes;
+      $('warnBox').classList.remove('hidden');
+      $('warnBox').innerHTML = '<strong>'+d.unsignedTitle+'</strong> — ' + d.unsigned;
+      break;
+    case 'failed':
+      setStatus(d.errorNetwork, 'bad');
+      break;
+    case 'httpErr':
+      setStatus(d.errorHttp, 'bad');
+      break;
+    case 'hostErr':
+      setStatus(d.errorHost, 'bad');
+      break;
+    case 'parseErr':
+      setStatus(d.errorParse, 'bad');
+      break;
+    case 'hashErr':
+      setStatus(d.errorHash, 'bad');
+      $('openRelBtn').classList.remove('hidden');
+      break;
+    case 'rateLimit':
+      setStatus(d.errorRate, 'bad');
+      break;
+    case 'noHash':
+      setStatus(d.noHash, 'warn');
+      $('openRelBtn').classList.remove('hidden');
+      $('installBtn').classList.remove('hidden');
+      $('installBtn').disabled = true;
+      $('notesBox').classList.remove('hidden');
+      $('notesBody').textContent = d.notes;
+      break;
+    case 'downloading':
+    case 'verifying':
+      setStatus(state==='verifying' ? d.verifying : d.downloading, 'info');
+      $('checkBtn').classList.add('hidden');
+      $('progBox').classList.remove('hidden');
+      $('progLabel').textContent = state==='verifying' ? d.verifying : d.downloading;
+      $('cancelBtn').classList.toggle('hidden', state==='verifying');
+      $('notesBox').classList.remove('hidden');
+      $('notesBody').textContent = d.notes;
+      break;
+    case 'ready':
+      setStatus(d.ready, 'ok');
+      $('openInstBtn').classList.remove('hidden');
+      $('openRelBtn').classList.remove('hidden');
+      $('progBox').classList.remove('hidden');
+      $('progLabel').textContent = d.ready;
+      $('progPct').textContent = '100%';
+      $('progBar').style.width = '100%';
+      $('cancelBtn').classList.add('hidden');
+      $('notesBox').classList.remove('hidden');
+      $('notesBody').textContent = d.notes;
+      $('warnBox').classList.remove('hidden');
+      $('warnBox').innerHTML = '<strong>'+d.unsignedTitle+'</strong> — ' + d.unsigned;
+      break;
+    case 'intel':
+      setStatus(d.noAsset, 'warn');
+      $('openRelBtn').classList.remove('hidden');
+      $('warnBox').classList.remove('hidden');
+      $('warnBox').textContent = d.intelWarn;
+      $('notesBox').classList.remove('hidden');
+      $('notesBody').textContent = d.notes;
+      break;
+    case 'ahead':
+      $('verNum').textContent = '1.0.2-dev';
+      setStatus(d.ahead, 'info');
+      break;
+    case 'dev':
+      $('devBadge').classList.remove('hidden');
+      setStatus(d.available, 'warn');
+      $('openRelBtn').classList.remove('hidden');
+      $('installBtn').classList.remove('hidden');
+      $('installBtn').disabled = true;
+      $('warnBox').classList.remove('hidden');
+      $('warnBox').textContent = d.devWarn;
+      $('notesBox').classList.remove('hidden');
+      $('notesBody').textContent = d.notes;
+      break;
+  }
+  if (state!=='dev' && state!=='noHash') $('installBtn').disabled = false;
+  renderScenes();
+}
+
+function setState(next, opts){
+  clearTimeout(checkTimer);
+  if (next!=='downloading' && next!=='verifying') { clearInterval(dlTimer); dlTimer = 0; }
+  state = next;
+  if (next==='autoOn') {
+    autoOn = true;
+    showToast();
+  }
+  if (next==='checking' && !opts?.keep) {
+    checkTimer = setTimeout(() => setState('available'), 900);
+  }
+  if (next==='downloading') startDownload();
+  applyState();
+}
+
+function startDownload(){
+  let pct = 0;
+  $('progBar').style.width = '0%';
+  $('progPct').textContent = '0%';
+  clearInterval(dlTimer);
+  dlTimer = setInterval(() => {
+    pct += 7 + Math.random()*6;
+    if (pct >= 100) {
+      pct = 100;
+      clearInterval(dlTimer);
+      $('progBar').style.width = '100%';
+      $('progPct').textContent = '100%';
+      state = 'verifying';
+      applyState();
+      setTimeout(() => setState('ready'), 700);
+      return;
+    }
+    $('progBar').style.width = pct + '%';
+    $('progPct').textContent = Math.floor(pct) + '%';
+  }, 180);
+}
+
+function showToast(){
+  const d = t();
+  $('toastTitle').textContent = d.toastTitle;
+  $('toastBody').textContent = d.toastBody;
+  $('toast').classList.remove('hidden');
+}
+function hideToast(){ $('toast').classList.add('hidden'); }
+
+function openModal(){
+  const d = t();
+  $('modalTitle').textContent = d.confirmTitle;
+  $('modalBody').textContent = d.confirmBody;
+  $('modalWarn').innerHTML = '<strong>'+d.unsignedTitle+'</strong><div style="margin-top:4px">'+d.unsigned+'</div>';
+  $('scrim').classList.remove('hidden');
+}
+function closeModal(){ $('scrim').classList.add('hidden'); }
+
+$('themeBtn').addEventListener('click', () => {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  applyStaticCopy();
+});
+$('langBtn').addEventListener('click', () => {
+  lang = lang==='zh' ? 'en' : 'zh';
+  document.documentElement.lang = lang==='zh' ? 'zh-CN' : 'en';
+  applyStaticCopy();
+});
+$('autoSw').addEventListener('click', () => {
+  autoOn = !autoOn;
+  // Toast only if a check already found a newer release — turning the
+  // switch on must not imply an update exists (spec KD-2 / auto-check).
+  if (autoOn && (state==='available' || state==='autoOn')) showToast();
+  if (!autoOn) hideToast();
+  applyState();
+});
+$('proxySw').addEventListener('click', () => {
+  $('proxySw').classList.toggle('on');
+  const on = $('proxySw').classList.contains('on');
+  $('proxySw').setAttribute('aria-checked', on ? 'true' : 'false');
+});
+$('checkBtn').addEventListener('click', () => {
+  if (state==='checking') return;
+  setState('checking');
+  clearTimeout(checkTimer);
+  const next = CYCLE[cycle % CYCLE.length];
+  cycle += 1;
+  checkTimer = setTimeout(() => setState(next), 900);
+});
+$('installBtn').addEventListener('click', () => {
+  if (state==='dev') return;
+  openModal();
+});
+$('modalCancel').addEventListener('click', closeModal);
+$('scrim').addEventListener('click', (e) => { if (e.target===$('scrim')) closeModal(); });
+$('modalOk').addEventListener('click', () => { closeModal(); setState('downloading'); });
+$('cancelBtn').addEventListener('click', () => { clearInterval(dlTimer); setState('available'); });
+$('openInstBtn').addEventListener('click', () => {
+  setStatus(t().opened, 'ok');
+});
+$('openRelBtn').addEventListener('click', () => {
+  window.open('https://github.com/limin411/hip/releases/tag/v1.0.1', '_blank', 'noopener');
+});
+$('toastLater').addEventListener('click', hideToast);
+$('toastView').addEventListener('click', hideToast);
+
+const GALLERY = [
+  ['idle','info'],['checking','info'],['upToDate','ok'],['available','warn'],
+  ['failed','bad'],['httpErr','bad'],['hostErr','bad'],['parseErr','bad'],['rateLimit','bad'],
+  ['hashErr','bad'],['noHash','warn'],['intel','warn'],['ahead','info'],
+  ['dev','warn'],['downloading','info'],['ready','ok']
+];
+function paintGallery(){
+  const g = $('gallery');
+  g.innerHTML = '';
+  const snap = {
+    idle: t().idle, checking: t().checking, upToDate: t().upToDate, available: t().available,
+    failed: t().errorNetwork, httpErr: t().errorHttp, hostErr: t().errorHost, parseErr: t().errorParse,
+    rateLimit: t().errorRate, hashErr: t().errorHash, noHash: t().noHash,
+    intel: t().noAsset, ahead: t().ahead, dev: t().devWarn,
+    downloading: t().downloading, ready: t().ready
+  };
+  GALLERY.forEach(([id, kind]) => {
+    const card = document.createElement('div');
+    card.className = 'gcard';
+    card.innerHTML = '<div class="gh"><span>'+t().scenes[id]+'</span><span class="mono">'+id+'</span></div>'
+      + '<div class="gb"><div class="status '+kind+'">'+snap[id]+'</div></div>';
+    g.appendChild(card);
+  });
+}
+
+applyStaticCopy();
+paintGallery();
+$('langBtn').addEventListener('click', paintGallery);
+</script>
+</body>
+</html>

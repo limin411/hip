@@ -37,6 +37,8 @@ export class WsServer {
     this.wss = new WebSocketServer({ port, host: BIND_HOST })
     this.sessionManager = new SessionManager(store)
     this.multiClient = multiClientEnabled()
+    // Wire IM gateway broadcast to the WS client registry
+    this.sessionManager.setImBroadcast((msg) => this.registry.broadcast(msg))
   }
 
   start(): Promise<void> {

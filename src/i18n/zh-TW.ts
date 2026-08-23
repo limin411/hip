@@ -1303,6 +1303,74 @@ export const zhTW = {
     "skillLabel": "Skills",
     "pluginsLabel": "外掛市場",
     "hooksLabel": "Hooks",
+    "imLabel": "IM 連接器",
+    "im": {
+      "title": "IM 連接器",
+      "intro": "連接 IM 機器人，讓使用者直接在飛書、企業微信或釘釘中與 hip 智慧體對話。訊息雙向——在 IM 中發訊息，智慧體執行並自動回覆。",
+      "offlineNote": "注意：hip 關閉時，所有 IM 連接器離線。hip 未執行時，IM 機器人無法接收或回覆訊息。",
+      "connect": "連接",
+      "edit": "編輯",
+      "delete": "刪除",
+      "deleteConfirm": "刪除此連接器？",
+      "deleteConfirmBody": "將斷開 IM 機器人連接並刪除所有設定。之後可以重新新增。",
+      "save": "儲存並連接",
+      "cancel": "取消",
+      "testMessage": "傳送測試訊息",
+      "testSuccess": "測試訊息已傳送！",
+      "testFailed": "傳送測試訊息失敗",
+      "permissionMode": "權限模式",
+      "permissionModeConfirm": "確認（推薦）",
+      "permissionModeAuto": "自動（高風險）",
+      "permissionModeAutoWarning": "自動模式下所有工具呼叫將不經確認直接執行，請謹慎使用。",
+      "enable": "已啟用",
+      "loading": "正在載入 IM 連線器…",
+      "connectorCount": "{{count}} 個連線器",
+      "noConnectors": "尚無連線器。選擇下方平台開始設定。",
+      "platform": {
+        "feishu": "飛書",
+        "feishuDesc": "飛書機器人，透過長連線（WebSocket）接入。",
+        "wecom": "企業微信",
+        "wecomDesc": "企業微信機器人，透過長連線接入。",
+        "dingtalk": "釘釘",
+        "dingtalkDesc": "釘釘企業內部機器人，透過 Stream 模式接入。"
+      },
+      "gate": {
+        "feishu": "需要：飛書開發者帳號 + 自建應用開啟機器人能力。",
+        "wecom": "需要：企業微信管理員 + API 模式開啟長連線。",
+        "dingtalk": "需要：釘釘企業開發者 + 企業內部應用開啟 Stream 模式。"
+      },
+      "field": {
+        "appId": "App ID",
+        "appSecret": "App Secret",
+        "botId": "Bot ID",
+        "secret": "Secret",
+        "clientId": "Client ID",
+        "clientSecret": "Client Secret",
+        "name": "連接器名稱",
+        "namePlaceholder": "我的機器人"
+      },
+      "status": {
+        "connected": "已連線",
+        "connecting": "連線中…",
+        "disconnected": "未連線",
+        "error": "錯誤"
+      },
+      "errcode": {
+        "invalid_credentials": "憑證無效。請檢查 App ID 和 Secret。",
+        "app_not_published": "應用未發布。請先在開發者後台發布。",
+        "bot_removed": "機器人已被移出群組。請重新新增後重試。",
+        "network_error": "網路錯誤。請檢查網路連線。"
+      },
+      "parked": {
+        "title": "待授權",
+        "empty": "暫無待處理訊息。未授權的入站訊息將顯示在此。",
+        "allow": "允許",
+        "deny": "拒絕",
+        "user": "使用者",
+        "chat": "對話",
+        "time": "時間"
+      }
+    },
     "memoryLabel": "記憶",
     "productHelp": {
       "navLabel": "說明",
@@ -3250,6 +3318,7 @@ export const zhTW = {
       "skill": "設定：Skills",
       "plugins": "設定：外掛市集",
       "hooks": "設定：Hooks",
+      "im": "設定：IM 連線器",
       "memory": "設定：記憶",
       "help": "設定：產品說明"
     },

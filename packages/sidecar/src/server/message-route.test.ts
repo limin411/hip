@@ -66,4 +66,18 @@ describe('classify', () => {
     ).toBe('broadcast')
     expect(classify({ type: 'clients:changed', clients: [] })).toBe('broadcast')
   })
+
+  it('classifies im:config:*:result as unicast', () => {
+    expect(classify({ type: 'im:config:list:result', connectors: [] })).toBe('unicast')
+    expect(classify({ type: 'im:config:upsert:result', connector: { id: 'c1', platform: 'feishu', name: 'test', enabled: true, hasCredentials: true, permissionMode: 'confirm', allowlist: [], parked: [], status: 'connected', createdAt: 1, updatedAt: 1 } })).toBe('unicast')
+    expect(classify({ type: 'im:config:delete:result', connectorId: 'c1', ok: true })).toBe('unicast')
+    expect(classify({ type: 'im:test:result', connectorId: 'c1', ok: true })).toBe('unicast')
+    expect(classify({ type: 'im:parked:list:result', connectorId: 'c1', entries: [] })).toBe('unicast')
+    expect(classify({ type: 'im:parked:resolve:result', connectorId: 'c1', entryId: 'e1', ok: true })).toBe('unicast')
+  })
+
+  it('broadcasts im:gateway:status and im:parked:updated', () => {
+    expect(classify({ type: 'im:gateway:status', connectorId: 'c1', status: 'connected' })).toBe('broadcast')
+    expect(classify({ type: 'im:parked:updated', connectorId: 'c1', entries: [] })).toBe('broadcast')
+  })
 })

@@ -1299,6 +1299,74 @@ export const ko = {
     "skillLabel": "Skills",
     "pluginsLabel": "플러그인 마켓",
     "hooksLabel": "Hooks",
+    "imLabel": "IM 커넥터",
+    "im": {
+      "title": "IM 커넥터",
+      "intro": "IM 봇을 연결하여 Feishu, WeCom, DingTalk에서 직접 hip 에이전트와 채팅할 수 있습니다. 양방향 메시지 — IM에서 메시지를 보내면 에이전트가 실행하고 자동으로 응답합니다.",
+      "offlineNote": "참고: hip이 종료되면 모든 IM 커넥터가 오프라인됩니다. hip이 실행 중이 아닐 때는 IM 봇이 메시지를 수신하거나 응답할 수 없습니다.",
+      "connect": "연결",
+      "edit": "편집",
+      "delete": "삭제",
+      "deleteConfirm": "이 커넥터를 삭제하시겠습니까?",
+      "deleteConfirmBody": "IM 봇 연결이 끊어지고 모든 설정이 삭제됩니다. 나중에 다시 추가할 수 있습니다.",
+      "save": "저장 및 연결",
+      "cancel": "취소",
+      "testMessage": "테스트 메시지 보내기",
+      "testSuccess": "테스트 메시지를 보냈습니다!",
+      "testFailed": "테스트 메시지 전송 실패",
+      "permissionMode": "권한 모드",
+      "permissionModeConfirm": "확인 (권장)",
+      "permissionModeAuto": "자동 (위험)",
+      "permissionModeAutoWarning": "자동 모드에서는 모든 도구 호출이 확인 없이 실행됩니다. 주의해서 사용하세요.",
+      "enable": "활성화",
+      "loading": "IM 커넥터 로딩 중…",
+      "connectorCount": "커넥터 {{count}}개",
+      "noConnectors": "커넥터가 없습니다. 아래 플랫폼에서 시작하세요.",
+      "platform": {
+        "feishu": "Feishu",
+        "feishuDesc": "Feishu 봇, 장기 연결(WebSocket) 방식.",
+        "wecom": "WeCom",
+        "wecomDesc": "기업 WeChat 봇, 장기 연결 방식.",
+        "dingtalk": "DingTalk",
+        "dingtalkDesc": "DingTalk 기업 내부 봇, Stream 모드 방식."
+      },
+      "gate": {
+        "feishu": "필요: Feishu 개발자 계정 + 자사 앱에 봇 기능 활성화.",
+        "wecom": "필요: 기업 WeChat 관리자 + API 모드에서 장기 연결 활성화.",
+        "dingtalk": "필요: DingTalk 기업 개발자 + 기업 내부 앱에서 Stream 모드 활성화."
+      },
+      "field": {
+        "appId": "App ID",
+        "appSecret": "App Secret",
+        "botId": "Bot ID",
+        "secret": "Secret",
+        "clientId": "Client ID",
+        "clientSecret": "Client Secret",
+        "name": "커넥터 이름",
+        "namePlaceholder": "내 봇"
+      },
+      "status": {
+        "connected": "연결됨",
+        "connecting": "연결 중…",
+        "disconnected": "연결 안 됨",
+        "error": "오류"
+      },
+      "errcode": {
+        "invalid_credentials": "인증 정보가 잘못되었습니다. App ID와 Secret을 확인하세요.",
+        "app_not_published": "앱이 게시되지 않았습니다. 개발자 콘솔에서 먼저 게시하세요.",
+        "bot_removed": "봇이 채팅에서 제거되었습니다. 다시 추가한 후 시도하세요.",
+        "network_error": "네트워크 오류입니다. 인터넷 연결을 확인하세요."
+      },
+      "parked": {
+        "title": "승인 대기",
+        "empty": "보류 중인 메시지가 없습니다. 미승인 인바운드 메시지가 여기에 표시됩니다.",
+        "allow": "허용",
+        "deny": "거부",
+        "user": "사용자",
+        "chat": "채팅",
+        "time": "시간"
+      }
+    },
     "memoryLabel": "메모리",
     "productHelp": {
       "navLabel": "도움말",
@@ -3248,6 +3316,7 @@ export const ko = {
       "skill": "설정: Skills",
       "plugins": "설정: 플러그인 마켓",
       "hooks": "설정: Hooks",
+      "im": "설정: IM 커넥터",
       "memory": "설정: 메모리",
       "help": "설정: 제품 도움말"
     },

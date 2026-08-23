@@ -1299,6 +1299,74 @@ export const ja = {
     "skillLabel": "Skills",
     "pluginsLabel": "プラグインマーケット",
     "hooksLabel": "Hooks",
+    "imLabel": "IMコネクタ",
+    "im": {
+      "title": "IMコネクタ",
+      "intro": "IMボットを接続し、飛書・WeCom・DingTalkから直接hipエージェントとチャットできます。双方向メッセージ——IMで送信するとエージェントが実行して自動返信します。",
+      "offlineNote": "注意：hipが閉じると、すべてのIMコネクタはオフラインになります。hipが実行されていない場合、IMボットはメッセージの受信・返信ができません。",
+      "connect": "接続",
+      "edit": "編集",
+      "delete": "削除",
+      "deleteConfirm": "このコネクタを削除しますか？",
+      "deleteConfirmBody": "IMボットの接続が切断され、すべての設定が削除されます。後から再追加できます。",
+      "save": "保存して接続",
+      "cancel": "キャンセル",
+      "testMessage": "テストメッセージを送信",
+      "testSuccess": "テストメッセージを送信しました！",
+      "testFailed": "テストメッセージの送信に失敗しました",
+      "permissionMode": "許可モード",
+      "permissionModeConfirm": "確認（推奨）",
+      "permissionModeAuto": "自動（高リスク）",
+      "permissionModeAutoWarning": "自動モードではすべてのツール呼び出しが確認なしで実行されます。注意して使用してください。",
+      "enable": "有効",
+      "loading": "IMコネクタを読み込み中…",
+      "connectorCount": "コネクタ {{count}} 件",
+      "noConnectors": "コネクタがありません。下のプラットフォームから始めましょう。",
+      "platform": {
+        "feishu": "飛書",
+        "feishuDesc": "飛書ボット、長接続（WebSocket）経由。",
+        "wecom": "WeCom",
+        "wecomDesc": "企業微信ボット、長接続経由。",
+        "dingtalk": "DingTalk",
+        "dingtalkDesc": "DingTalk社内ボット、Streamモード経由。"
+      },
+      "gate": {
+        "feishu": "必要：飛書開発者アカウント＋自建アプリでボット機能を有効化。",
+        "wecom": "必要：企業微信管理者＋APIモードで長接続を有効化。",
+        "dingtalk": "必要：DingTalk企業開発者＋社内アプリでStreamモードを有効化。"
+      },
+      "field": {
+        "appId": "App ID",
+        "appSecret": "App Secret",
+        "botId": "Bot ID",
+        "secret": "Secret",
+        "clientId": "Client ID",
+        "clientSecret": "Client Secret",
+        "name": "コネクタ名",
+        "namePlaceholder": "マイボット"
+      },
+      "status": {
+        "connected": "接続済み",
+        "connecting": "接続中…",
+        "disconnected": "未接続",
+        "error": "エラー"
+      },
+      "errcode": {
+        "invalid_credentials": "認証情報が無効です。App IDとSecretを確認してください。",
+        "app_not_published": "アプリが未公開です。開発者コンソールで先に公開してください。",
+        "bot_removed": "ボットがチャットから削除されました。再追加してお試しください。",
+        "network_error": "ネットワークエラー。インターネット接続を確認してください。"
+      },
+      "parked": {
+        "title": "承認待ち",
+        "empty": "保留中のメッセージはありません。未承認の受信メッセージがここに表示されます。",
+        "allow": "許可",
+        "deny": "拒否",
+        "user": "ユーザー",
+        "chat": "チャット",
+        "time": "時刻"
+      }
+    },
     "memoryLabel": "メモリー",
     "productHelp": {
       "navLabel": "ヘルプ",
@@ -3248,6 +3316,7 @@ export const ja = {
       "skill": "設定：Skills",
       "plugins": "設定：プラグインマーケット",
       "hooks": "設定：Hooks",
+      "im": "設定：IMコネクタ",
       "memory": "設定：メモリー",
       "help": "設定：製品ヘルプ"
     },

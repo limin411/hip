@@ -25,6 +25,7 @@ export * from './hip-config.js'
 export * from './token-estimation/index.js'
 export * from './tool-names.js'
 export * from './task-runtime.js'
+export * from './im-types.js'
 
 export {
   normalizeSessionConfig,

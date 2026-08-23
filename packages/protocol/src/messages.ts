@@ -35,6 +35,13 @@ import type {
   McpPromptMessage,
 } from './mcp-resources.js'
 import type { PluginManifest } from './plugins.js'
+import type {
+  ImConnectorRecord,
+  ImConnectorPublic,
+  ImParkedEntry,
+  ImConnectorStatus,
+  ImSessionOrigin,
+} from './im-types.js'
 import type { WorkflowDef, OrchestratorEvent, RunState } from './workflow-protocol.js'
 import type { OrchestrationMode } from './orchestration-types.js'
 import type { AgentProfileInfo } from './agent-profile.js'
@@ -275,6 +282,13 @@ export type ClientMessage =
     }
   /** UI pushes ring tail / switch-context note into the sidecar context (D11). */
   | { type: 'session:terminalContext'; sessionId: string; note?: string; ringTail?: string }
+  // ── IM Connector messages ──────────────────────────────────────────────
+  | { type: 'im:config:list' }
+  | { type: 'im:config:upsert'; connector: ImConnectorRecord }
+  | { type: 'im:config:delete'; connectorId: string }
+  | { type: 'im:test'; connectorId: string }
+  | { type: 'im:parked:list'; connectorId: string }
+  | { type: 'im:parked:resolve'; connectorId: string; entryId: string; action: 'allow' | 'deny' }
 
 /** UI answer for a `terminal_exec` bridge request (see session:uiToolResult). */
 export type UiToolResultPayload = Extract<ClientMessage, { type: 'session:uiToolResult' }>
@@ -325,7 +339,7 @@ export interface EmptyGreetingGenerateContext {
 type AttachmentSendPayload = Attachment & { path: string }
 
 export type ServerMessage =
-  | { type: 'session:created'; sessionId: string }
+  | { type: 'session:created'; sessionId: string; origin?: ImSessionOrigin }
   | { type: 'agent:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string; taskId?: string; name?: string }
   /**
    * Streaming assistant / subagent token. Builtin hub supervisor includes
@@ -710,6 +724,15 @@ export type ServerMessage =
       payload?: TaskOutputPayload
       error?: string
     }
+  // ── IM Connector server messages ─────────────────────────────────────
+  | { type: 'im:config:list:result'; connectors: ImConnectorPublic[] }
+  | { type: 'im:config:upsert:result'; connector: ImConnectorPublic }
+  | { type: 'im:config:delete:result'; connectorId: string; ok: boolean }
+  | { type: 'im:test:result'; connectorId: string; ok: boolean; error?: string }
+  | { type: 'im:parked:list:result'; connectorId: string; entries: ImParkedEntry[] }
+  | { type: 'im:parked:resolve:result'; connectorId: string; entryId: string; ok: boolean }
+  | { type: 'im:gateway:status'; connectorId: string; status: ImConnectorStatus; lastError?: string | null }
+  | { type: 'im:parked:updated'; connectorId: string; entries: ImParkedEntry[] }
 
 /** Taxonomy for provider key usability probes (config:testProvider). */
 export type KeyProbeCode =

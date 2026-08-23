@@ -4,7 +4,7 @@
 - 配套：`im-connectors-plan.md`（执行计划：PR 拆解、文件级任务、测试与验收）；`im-connectors-preview.html`（设置页多状态交互原型，浏览器直接打开）
 - 作者：hip design (agent)
 - 日期：2026-08-23
-- 状态：Draft
+- 状态：In Progress (PR-1..4 implemented)
 - 产品原话演进：第一版「IM 连接器（微信/企微/飞书），单向通知」→ 评审后改为 **去掉微信，一步到位做双向对话**。落地为 **设置 → Agents 组新增「IM 连接器」页**：连接 飞书 / 企业微信 / 钉钉 的官方机器人，用户在 IM 里直接与 hip 智能体对话（发消息 → 智能体干活 → 自动回复），HITL 授权以 IM 交互卡片完成。
 - 前置基线（2026-08-23 已核对代码 / 外部文档）：
   - 设置 IA：`src/components/account/settingsNav.ts`（`SETTINGS_NAV_GROUPS`）；页面 id 注册在 `src/store/uiStore.ts`（`SettingsPageId` + `SETTINGS_PAGE_IDS` + `normalizeSettingsPage`）；新增 `im` 页归入 agents 组

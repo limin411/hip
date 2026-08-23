@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "tsx src/main.ts",
     "prebuild": "node ../../scripts/generate-product-content.mjs && node ../../scripts/generate-ops-content.mjs",
-    "build": "ncc build src/main.ts -o dist",
+    "build": "node build.cjs",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

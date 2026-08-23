@@ -66,6 +66,7 @@ export type GlobalCommandLabels = {
     skill: string
     plugins: string
     hooks: string
+    im: string
     memory: string
   }
   context: {
@@ -188,6 +189,7 @@ const ALL_SETTINGS_PAGES: SettingsPageId[] = [
   'skill',
   'plugins',
   'hooks',
+  'im',
 ]
 
 /** Shown on empty query (curated). */
@@ -205,6 +207,7 @@ const SETTINGS_ICON: Record<SettingsPageId, GlobalCommand['icon']> = {
   skill: 'sparkles',
   plugins: 'puzzle',
   hooks: 'link-2',
+  im: 'message-square',
   memory: 'brain',
 }
 

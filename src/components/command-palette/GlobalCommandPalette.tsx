@@ -179,6 +179,7 @@ export function GlobalCommandPalette() {
         skill: t('commandPalette.settings.skill'),
         plugins: t('commandPalette.settings.plugins'),
         hooks: t('commandPalette.settings.hooks'),
+        im: t('commandPalette.settings.im'),
         memory: t('commandPalette.settings.memory'),
       },
       context: {

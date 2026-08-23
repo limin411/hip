@@ -30,6 +30,8 @@ import { MemoryStore } from '../memory/store.js'
 import { tryEnableMemoriesFts } from '../persistence/schema.js'
 import { handleSessionMessage, isSessionMessage } from './handlers/session.js'
 import { handlePluginMessage, isPluginMessage, type PluginHandlerContext } from './handlers/plugin.js'
+import { handleImMessage, isImMessage, type ImHandlerContext } from '../im/handlers.js'
+import { ImConnectorStore } from '../im/store.js'
 import type { SendFn, SessionLifecycleContext } from './handlers/types.js'
 import {
   resolveTrashRetentionDays,
@@ -136,6 +138,8 @@ export class SessionManager {
       } else if (isPluginMessage(msg)) {
         const r = handlePluginMessage(this.pluginCtx(), msg, send)
         if (r) await r
+      } else if (isImMessage(msg)) {
+        handleImMessage(this.imCtx(), msg, send)
       }
 
       logDebug('mgr', 'msg:done', {
@@ -273,6 +277,26 @@ export class SessionManager {
           send({ type: 'error', sessionId, code: 'REPLAY_FAILED', message: safeErrorMessage(err) })
         }
       },
+    }
+  }
+
+  private _imStore?: ImConnectorStore
+  private get imStore(): ImConnectorStore {
+    if (!this._imStore) this._imStore = new ImConnectorStore()
+    return this._imStore
+  }
+
+  private _imBroadcast?: (msg: import('@hip/protocol').ServerMessage) => void
+
+  /** Set the broadcast function for IM events (called by WsServer). */
+  setImBroadcast(broadcast: (msg: import('@hip/protocol').ServerMessage) => void): void {
+    this._imBroadcast = broadcast
+  }
+
+  private imCtx(): ImHandlerContext {
+    return {
+      store: this.imStore,
+      broadcast: (msg) => this._imBroadcast?.(msg),
     }
   }
 

@@ -113,6 +113,15 @@ describe('message-guard', () => {
     expect(msg!.reason).toBe('clearAll')
   })
 
+  it('accepts im:config:* messages', () => {
+    expect(parseClientMessage({ type: 'im:config:list' })?.type).toBe('im:config:list')
+    expect(parseClientMessage({ type: 'im:config:upsert', connector: { id: 'c1' } })?.type).toBe('im:config:upsert')
+    expect(parseClientMessage({ type: 'im:config:delete', connectorId: 'c1' })?.type).toBe('im:config:delete')
+    expect(parseClientMessage({ type: 'im:test', connectorId: 'c1' })?.type).toBe('im:test')
+    expect(parseClientMessage({ type: 'im:parked:list', connectorId: 'c1' })?.type).toBe('im:parked:list')
+    expect(parseClientMessage({ type: 'im:parked:resolve', connectorId: 'c1', entryId: 'e1', action: 'allow' })?.type).toBe('im:parked:resolve')
+  })
+
   it('accepts session soft-delete / restore / trash RPCs', () => {
     expect(parseClientMessage({ type: 'session:softDelete', sessionId: 's1' })?.type).toBe('session:softDelete')
     expect(

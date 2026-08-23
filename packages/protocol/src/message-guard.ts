@@ -94,6 +94,12 @@ export const CLIENT_MESSAGE_TYPES = [
   'session:uiToolRead:result',
   'session:uiToolWrite:result',
   'session:terminalContext',
+  'im:config:list',
+  'im:config:upsert',
+  'im:config:delete',
+  'im:test',
+  'im:parked:list',
+  'im:parked:resolve',
 ] as const
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[number]

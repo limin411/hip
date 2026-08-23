@@ -9,6 +9,7 @@ import {
   Cpu,
   KeyRound,
   Link2,
+  MessageSquare,
   Mic,
   Package,
   Plug,
@@ -32,6 +33,7 @@ import { SkillConfig } from './SkillConfig'
 import { PluginConfig } from './PluginConfig'
 import { HookConfig } from './HookConfig'
 import { MemoryConfig } from './MemoryConfig'
+import { ImConfig } from './ImConfig'
 
 export type SettingsPageDef = {
   id: SettingsPageId
@@ -49,6 +51,7 @@ export type SettingsPageDef = {
     | 'settings.pluginsLabel'
     | 'settings.hooksLabel'
     | 'settings.memoryLabel'
+    | 'settings.imLabel'
   Component: () => React.JSX.Element
 }
 
@@ -91,6 +94,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
       { id: 'skill', icon: Sparkles, labelKey: 'settings.skillLabel', Component: SkillConfig },
       { id: 'plugins', icon: Package, labelKey: 'settings.pluginsLabel', Component: PluginConfig },
       { id: 'hooks', icon: Link2, labelKey: 'settings.hooksLabel', Component: HookConfig },
+      { id: 'im', icon: MessageSquare, labelKey: 'settings.imLabel', Component: ImConfig },
     ],
   },
 ]

@@ -796,6 +796,7 @@ export const en = {
         agents: 'Agent Settings',
       },
       general: 'General',
+      updatesPage: 'Update check',
       voicePage: 'Voice',
       voicePageDesc:
         'Optional local dictation. Enable only if you need speech-to-text; download models on this page.',
@@ -3345,6 +3346,7 @@ export const en = {
       openAutomations: 'Open automations',
       settings: {
         general: 'Settings: General',
+        updates: 'Settings: Update check',
         voice: 'Settings: Voice',
         window: 'Settings: Window & background',
         model: 'Settings: Model',

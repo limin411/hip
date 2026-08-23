@@ -12,6 +12,7 @@ import {
   Mic,
   Package,
   Plug,
+  RefreshCw,
   SlidersHorizontal,
   Sparkles,
   type LucideIcon,
@@ -20,6 +21,7 @@ import type { SettingsPageId } from '@/store/uiStore'
 import { VOICE_INPUT } from '@/components/chat/voiceFeature'
 
 import { GeneralSettings } from './GeneralSettings'
+import { UpdatesSettings } from './UpdatesSettings'
 import { VoiceSettings } from './VoiceSettings'
 import { WindowSettings } from './WindowSettings'
 import { ModelConfig } from './ModelConfig'
@@ -36,6 +38,7 @@ export type SettingsPageDef = {
   icon: LucideIcon
   labelKey:
     | 'settings.general'
+    | 'settings.updatesPage'
     | 'settings.voicePage'
     | 'settings.window'
     | 'settings.model'
@@ -62,6 +65,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     labelKey: 'settings.groups.basics',
     pages: [
       { id: 'general', icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
+      { id: 'updates', icon: RefreshCw, labelKey: 'settings.updatesPage', Component: UpdatesSettings },
       ...(VOICE_INPUT
         ? ([
             {

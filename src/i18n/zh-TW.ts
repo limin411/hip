@@ -830,6 +830,7 @@ export const zhTW = {
       "agents": "智慧體設定"
     },
     "general": "通用",
+    "updatesPage": "更新檢查",
     "voicePage": "語音功能",
     "voicePageDesc": "可選的本機聽寫。僅在需要語音轉文字時開啟；在本頁下載模型。",
     "window": "視窗與背景",
@@ -3239,6 +3240,7 @@ export const zhTW = {
     "openAutomations": "開啟自動化",
     "settings": {
       "general": "設定：一般",
+      "updates": "設定：更新檢查",
       "voice": "設定：語音功能",
       "window": "設定：視窗與背景",
       "model": "設定：模型",

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   listeners: {} as Record<string, (p: unknown) => void>,
   unlisten: vi.fn(),
   toast: vi.fn(),
+  openSettingsOverlay: vi.fn(),
 }))
 
 vi.mock('@/ipc/updates', () => ({
@@ -76,7 +77,7 @@ vi.mock('@/lib/activeWork', () => ({
 }))
 
 vi.mock('@/components/layout/sidebarActions', () => ({
-  openSettingsOverlay: vi.fn(),
+  openSettingsOverlay: (...a: unknown[]) => mocks.openSettingsOverlay(...a),
 }))
 
 const uiState: { overlay: string | null; settingsPage: string } = {
@@ -131,9 +132,9 @@ describe('WindowLifecycleHost updates listeners', () => {
     )
   })
 
-  it('still writes the store but skips the toast when settings/general is open', async () => {
+  it('still writes the store but skips the toast when the updates page is open', async () => {
     uiState.overlay = 'settings'
-    uiState.settingsPage = 'general'
+    uiState.settingsPage = 'updates'
     render(<WindowLifecycleHost />)
     await act(async () => {
       await Promise.resolve()
@@ -141,6 +142,19 @@ describe('WindowLifecycleHost updates listeners', () => {
     act(() => mocks.listeners.available(AVAILABLE))
     expect(useUpdatesStore.getState().lastResult?.latestTag).toBe('v1.0.2')
     expect(mocks.toast).not.toHaveBeenCalled()
+  })
+
+  it('toast View action opens the dedicated updates page', async () => {
+    render(<WindowLifecycleHost />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    act(() => mocks.listeners.available(AVAILABLE))
+    const call = mocks.toast.mock.calls[0]
+    expect(call).toBeDefined()
+    const action = call[1].action
+    act(() => action.onClick())
+    expect(mocks.openSettingsOverlay).toHaveBeenCalledWith('updates')
   })
 
   it('progress events land in the store process-wide', async () => {

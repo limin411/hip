@@ -823,6 +823,7 @@ export const ko = {
       "agents": "에이전트 설정"
     },
     "general": "일반",
+    "updatesPage": "업데이트 확인",
     "voicePage": "음성 기능",
     "voicePageDesc": "선택적 로컬 받아쓰기. 필요할 때만 켜고, 이 페이지에서 모델을 다운로드하세요.",
     "window": "창 및 백그라운드",
@@ -3237,6 +3238,7 @@ export const ko = {
     "openAutomations": "자동화 열기",
     "settings": {
       "general": "설정: 일반",
+      "updates": "설정: 업데이트 확인",
       "voice": "설정: 음성 기능",
       "window": "설정: 창 및 백그라운드",
       "model": "설정: 모델",

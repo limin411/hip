@@ -126,17 +126,17 @@ export function WindowLifecycleHost() {
         })
         const u6 = await listenUpdatesAvailable((r) => {
           if (cancelled) return
-          // Always write the store first — an open General page must update
+          // Always write the store first — an open 更新检查 page must update
           // even though we skip the toast (KD-13).
           useUpdatesStore.getState().setLastResult(r)
           const { overlay, settingsPage } = useUiStore.getState()
-          if (overlay === 'settings' && settingsPage === 'general') {
+          if (overlay === 'settings' && settingsPage === 'updates') {
             return
           }
           toast(t('settings.updates.toastTitle', { tag: r.latestTag ?? '' }), {
             action: {
               label: t('settings.updates.toastAction'),
-              onClick: () => openSettingsOverlay(), // no page → General
+              onClick: () => openSettingsOverlay('updates'),
             },
             cancel: {
               label: t('settings.updates.toastSnooze'),

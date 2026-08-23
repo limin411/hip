@@ -56,6 +56,7 @@ export type GlobalCommandLabels = {
   current: string
   settings: {
     general: string
+    updates: string
     voice: string
     window: string
     model: string
@@ -194,6 +195,7 @@ const CURATED_SETTINGS: SettingsPageId[] = ['model', 'memory', 'skill', 'mcp']
 
 const SETTINGS_ICON: Record<SettingsPageId, GlobalCommand['icon']> = {
   general: 'settings',
+  updates: 'settings',
   voice: 'settings',
   window: 'settings',
   model: 'cpu',

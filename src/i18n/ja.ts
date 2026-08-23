@@ -823,6 +823,7 @@ export const ja = {
       "agents": "エージェント設定"
     },
     "general": "一般",
+    "updatesPage": "アップデート確認",
     "voicePage": "音声入力",
     "voicePageDesc": "任意のローカル音声入力。必要なときだけ有効化し、このページでモデルをダウンロードします。",
     "window": "ウィンドウとバックグラウンド",
@@ -3237,6 +3238,7 @@ export const ja = {
     "openAutomations": "オートメーションを開く",
     "settings": {
       "general": "設定：一般",
+      "updates": "設定：アップデート確認",
       "voice": "設定：音声入力",
       "window": "設定：ウィンドウとバックグラウンド",
       "model": "設定：モデル",

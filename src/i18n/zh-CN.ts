@@ -788,6 +788,7 @@ export const zhCN = {
         agents: '智能体设置',
       },
       general: '通用',
+      updatesPage: '更新检查',
       voicePage: '语音功能',
       voicePageDesc:
         '可选的本地听写。仅在需要语音转文字时开启；在本页下载模型。',
@@ -3278,6 +3279,7 @@ export const zhCN = {
       openAutomations: '打开自动化',
       settings: {
         general: '设置：通用',
+        updates: '设置：更新检查',
         voice: '设置：语音功能',
         window: '设置：窗口与后台',
         model: '设置：模型',

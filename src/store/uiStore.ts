@@ -89,6 +89,7 @@ export function isPlaceholderSidebarSection(s: SidebarSection): s is Placeholder
 /** Settings panel left-nav page ids (see SettingsPanel PAGES). */
 export type SettingsPageId =
   | 'general'
+  | 'updates'
   | 'voice'
   | 'window'
   | 'model'
@@ -103,6 +104,7 @@ export type SettingsPageId =
 /** Order matches SettingsPanel NAV_GROUPS (basics → agents). */
 const SETTINGS_PAGE_IDS: readonly SettingsPageId[] = [
   'general',
+  'updates',
   'voice',
   'window',
   'model',

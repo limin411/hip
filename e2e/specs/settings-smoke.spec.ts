@@ -8,6 +8,8 @@ const settings = new SettingsPage()
 
 const PAGES = [
   { id: 'general', label: '通用设置' },
+  // Updates page heading is 版本与更新 (substring 版本 matches, locale-independent).
+  { id: 'updates', label: '版本' },
   { id: 'model', label: '模型配置' },
   { id: 'agents', label: '智能体管理' },
   { id: 'mcp', label: '外部工具服务' },
@@ -36,7 +38,14 @@ describe('settings smoke @settings @smoke', () => {
     expect(await panel.getText()).not.toBe('')
   })
 
-  it('general tab shows the version & updates block (testid only, no GitHub calls)', async () => {
+  it('updates tab shows the version & updates block (testid only, no GitHub calls)', async () => {
+    const nav = await settings.nav('updates')
+    await nav.waitForClickable({ timeout: 10000 })
+    await nav.click()
+    await browser.waitUntil(
+      async () => (await nav.getAttribute('aria-selected')) === 'true',
+      { timeout: 10000, interval: 200 },
+    )
     const panel = await settings.activeTabPanel
     const block = await panel.$('[data-testid="settings-updates"]')
     await block.waitForExist({ timeout: 10000 })

@@ -169,6 +169,7 @@ export function GlobalCommandPalette() {
       current: t('commandPalette.current'),
       settings: {
         general: t('commandPalette.settings.general'),
+        updates: t('commandPalette.settings.updates'),
         voice: t('commandPalette.settings.voice'),
         window: t('commandPalette.settings.window'),
         model: t('commandPalette.settings.model'),

@@ -1344,6 +1344,102 @@ pub fn updates_open_release_page(app: tauri::AppHandle, url: String) -> Result<(
         .map_err(|e| format!("opener failed: {e}"))
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// 24h auto-check wake loop (PR-5) — the ONLY owner of periodic checks (KD-13)
+// ══════════════════════════════════════════════════════════════════════════
+
+const WAKE_INITIAL_DELAY: Duration = Duration::from_secs(5);
+const WAKE_INTERVAL: Duration = Duration::from_secs(3600);
+
+/// Pure wake policy (injectable clock): should this tick hit the network?
+/// auto_check omitted / false ⇒ **zero** HTTP / client builds.
+fn wake_should_check(
+    auto_check: Option<bool>,
+    cache: Option<&(LastCheckCache, bool)>,
+    now: i64,
+) -> bool {
+    if auto_check != Some(true) {
+        return false;
+    }
+    match cache {
+        Some((c, true)) => {
+            let checked = iso8601_to_unix(&c.checked_at).unwrap_or(0);
+            now - checked >= CHECK_TTL_SECS
+        }
+        _ => true,
+    }
+}
+
+/// Pure snooze policy: re-prompt only for a new tag or ≥24h after the last prompt.
+fn wake_should_prompt(
+    cache: Option<&(LastCheckCache, bool)>,
+    latest_tag: Option<&str>,
+    now: i64,
+) -> bool {
+    match cache {
+        Some((c, _)) => {
+            let same_tag = c.prompted_tag.as_deref() == latest_tag;
+            let prompted = c
+                .prompted_at
+                .as_deref()
+                .and_then(iso8601_to_unix)
+                .unwrap_or(0);
+            !same_tag || now - prompted >= CHECK_TTL_SECS
+        }
+        None => true,
+    }
+}
+
+async fn wake_once(app: &tauri::AppHandle) {
+    use tauri::Emitter;
+    // Every wake re-reads the GLOBAL toml (that loader never reads project
+    // `.hip/hip.toml`), so toggling the switch applies within the hour.
+    let auto = crate::hip_config::load_hip_config(app)
+        .ok()
+        .and_then(|cfg| cfg.updates)
+        .and_then(|u| u.auto_check);
+    let dir = paths::updates_cache_dir(app);
+    let cache = dir.as_deref().and_then(read_cache);
+    if !wake_should_check(auto, cache.as_ref(), now_unix()) {
+        return;
+    }
+
+    // check_inner (never the command) — the command path must not emit (KD-13).
+    let result = check_inner(app, false).await;
+    if !matches!(
+        result.status,
+        UpdateCheckStatus::UpdateAvailable | UpdateCheckStatus::NoMatchingAsset
+    ) {
+        return;
+    }
+    if !wake_should_prompt(cache.as_ref(), result.latest_tag.as_deref(), now_unix()) {
+        return;
+    }
+
+    // Snooze is written by Rust at emit time (the UI "Later" closes the toast
+    // without any IPC). The check already wrote the fresh result to the cache;
+    // only prompted* changes here.
+    if let Some(dir) = &dir {
+        if let Some((mut c, _)) = read_cache(dir) {
+            c.prompted_tag = result.latest_tag.clone();
+            c.prompted_at = Some(now_iso8601());
+            write_cache(dir, &c);
+        }
+    }
+    let _ = app.emit("updates://available", &result);
+}
+
+/// Spawn from setup: 5s after launch, then every hour. Never runs in tests.
+pub fn spawn_wake_loop(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(WAKE_INITIAL_DELAY).await;
+        loop {
+            wake_once(&app).await;
+            tokio::time::sleep(WAKE_INTERVAL).await;
+        }
+    });
+}
+
 // ── Tests ──
 
 #[cfg(test)]
@@ -2364,5 +2460,86 @@ mod tests {
         let _ = rx.recv().await;
         let _ = rx.recv().await;
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── PR-5: wake-loop policy (injectable fake clock; zero HTTP when off) ──
+
+    fn wake_cache(checked_at: &str, prompted_tag: Option<&str>, prompted_at: Option<&str>) -> LastCheckCache {
+        let r = UpdateCheckResult {
+            status: UpdateCheckStatus::UpToDate,
+            current_version: "1.0.1".into(),
+            latest_tag: Some("v1.0.2".into()),
+            latest_version: Some("1.0.2".into()),
+            published_at: None,
+            notes_excerpt: None,
+            html_url: None,
+            asset: None,
+            cache_hit: false,
+            checked_at: checked_at.into(),
+            latency_ms: 0,
+            error_kind: None,
+            error_message: None,
+            retry_after_sec: None,
+            debug_build: false,
+        };
+        LastCheckCache {
+            parser_version: PARSER_VERSION,
+            etag: None,
+            checked_at: checked_at.into(),
+            result: CachedResult::from(&r),
+            prompted_tag: prompted_tag.map(str::to_string),
+            prompted_at: prompted_at.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn wake_auto_check_omitted_or_false_means_zero_checks() {
+        // autoCheck omitted / false ⇒ the first N seconds build zero clients.
+        for auto in [None, Some(false)] {
+            for secs in [0, 5, 3600, 86400, 1_000_000] {
+                assert!(!wake_should_check(auto, None, secs), "auto={auto:?} t={secs}");
+            }
+        }
+        // Even with a stale cache, the toggle still gates everything.
+        let cache = wake_cache("2020-01-01T00:00:00Z", None, None);
+        assert!(!wake_should_check(None, Some(&(cache, true)), now_unix() + 999_999));
+    }
+
+    #[test]
+    fn wake_auto_check_on_respects_24h_ttl() {
+        let now = 1_800_000_000;
+        // No cache ⇒ check.
+        assert!(wake_should_check(Some(true), None, now));
+        // Fresh successful check (< 24h) ⇒ skip network.
+        let fresh = wake_cache(&format_iso8601(now - 3600), None, None);
+        assert!(!wake_should_check(Some(true), Some(&(fresh, true)), now));
+        // ≥ 24h ⇒ check.
+        let stale = wake_cache(&format_iso8601(now - CHECK_TTL_SECS - 1), None, None);
+        assert!(wake_should_check(Some(true), Some(&(stale.clone(), true)), now));
+        // Unusable cache (parserVersion drift) ⇒ check.
+        assert!(wake_should_check(Some(true), Some(&(stale, false)), now));
+    }
+
+    #[test]
+    fn wake_snooze_24h_policy() {
+        let now = 1_800_000_000;
+        // Never prompted ⇒ prompt.
+        assert!(wake_should_prompt(None, Some("v1.0.2"), now));
+        // Same tag, prompted < 24h ago ⇒ snooze.
+        let c = wake_cache(
+            "2020-01-01T00:00:00Z",
+            Some("v1.0.2"),
+            Some(&format_iso8601(now - 60)),
+        );
+        assert!(!wake_should_prompt(Some(&(c.clone(), true)), Some("v1.0.2"), now));
+        // Same tag, prompted ≥ 24h ago ⇒ re-prompt.
+        let c = wake_cache(
+            "2020-01-01T00:00:00Z",
+            Some("v1.0.2"),
+            Some(&format_iso8601(now - CHECK_TTL_SECS - 1)),
+        );
+        assert!(wake_should_prompt(Some(&(c.clone(), true)), Some("v1.0.2"), now));
+        // New tag ⇒ prompt immediately.
+        assert!(wake_should_prompt(Some(&(c, true)), Some("v1.0.3"), now));
     }
 }

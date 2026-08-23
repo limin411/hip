@@ -26,6 +26,10 @@ import { openSettingsOverlay } from '@/components/layout/sidebarActions'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
+import { useUiStore } from '@/store/uiStore'
+import { useUpdatesStore } from '@/store/updatesStore'
+import { listenUpdatesAvailable, listenUpdatesProgress } from '@/ipc/updates'
+import { toast } from 'sonner'
 
 /**
  * Phase 2 host: first-close / ask dialog, exit confirm when work is running,
@@ -113,13 +117,43 @@ export function WindowLifecycleHost() {
           if (cancelled) return
           openSettingsOverlay() // tray/menu → General
         })
+        // Update events are process-level (NOT mounted under the settings
+        // tree): progress survives unmount, and the wake loop result lands in
+        // the store even when the settings page is closed.
+        const u5 = await listenUpdatesProgress((p) => {
+          if (cancelled) return
+          useUpdatesStore.getState().setProgress(p)
+        })
+        const u6 = await listenUpdatesAvailable((r) => {
+          if (cancelled) return
+          // Always write the store first — an open General page must update
+          // even though we skip the toast (KD-13).
+          useUpdatesStore.getState().setLastResult(r)
+          const { overlay, settingsPage } = useUiStore.getState()
+          if (overlay === 'settings' && settingsPage === 'general') {
+            return
+          }
+          toast(t('settings.updates.toastTitle', { tag: r.latestTag ?? '' }), {
+            action: {
+              label: t('settings.updates.toastAction'),
+              onClick: () => openSettingsOverlay(), // no page → General
+            },
+            cancel: {
+              label: t('settings.updates.toastSnooze'),
+              // "Later" only closes the toast — snooze state is Rust-side.
+              onClick: () => {},
+            },
+          })
+        })
         if (cancelled) {
           u1()
           u2()
           u3()
           u4()
+          u5()
+          u6()
         } else {
-          unsubs = [u1, u2, u3, u4]
+          unsubs = [u1, u2, u3, u4, u5, u6]
         }
       } catch {
         /* non-tauri */

@@ -846,6 +846,9 @@ pub fn run() {
                     Err(e) => eprintln!("[tauri] models catalog refresh failed: {e}"),
                 }
             });
+            // 24h auto-check loop (Settings → General → Version & updates).
+            // Sole owner of periodic checks; opts in via hip.toml [updates].autoCheck.
+            updates::spawn_wake_loop(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -36,6 +36,19 @@ describe('settings smoke @settings @smoke', () => {
     expect(await panel.getText()).not.toBe('')
   })
 
+  it('general tab shows the version & updates block (testid only, no GitHub calls)', async () => {
+    const panel = await settings.activeTabPanel
+    const block = await panel.$('[data-testid="settings-updates"]')
+    await block.waitForExist({ timeout: 10000 })
+    // Locale-independent assertions; never click "check" (no real GitHub traffic).
+    const version = await panel.$('[data-testid="settings-updates-version"]')
+    await version.waitForExist({ timeout: 10000 })
+    expect(await version.getText()).toMatch(/\d+\.\d+\.\d+/)
+    const auto = await panel.$('[data-testid="settings-updates-auto"]')
+    await auto.waitForExist({ timeout: 10000 })
+    expect(await auto.getAttribute('aria-checked')).toBe('false')
+  })
+
   for (const { id, label } of PAGES) {
     it(`switches to the ${id} tab`, async () => {
       const nav = await settings.nav(id)

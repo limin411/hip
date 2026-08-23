@@ -46,8 +46,17 @@ pub fn scratch_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "scratc
 /// User-local tool binaries managed by hip (`rg`, …).
 pub fn bin_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "bin") }
 
-/// Create `dir` with mode `0700` on Unix (for voice models / scratch).
-fn ensure_private_dir(dir: &std::path::Path) -> Option<()> {
+/// Update-check cache & downloaded installers (`~/.hip/cache/updates/`, mode 0700 on Unix).
+/// Holds ETag/check results and installer payloads — always private; do NOT use
+/// `cache_dir().join("updates")` (that parent is a plain 0755 create_dir_all).
+pub fn updates_cache_dir(app: &AppHandle) -> Option<PathBuf> {
+    let dir = hip_base_dir(app)?.join("cache").join("updates");
+    ensure_private_dir(&dir)?;
+    Some(dir)
+}
+
+/// Create `dir` with mode `0700` on Unix (for voice models / scratch / updates cache).
+pub(crate) fn ensure_private_dir(dir: &std::path::Path) -> Option<()> {
     std::fs::create_dir_all(dir).ok()?;
     #[cfg(unix)]
     {
@@ -313,5 +322,25 @@ mod tests {
             base.join("scratch").join("voice"),
             PathBuf::from("/Users/x/.hip/scratch/voice")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ensure_private_dir_is_0700_on_unix() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "hip-updates-cache-mode-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let made = super::ensure_private_dir(&dir);
+        assert!(made.is_some());
+        let mode = std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700, "expected 0700, got {mode:o}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

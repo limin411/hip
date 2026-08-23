@@ -31,6 +31,7 @@ mod knowledge_link_index;
 mod voice_models;
 mod voice;
 mod provider_logo;
+mod updates;
 // Production SSH (default feature `ssh`); stubs keep IPC registered when stripped.
 #[cfg(feature = "ssh")]
 mod ssh_session;
@@ -895,6 +896,8 @@ pub fn run() {
             models_catalog_refresh,
             get_hip_config,
             set_hip_config,
+            updates::updates_app_info,
+            updates::updates_check,
             get_network_policy,
             set_network_policy,
             list_skills,

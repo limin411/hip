@@ -133,6 +133,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 plan: None,
                 voice: None,
             proxy: None,
+            updates: None,
             };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
@@ -1156,6 +1157,7 @@ mod tests {
             plan: None,
             voice: None,
         proxy: None,
+        updates: None,
         }
     }
 
@@ -1350,6 +1352,7 @@ mod tests {
             plan: None,
             voice: None,
         proxy: None,
+        updates: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1534,6 +1537,7 @@ mod tests {
             plan: None,
             voice: None,
         proxy: None,
+        updates: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1655,6 +1659,7 @@ mod tests {
             plan: None,
             voice: None,
         proxy: None,
+        updates: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1697,6 +1702,7 @@ mod tests {
             plan: None,
             voice: None,
         proxy: None,
+        updates: None,
         };
 
         // UI path: JSON (camelCase) → HipConfig → TomlHipConfig → TOML → back
@@ -1780,6 +1786,7 @@ doomLoopStrategy = "auto_continue"
             plan: None,
             voice: None,
         proxy: None,
+        updates: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1881,6 +1888,7 @@ colorTheme = "one-dark"
             plan: None,
             voice: None,
             proxy: None,
+            updates: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1954,6 +1962,7 @@ colorTheme = "follow"
             plan: None,
             voice: None,
             proxy: None,
+            updates: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -2034,6 +2043,7 @@ docWidth = "default"
             plan: None,
             voice: None,
         proxy: None,
+        updates: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -2134,6 +2144,7 @@ trayEnabled = true
             plan: None,
             voice: None,
         proxy: None,
+        updates: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -2209,6 +2220,7 @@ fsReadMaxBytes = 2000000
             }),
             voice: None,
         proxy: None,
+        updates: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();

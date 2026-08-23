@@ -23,6 +23,7 @@ import type {
   AcpHostConfig,
   PlanConfig,
   ProxyConfig,
+  UpdatesConfig,
 } from '@hip/protocol'
 import {
   isCodeBlockColorThemeId,
@@ -463,6 +464,18 @@ function normalizeProxy(raw: Record<string, unknown>): ProxyConfig {
   return out
 }
 
+/**
+ * Normalize `[updates]` version-check prefs (camelCase + snake_case aliases).
+ * Global-only section: deepMergeConfig deliberately does NOT overlay it from
+ * project `.hip/hip.toml` (same as proxy / window).
+ */
+function normalizeUpdates(raw: Record<string, unknown>): UpdatesConfig {
+  const out: UpdatesConfig = {}
+  const auto = raw.autoCheck ?? raw.auto_check
+  if (typeof auto === 'boolean') out.autoCheck = auto
+  return out
+}
+
 /** Normalize `[window]` close / tray policy (camelCase + snake_case aliases). */
 function normalizeWindow(raw: Record<string, unknown>): WindowConfig {
   const out: WindowConfig = {}
@@ -633,6 +646,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const proxy = obj.proxy
   if (proxy && typeof proxy === 'object' && !Array.isArray(proxy)) {
     config.proxy = normalizeProxy(proxy as Record<string, unknown>)
+  }
+
+  const updates = obj.updates
+  if (updates && typeof updates === 'object' && !Array.isArray(updates)) {
+    config.updates = normalizeUpdates(updates as Record<string, unknown>)
   }
 
   return config

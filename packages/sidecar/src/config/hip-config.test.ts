@@ -714,6 +714,52 @@ childMaxSteps = 5
   })
 })
 
+describe('updates config', () => {
+  it('parses [updates] autoCheck (camel + snake)', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[updates]
+autoCheck = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.updates).toEqual({ autoCheck: true })
+  })
+
+  it('normalizes snake_case auto_check', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[updates]
+auto_check = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.updates).toEqual({ autoCheck: true })
+  })
+
+  it('project [updates] does not override global', () => {
+    const dir = tmpDir()
+    const globalFile = writeToml(dir, 'global.toml', `version = 1
+
+[updates]
+autoCheck = true
+`)
+    process.env.HIP_CONFIG_PATH = globalFile
+
+    const { root } = setupProjectDir()
+    writeToml(join(root, '.hip'), 'hip.toml', `version = 1
+
+[updates]
+autoCheck = false
+`)
+
+    const cfg = resolveEffectiveConfig(root)
+    expect(cfg.updates).toEqual({ autoCheck: true })
+  })
+})
+
 describe('resolveEffectiveConfig', () => {
   it('returns defaults when no config files exist anywhere', () => {
     delete process.env.HIP_CONFIG_PATH

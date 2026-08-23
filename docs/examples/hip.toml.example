@@ -74,6 +74,13 @@ fsReadMaxBytes = 2000000
 # # all = "http://127.0.0.1:7890"
 # no_proxy = "localhost,127.0.0.1,::1"
 
+# ── Version checks (Settings → General → Version & updates) ─────────────
+# Opt-in: default autoCheck=false when omitted — no GitHub traffic until
+# the user turns this on or clicks “Check for updates”.
+# ON = check GitHub Releases every 24h and notify; never auto-download.
+# [updates]
+# autoCheck = false
+
 # ── Providers (non-secret) ─────────────────────────────────────────────────
 # API keys still go in auth.json — do not use apiKey in hip.toml (ignored for BYOK).
 # [[providers]]

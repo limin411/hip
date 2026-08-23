@@ -594,6 +594,17 @@ export interface ProxyConfig {
   noProxy?: string
 }
 
+/**
+ * Optional `[updates]` section in hip.toml — version check preferences.
+ * Global-only: project `.hip/hip.toml` sections are ignored (machine preference,
+ * not a repository policy).
+ */
+export interface UpdatesConfig {
+  /** Master switch for periodic GitHub checks. Default false when omitted —
+   *  no GitHub traffic until the user turns this on or clicks “Check for updates”. */
+  autoCheck?: boolean
+}
+
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
@@ -635,6 +646,8 @@ export interface HipConfig {
   voice?: VoiceConfig
   /** Optional HTTP(S) network proxy (General Settings). */
   proxy?: ProxyConfig
+  /** Optional version-check / update prefs (Settings → General → Version & updates). */
+  updates?: UpdatesConfig
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.

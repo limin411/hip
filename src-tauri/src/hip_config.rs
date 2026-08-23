@@ -316,6 +316,18 @@ pub(crate) struct HipConfig {
     /// Optional HTTP(S) proxy. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) proxy: Option<ProxyConfig>,
+    /// Optional version-check prefs. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) updates: Option<UpdatesConfig>,
+}
+
+/// Optional `[updates]` version-check prefs. JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UpdatesConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) auto_check: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -635,6 +647,17 @@ pub(crate) struct TomlHipConfig {
     pub(crate) voice: Option<TomlVoiceConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) proxy: Option<TomlProxyConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) updates: Option<TomlUpdatesConfig>,
+}
+
+/// TOML mirror for `[updates]` (snake_case keys; camelCase aliases for hand-edited files).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlUpdatesConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "autoCheck")]
+    pub(crate) auto_check: Option<bool>,
 }
 
 // ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
@@ -770,6 +793,7 @@ pub fn load_hip_config(app: &tauri::AppHandle) -> Result<HipConfig, String> {
             plan: None,
             voice: None,
             proxy: None,
+            updates: None,
         }),
         Err(e) => Err(e.to_string()),
     }
@@ -1073,6 +1097,22 @@ impl From<TomlProxyConfig> for ProxyConfig {
     }
 }
 
+impl From<UpdatesConfig> for TomlUpdatesConfig {
+    fn from(u: UpdatesConfig) -> Self {
+        TomlUpdatesConfig {
+            auto_check: u.auto_check,
+        }
+    }
+}
+
+impl From<TomlUpdatesConfig> for UpdatesConfig {
+    fn from(u: TomlUpdatesConfig) -> Self {
+        UpdatesConfig {
+            auto_check: u.auto_check,
+        }
+    }
+}
+
 impl From<HipConfig> for TomlHipConfig {
     fn from(cfg: HipConfig) -> Self {
         TomlHipConfig {
@@ -1093,6 +1133,7 @@ impl From<HipConfig> for TomlHipConfig {
             plan: cfg.plan.map(|x| x.into()),
             voice: cfg.voice.map(|x| x.into()),
             proxy: cfg.proxy.map(|x| x.into()),
+            updates: cfg.updates.map(|x| x.into()),
         }
     }
 }
@@ -1117,6 +1158,7 @@ impl From<TomlHipConfig> for HipConfig {
             plan: cfg.plan.map(|x| x.into()),
             voice: cfg.voice.map(|x| x.into()),
             proxy: cfg.proxy.map(|x| x.into()),
+            updates: cfg.updates.map(|x| x.into()),
         }
     }
 }
@@ -1169,6 +1211,7 @@ mod voice_preserve_tests {
                 model_urls: None,
             }),
             proxy: None,
+            updates: None,
         };
         let toml_cfg: TomlHipConfig = cfg.clone().into();
         let text = toml::to_string_pretty(&toml_cfg).expect("serialize");
@@ -1180,6 +1223,74 @@ mod voice_preserve_tests {
         assert_eq!(back.voice, cfg.voice);
         assert_eq!(back.terminal, cfg.terminal);
         assert_eq!(back.window, cfg.window);
+    }
+
+    #[test]
+    fn updates_round_trips_toml_with_proxy_and_window() {
+        let cfg = HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            terminal: None,
+            code_block: None,
+            knowledge: None,
+            window: Some(WindowConfig {
+                close_action: Some("hide".into()),
+                tray_enabled: None,
+                tray_always_visible: None,
+                close_prompt_seen: None,
+                hide_hint_shown: None,
+                launch_at_login: None,
+                start_hidden_on_login: None,
+                notify_on_agent_complete: None,
+            }),
+            acp: None,
+            plan: None,
+            voice: None,
+            proxy: Some(ProxyConfig {
+                enabled: Some(true),
+                http: None,
+                https: Some("http://127.0.0.1:7890".into()),
+                all: None,
+                no_proxy: None,
+            }),
+            updates: Some(UpdatesConfig {
+                auto_check: Some(true),
+            }),
+        };
+        let toml_cfg: TomlHipConfig = cfg.clone().into();
+        let text = toml::to_string_pretty(&toml_cfg).expect("serialize");
+        assert!(text.contains("[proxy]"), "{text}");
+        assert!(text.contains("[window]"), "{text}");
+        assert!(text.contains("[updates]"), "{text}");
+        let parsed: TomlHipConfig = toml::from_str(&text).expect("parse");
+        let back: HipConfig = parsed.into();
+        assert_eq!(back.proxy, cfg.proxy);
+        assert_eq!(back.window, cfg.window);
+        assert_eq!(back.updates, cfg.updates);
+    }
+
+    #[test]
+    fn updates_accepts_camel_case_toml_alias() {
+        let text = r#"
+version = 1
+[updates]
+autoCheck = true
+"#;
+        let parsed: TomlHipConfig = toml::from_str(text).expect("parse");
+        let cfg: HipConfig = parsed.into();
+        assert_eq!(
+            cfg.updates,
+            Some(UpdatesConfig {
+                auto_check: Some(true)
+            })
+        );
     }
 
     #[test]

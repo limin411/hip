@@ -35,6 +35,8 @@ export interface ImHandlerContext {
   sendTest?: (connectorId: string) => Promise<boolean>
   /** Resolve parked entry by id. */
   resolveParked?: (connectorId: string, entryId: string, action: 'allow' | 'deny') => void
+  /** Called after a connector is upserted. Use to auto-start the adapter. */
+  onUpsert?: (connector: import('@hip/protocol').ImConnectorPublic) => void
 }
 
 export function handleImMessage(
@@ -54,6 +56,8 @@ export function handleImMessage(
     case 'im:config:upsert': {
       const pub = ctx.store.upsert(msg.connector)
       send({ type: 'im:config:upsert:result', connector: pub })
+      // Trigger auto-connect for the adapter
+      ctx.onUpsert?.(pub)
       break
     }
 

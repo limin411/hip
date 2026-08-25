@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Zap,
+  Loader2,
 } from 'lucide-react'
 import type { ImConnectorPublic, ImPlatform } from '@hip/protocol'
 import { useImConnectorsStore } from '@/store/imConnectorsStore'
@@ -41,13 +42,16 @@ export function ImConfig() {
     connectors,
     loaded,
     error,
+    wsConnected,
     gatewayStatuses,
     testFeedback,
+    saveResult,
     load,
     upsert,
     remove,
     test,
     clearTestFeedback,
+    clearSaveResult,
   } = useImConnectorsStore()
 
   const [editing, setEditing] = useState<ImPlatformEntry | null>(null)
@@ -69,9 +73,12 @@ export function ImConfig() {
 
   const handleSave = async (form: Record<string, string>, platform: ImPlatform) => {
     const draft = buildConnectorDraft(form, platform)
-    await upsert(draft)
-    setEditing(null)
-    setEditConnector(null)
+    const result = await upsert(draft)
+    if (result.ok) {
+      setEditing(null)
+      setEditConnector(null)
+    }
+    return result
   }
 
   const handleDelete = async () => {
@@ -106,6 +113,29 @@ export function ImConfig() {
       {error && (
         <div className="mt-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-meta text-danger">
           {error}
+        </div>
+      )}
+
+      {/* WS disconnected banner */}
+      {!wsConnected && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-meta text-warning">
+          <WifiOff className="h-3.5 w-3.5 shrink-0" />
+          {t('settings.im.wsDisconnected')}
+        </div>
+      )}
+
+      {/* Save success banner */}
+      {saveResult?.ok && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-meta text-success">
+          <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+          {t('settings.im.saveSuccess')}
+          <button
+            type="button"
+            onClick={clearSaveResult}
+            className="ml-auto text-ink-tertiary hover:text-ink"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -409,7 +439,7 @@ function ConnectorEditorModal({
 }: {
   entry: ImPlatformEntry
   existing: ImConnectorPublic | null
-  onSave: (form: Record<string, string>) => void
+  onSave: (form: Record<string, string>) => Promise<{ ok: boolean; error?: string }>
   onClose: () => void
 }) {
   const { t: rawT } = useTranslation()
@@ -430,17 +460,21 @@ function ConnectorEditorModal({
   const patch = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }))
 
-  const canSave = form.name.trim().length > 0
+  const canSave = form.name.trim().length > 0 && !busy
 
   const handleSave = async () => {
     if (!canSave) return
     setBusy(true)
     setError(null)
     try {
-      await onSave(form)
+      const result = await onSave(form)
+      if (!result.ok) {
+        setError(result.error ?? t('settings.im.saveFailed'))
+        setBusy(false)
+      }
+      // On success, parent closes the modal
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-    } finally {
       setBusy(false)
     }
   }
@@ -451,8 +485,9 @@ function ConnectorEditorModal({
     <Modal
       open
       variant="confirm"
+      closeDisabled={busy}
       onOpenChange={(o) => {
-        if (!o) onClose()
+        if (!o && !busy) onClose()
       }}
       title={`${title} — ${t(entry.nameKey)}`}
     >
@@ -466,6 +501,7 @@ function ConnectorEditorModal({
             value={form.name}
             onChange={(e) => patch('name', e.target.value)}
             placeholder={t('settings.im.field.namePlaceholder')}
+            disabled={busy}
           />
         </div>
 
@@ -480,6 +516,7 @@ function ConnectorEditorModal({
               value={form[field.key] ?? ''}
               onChange={(e) => patch(field.key, e.target.value)}
               placeholder={existing?.hasCredentials ? '••••••••' : ''}
+              disabled={busy}
             />
           </div>
         ))}
@@ -493,6 +530,7 @@ function ConnectorEditorModal({
             value={form.permissionMode}
             onChange={(e) => patch('permissionMode', e.target.value)}
             className={cn(inputCls, 'h-9')}
+            disabled={busy}
           >
             <option value="confirm">{t('settings.im.permissionModeConfirm')}</option>
             <option value="auto">{t('settings.im.permissionModeAuto')}</option>
@@ -504,6 +542,14 @@ function ConnectorEditorModal({
           )}
         </div>
 
+        {/* Busy indicator */}
+        {busy && (
+          <div className="flex items-center gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-meta text-accent">
+            <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+            {t('settings.im.saving')}
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-meta text-danger">
@@ -513,15 +559,16 @@ function ConnectorEditorModal({
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>
             {t('settings.im.cancel')}
           </Button>
           <Button
             variant="primary"
             size="sm"
-            disabled={!canSave || busy}
+            disabled={!canSave}
             onClick={() => void handleSave()}
           >
+            {busy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
             {t('settings.im.save')}
           </Button>
         </div>

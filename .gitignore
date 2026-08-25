@@ -15,6 +15,7 @@ node_modules
 # Build outputs
 dist
 dist-ssr
+dist-tsc
 *.local
 coverage/
 

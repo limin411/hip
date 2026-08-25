@@ -205,6 +205,19 @@ export class ImGateway {
     }
   }
 
+  /** Connect a single adapter by connector id. */
+  async connectOne(connectorId: string): Promise<void> {
+    const entry = this.adapters.get(connectorId)
+    if (!entry) return
+    this.setStatus(connectorId, 'connecting')
+    try {
+      await entry.adapter.connect()
+      this.setStatus(connectorId, 'connected')
+    } catch (err) {
+      this.setStatus(connectorId, 'error', err instanceof Error ? err.message : String(err))
+    }
+  }
+
   /** Disconnect all adapters. */
   async disconnectAll(): Promise<void> {
     for (const [id, entry] of this.adapters) {

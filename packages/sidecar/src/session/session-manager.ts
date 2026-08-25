@@ -32,6 +32,8 @@ import { handleSessionMessage, isSessionMessage } from './handlers/session.js'
 import { handlePluginMessage, isPluginMessage, type PluginHandlerContext } from './handlers/plugin.js'
 import { handleImMessage, isImMessage, type ImHandlerContext } from '../im/handlers.js'
 import { ImConnectorStore } from '../im/store.js'
+import { ImGateway } from '../im/gateway.js'
+import type { ImConnectorPublic } from '@hip/protocol'
 import type { SendFn, SessionLifecycleContext } from './handlers/types.js'
 import {
   resolveTrashRetentionDays,
@@ -286,6 +288,22 @@ export class SessionManager {
     return this._imStore
   }
 
+  private _imGateway?: ImGateway
+  private get imGateway(): ImGateway {
+    if (!this._imGateway) {
+      this._imGateway = new ImGateway(this.imStore)
+      this._imGateway.onStatus((connectorId, status, lastError) => {
+        this._imBroadcast?.({
+          type: 'im:gateway:status',
+          connectorId,
+          status,
+          lastError,
+        })
+      })
+    }
+    return this._imGateway
+  }
+
   private _imBroadcast?: (msg: import('@hip/protocol').ServerMessage) => void
 
   /** Set the broadcast function for IM events (called by WsServer). */
@@ -297,6 +315,30 @@ export class SessionManager {
     return {
       store: this.imStore,
       broadcast: (msg) => this._imBroadcast?.(msg),
+      onUpsert: (pub) => this.imAutoConnect(pub),
+    }
+  }
+
+  /** Auto-connect an adapter after connector upsert. */
+  private async imAutoConnect(pub: ImConnectorPublic): Promise<void> {
+    try {
+      const connector = this.imStore.get(pub.id)
+      if (!connector || !connector.enabled) return
+
+      // Unregister any existing adapter first (for re-connect on edit)
+      this.imGateway.unregister(pub.id)
+
+      const { createAdapter } = await import('../im/adapter-factory.js')
+      const adapter = createAdapter(connector)
+      if (!adapter) {
+        this.imGateway.setStatus(pub.id, 'error', `Adapter not available for platform: ${pub.platform}`)
+        return
+      }
+      this.imGateway.register({ connectorId: pub.id, adapter })
+      // Connect in background — status broadcasts via onStatus callback
+      void this.imGateway.connectOne(pub.id).catch(() => {})
+    } catch (err) {
+      this.imGateway.setStatus(pub.id, 'error', err instanceof Error ? err.message : String(err))
     }
   }
 

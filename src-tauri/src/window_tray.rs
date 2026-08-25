@@ -289,29 +289,15 @@ pub fn sync_tray(app: &AppHandle) {
     }
 }
 
-/// Monochrome "HIP" wordmark for the system tray (not the orange mascot).
+/// Product mascot (Flat Butt) for the system tray.
 ///
-/// - macOS: black-on-transparent + `icon_as_template(true)` so the menu bar
-///   tints it for light/dark appearance (Apple template convention).
-/// - Windows/Linux: white-on-transparent (typical dark taskbar / panel).
+/// Full-color orange mascot on all platforms — not a template image.
 fn tray_icon_image() -> Result<tauri::image::Image<'static>, String> {
-    #[cfg(target_os = "macos")]
-    {
-        // 32pt logical; template scales for retina.
-        tauri::image::Image::from_bytes(include_bytes!("../icons/tray-hip-32.png"))
-            .or_else(|_| {
-                tauri::image::Image::from_bytes(include_bytes!("../icons/tray-hip-64.png"))
-            })
-            .map_err(|e| format!("load tray HIP icon: {e}"))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        tauri::image::Image::from_bytes(include_bytes!("../icons/tray-hip-white-32.png"))
-            .or_else(|_| {
-                tauri::image::Image::from_bytes(include_bytes!("../icons/tray-hip-white-64.png"))
-            })
-            .map_err(|e| format!("load tray HIP icon: {e}"))
-    }
+    tauri::image::Image::from_bytes(include_bytes!("../icons/tray-mascot-32.png"))
+        .or_else(|_| {
+            tauri::image::Image::from_bytes(include_bytes!("../icons/tray-mascot-64.png"))
+        })
+        .map_err(|e| format!("load tray mascot icon: {e}"))
 }
 
 fn try_create_tray_inner(app: &AppHandle) -> Result<TrayIcon, String> {
@@ -348,11 +334,8 @@ fn try_create_tray_inner(app: &AppHandle) -> Result<TrayIcon, String> {
             }
         });
 
-    // Black HIP glyph is a proper template silhouette (unlike the color mascot).
-    #[cfg(target_os = "macos")]
-    {
-        builder = builder.icon_as_template(true);
-    }
+    // Mascot is full-color — do NOT set icon_as_template (that would render
+    // it as a monochrome silhouette in the macOS menu bar).
 
     builder.build(app).map_err(|e| e.to_string())
 }

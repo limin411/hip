@@ -1,4 +1,4 @@
-import type { HostAuthMethod, TerminalHost } from '@/ipc/terminalHosts'
+import type { BastionConfig, HostAuthMethod, TerminalHost } from '@/ipc/terminalHosts'
 
 /** Form field values (port as string for controlled input). */
 export interface HostFormValues {
@@ -15,6 +15,12 @@ export interface HostFormValues {
   /** Empty string = ungrouped. */
   groupId: string
   remotePath: string
+  /** Bastion (jump host) host ID. Empty string = no bastion. */
+  bastionHostId: string
+  /** Bastion username override. Empty string = use target username. */
+  bastionUsername: string
+  /** Bastion port override. Empty string = use target port. */
+  bastionPort: string
 }
 
 export type HostFormField =
@@ -39,6 +45,9 @@ export function emptyHostFormValues(): HostFormValues {
     passphrase: '',
     groupId: '',
     remotePath: '',
+    bastionHostId: '',
+    bastionUsername: '',
+    bastionPort: '',
   }
 }
 
@@ -54,6 +63,9 @@ export function hostToFormValues(host: TerminalHost): HostFormValues {
     passphrase: '',
     groupId: host.groupId ?? '',
     remotePath: host.remotePath ?? '',
+    bastionHostId: host.bastion?.hostId ?? '',
+    bastionUsername: host.bastion?.username ?? '',
+    bastionPort: host.bastion?.port?.toString() ?? '',
   }
 }
 
@@ -138,6 +150,21 @@ export function formValuesToHost(
   }
   if (values.remotePath.trim()) {
     host.remotePath = values.remotePath.trim()
+  }
+  if (values.bastionHostId.trim()) {
+    const bastion: BastionConfig = {
+      hostId: values.bastionHostId.trim(),
+    }
+    if (values.bastionUsername.trim()) {
+      bastion.username = values.bastionUsername.trim()
+    }
+    if (values.bastionPort.trim()) {
+      const bastionPortNum = Number(values.bastionPort)
+      if (Number.isInteger(bastionPortNum) && bastionPortNum >= 1 && bastionPortNum <= 65535) {
+        bastion.port = bastionPortNum
+      }
+    }
+    host.bastion = bastion
   }
   return host
 }

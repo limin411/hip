@@ -51,6 +51,7 @@ export function HostFormDialog({
   /** Dynamic form error keys are validated string literals from hostFormDraft. */
   const tr = t as TFunction & ((key: string) => string)
   const upsertHost = useTerminalHostStore((s) => s.upsertHost)
+  const hosts = useTerminalHostStore((s) => s.hosts)
 
   const [values, setValues] = useState<HostFormValues>(emptyHostFormValues)
   const [passwordSaved, setPasswordSaved] = useState(false)
@@ -64,6 +65,23 @@ export function HostFormDialog({
   const sortedGroups = useMemo(
     () => [...groups].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)),
     [groups],
+  )
+
+  // Filter available bastions: exclude current host and hosts that already have a bastion
+  const availableBastions = useMemo(
+    () =>
+      hosts.filter(
+        (h) =>
+          h.id !== hostId && // Cannot point to self
+          !h.bastion, // Bastion itself cannot have a bastion (single-hop only)
+      ),
+    [hosts, hostId],
+  )
+
+  // Selected bastion info for preview
+  const selectedBastion = useMemo(
+    () => hosts.find((h) => h.id === values.bastionHostId),
+    [hosts, values.bastionHostId],
   )
 
   // Reset form when dialog opens / mode changes.
@@ -432,6 +450,61 @@ export function HostFormDialog({
             autoComplete="off"
           />
         </Field>
+
+        {/* Bastion (jump host) configuration */}
+        <div className="border-t border-[var(--border)] pt-3">
+          <Field label={t('terminals.form.bastion', 'Jump Host (Bastion)')}>
+            <select
+              data-testid="host-form-bastion"
+              className={cn(inputCls)}
+              value={values.bastionHostId}
+              onChange={(e) => patch({ bastionHostId: e.target.value, bastionUsername: '', bastionPort: '' })}
+            >
+              <option value="">{t('terminals.form.bastionNone', 'Direct connection')}</option>
+              {availableBastions.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.label} ({h.hostname}:{h.port})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+              {t('terminals.form.bastionHint', 'Connect through a jump host to reach internal servers')}
+            </p>
+          </Field>
+
+          {values.bastionHostId ? (
+            <>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <Field label={t('terminals.form.bastionUsername', 'Bastion Username (optional)')}>
+                  <Input
+                    data-testid="host-form-bastion-username"
+                    value={values.bastionUsername}
+                    onChange={(e) => patch({ bastionUsername: e.target.value })}
+                    placeholder={values.username}
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label={t('terminals.form.bastionPort', 'Bastion Port (optional)')}>
+                  <Input
+                    data-testid="host-form-bastion-port"
+                    className="font-mono"
+                    inputMode="numeric"
+                    value={values.bastionPort}
+                    onChange={(e) => patch({ bastionPort: e.target.value })}
+                    placeholder={values.port}
+                    autoComplete="off"
+                  />
+                </Field>
+              </div>
+              <div className="mt-2 p-2 bg-[var(--bg-muted)] rounded-lg">
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {t('terminals.form.bastionPath', 'Connection path')}: 
+                  <span className="font-mono">Local → {selectedBastion?.label} → {values.label || 'Target'}</span>
+                </p>
+              </div>
+            </>
+          ) : null}
+        </div>
 
         {submitError ? (
           <p className="text-meta text-danger" role="alert">

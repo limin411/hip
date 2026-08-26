@@ -10,6 +10,13 @@ export interface HostGroup {
 
 export type HostAuthMethod = 'password' | 'privateKey'
 
+/** Bastion (jump host) configuration for single-hop proxy. */
+export interface BastionConfig {
+  hostId: string
+  username?: string
+  port?: number
+}
+
 /** Saved SSH host metadata (credentials live in auth.json raw keys). */
 export interface TerminalHost {
   id: string
@@ -22,6 +29,7 @@ export interface TerminalHost {
   privateKeyPath?: string
   remotePath?: string
   updatedAt: number
+  bastion?: BastionConfig
 }
 
 /** Recent successful launch (K11). */
@@ -136,6 +144,18 @@ function normalizeHost(raw: unknown): TerminalHost | null {
     privateKeyPath: typeof h.privateKeyPath === 'string' ? h.privateKeyPath : undefined,
     remotePath: typeof h.remotePath === 'string' ? h.remotePath : undefined,
     updatedAt: h.updatedAt,
+    bastion: normalizeBastion(h.bastion),
+  }
+}
+
+function normalizeBastion(raw: unknown): BastionConfig | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const b = raw as Record<string, unknown>
+  if (typeof b.hostId !== 'string') return undefined
+  return {
+    hostId: b.hostId,
+    username: typeof b.username === 'string' ? b.username : undefined,
+    port: typeof b.port === 'number' ? b.port : undefined,
   }
 }
 

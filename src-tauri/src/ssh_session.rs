@@ -25,7 +25,7 @@ use crate::ssh_known_hosts::{
 };
 use crate::ssh_path::expand_tilde_path;
 use crate::terminal_budget::{TerminalBudget, MAX_INTERACTIVE_TERMINALS};
-use crate::terminal_hosts::{load_catalog, TerminalHost};
+use crate::terminal_hosts::{load_catalog, BastionConfig, TerminalHost};
 
 // Coalesce constants — match PTY spirit (design).
 const COALESCE_BYTES: usize = 32 * 1024;
@@ -443,6 +443,339 @@ fn pin_tofu_if_needed(
     Ok(())
 }
 
+/// Authenticate an SSH connection using the host's credentials.
+async fn authenticate_ssh_connection(
+    app: &AppHandle,
+    handle: &mut Handle<SshHandler>,
+    host: &TerminalHost,
+) -> Result<(), String> {
+    let username = host.username.trim();
+    let auth_method = host.auth_method.as_str();
+    
+    match auth_method {
+        "password" => {
+            let password = crate::get_secret_value(app, &secret_password_key(&host.id))
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| format!("SSH password not configured for host {}", host.label))?;
+            let auth_res = handle
+                .authenticate_password(username, password)
+                .await
+                .map_err(|e| format!("SSH password auth error for {}: {e}", host.label))?;
+            if !auth_res.success() {
+                return Err(format!("SSH authentication failed (password) for host {}", host.label));
+            }
+        }
+        "privateKey" => {
+            let key_path_raw = host
+                .private_key_path
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+                .ok_or_else(|| format!("private key path not configured for host {}", host.label))?;
+            let key_path = expand_tilde_path(key_path_raw)?;
+            if !key_path.is_file() {
+                return Err(format!(
+                    "private key not found for host {}: {}",
+                    host.label,
+                    key_path.display()
+                ));
+            }
+            let passphrase = crate::get_secret_value(app, &secret_passphrase_key(&host.id))
+                .filter(|s| !s.is_empty());
+            let key = load_private_key_file(&key_path, passphrase.as_deref())?;
+            let hash_alg = handle
+                .best_supported_rsa_hash()
+                .await
+                .map_err(|e| format!("SSH key negotiation error: {e}"))?
+                .flatten();
+            let auth_res = handle
+                .authenticate_publickey(
+                    username,
+                    PrivateKeyWithHashAlg::new(Arc::new(key), hash_alg),
+                )
+                .await
+                .map_err(|e| format!("SSH publickey auth error for {}: {e}", host.label))?;
+            if !auth_res.success() {
+                return Err(format!("SSH authentication failed (public key) for host {}", host.label));
+            }
+        }
+        other => {
+            return Err(format!(
+                "unsupported SSH auth method for host {}: {other} (supports password | privateKey)",
+                host.label
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Connect to a target host through a bastion (jump host).
+/// Single-hop only: bastion cannot have its own bastion.
+async fn connect_through_bastion(
+    app: &AppHandle,
+    manager: &SshManager,
+    terminal_id: &str,
+    target_host: &TerminalHost,
+    bastion_config: &BastionConfig,
+    cols: u32,
+    rows: u32,
+) -> Result<SshOpenResult, String> {
+    eprintln!(
+        "[ssh] connecting through bastion: target={} bastion={}",
+        target_host.id, bastion_config.host_id
+    );
+
+    // 1. Load bastion host configuration
+    let bastion_host = load_host_meta(app, &bastion_config.host_id)?;
+    
+    // Apply overrides from bastion config
+    let mut bastion_host = bastion_host;
+    if let Some(username) = &bastion_config.username {
+        bastion_host.username = username.clone();
+    }
+    if let Some(port) = bastion_config.port {
+        bastion_host.port = port;
+    }
+
+    // 2. Connect to bastion (direct connection, no nesting)
+    let bastion_hostname = bastion_host.hostname.trim().to_string();
+    if bastion_hostname.is_empty() {
+        return Err("bastion hostname is empty".into());
+    }
+    let bastion_port = if bastion_host.port == 0 { 22 } else { bastion_host.port };
+
+    // Load known pin for TOFU
+    let kh_path = crate::ssh_known_hosts::known_hosts_path(app)
+        .ok_or_else(|| "no config dir".to_string())?;
+    let bastion_trusted = with_known_hosts(&kh_path, |kh| {
+        get_pin(kh, &bastion_hostname, bastion_port).cloned()
+    })?;
+
+    let bastion_gate = Arc::new(HostKeyGate {
+        trusted: bastion_trusted,
+        outcome: std::sync::Mutex::new(None),
+    });
+
+    let config = client::Config {
+        inactivity_timeout: None,
+        keepalive_interval: Some(Duration::from_secs(30)),
+        keepalive_max: 5,
+        ..Default::default()
+    };
+
+    let handler = SshHandler {
+        gate: Arc::clone(&bastion_gate),
+    };
+
+    eprintln!(
+        "[ssh] connecting to bastion {}:{}",
+        bastion_hostname, bastion_port
+    );
+
+    let mut bastion_handle = client::connect(Arc::new(config), (bastion_hostname.as_str(), bastion_port), handler)
+        .await
+        .map_err(|e| {
+            // Check for TOFU mismatch
+            if let Ok(g) = bastion_gate.outcome.lock() {
+                if let Some(ref o) = *g {
+                    if let HostKeyDecision::Mismatch {
+                        fingerprint_sha256,
+                        previous_fingerprint_sha256,
+                    } = &o.decision
+                    {
+                        return format!(
+                            "Bastion host key mismatch for {}: {}",
+                            bastion_host.label,
+                            mismatch_err(&bastion_hostname, bastion_port, fingerprint_sha256, previous_fingerprint_sha256.clone(), &o.server_public_key)
+                        );
+                    }
+                }
+            }
+            format!("Failed to connect to bastion {}: {e}", bastion_host.label)
+        })?;
+
+    // Authenticate bastion
+    authenticate_ssh_connection(app, &mut bastion_handle, &bastion_host).await
+        .map_err(|e| format!("Bastion authentication failed: {e}"))?;
+
+    // Pin TOFU if needed
+    if let Ok(g) = bastion_gate.outcome.lock() {
+        if let Some(ref o) = *g {
+            if let Err(e) = pin_tofu_if_needed(app, &bastion_hostname, bastion_port, o) {
+                eprintln!("[ssh] tofu pin failed bastion={}: {e}", host_key_id(&bastion_hostname, bastion_port));
+            }
+        }
+    }
+
+    eprintln!("[ssh] bastion connected, opening tunnel to {}:{}", target_host.hostname, target_host.port);
+
+    // 3. Open tunnel channel through bastion to target
+    let target_port = if target_host.port == 0 { 22 } else { target_host.port };
+    let tunnel_channel = bastion_handle
+        .channel_open_direct_tcpip(
+            &target_host.hostname,
+            target_port as u32,
+            "127.0.0.1",
+            0,
+        )
+        .await
+        .map_err(|e| format!("Failed to open tunnel through bastion to {}:{}: {e}", target_host.hostname, target_port))?;
+
+    // 4. Convert channel to stream for new SSH connection
+    let stream = tunnel_channel.into_stream();
+
+    // 5. Connect to target through tunnel
+    let target_gate = Arc::new(HostKeyGate {
+        trusted: None, // Target is behind bastion, skip TOFU
+        outcome: std::sync::Mutex::new(None),
+    });
+
+    let target_handler = SshHandler {
+        gate: Arc::clone(&target_gate),
+    };
+
+    let target_config = client::Config {
+        inactivity_timeout: None,
+        keepalive_interval: Some(Duration::from_secs(30)),
+        keepalive_max: 5,
+        ..Default::default()
+    };
+
+    eprintln!(
+        "[ssh] connecting to target {} through tunnel",
+        target_host.hostname
+    );
+
+    let mut target_handle = client::connect_stream(Arc::new(target_config), stream, target_handler)
+        .await
+        .map_err(|e| format!("Failed to connect to target {} through tunnel: {e}", target_host.hostname))?;
+
+    // 6. Authenticate to target
+    authenticate_ssh_connection(app, &mut target_handle, target_host).await
+        .map_err(|e| format!("Target authentication failed: {e}"))?;
+
+    eprintln!("[ssh] target connected, opening shell");
+
+    // 7. Open shell channel on target
+    let channel = target_handle
+        .channel_open_session()
+        .await
+        .map_err(|e| format!("Failed to open shell channel on target: {e}"))?;
+    channel
+        .request_pty(false, "xterm-256color", cols, rows, 0, 0, &[])
+        .await
+        .map_err(|e| format!("Failed to request PTY on target: {e}"))?;
+    channel
+        .request_shell(false)
+        .await
+        .map_err(|e| format!("Failed to request shell on target: {e}"))?;
+
+    let (mut read_half, write_half) = channel.split();
+    let generation = manager.next_gen();
+    let alive = Arc::new(AtomicBool::new(true));
+
+    let sess = Arc::new(SshSession {
+        host_id: target_host.id.clone(),
+        hostname: target_host.hostname.clone(),
+        port: target_port,
+        alive: Arc::clone(&alive),
+        generation,
+        writer: AsyncMutex::new(Some(write_half)),
+        handle: AsyncMutex::new(Some(target_handle)),
+        sftp: AsyncMutex::new(None),
+    });
+
+    {
+        let mut map = manager.sessions.lock().unwrap();
+        if let Some(displaced) = map.insert(terminal_id.to_string(), Arc::clone(&sess)) {
+            displaced.alive.store(false, Ordering::SeqCst);
+            let d = Arc::clone(&displaced);
+            tauri::async_runtime::spawn(async move {
+                close_session_handles(&d).await;
+            });
+        }
+    }
+
+    // Spawn reader loop (same as direct connection)
+    let emit_app = app.clone();
+    let emit_id = terminal_id.to_string();
+    let emit_alive = Arc::clone(&alive);
+    let emit_gen = generation;
+    let emit_budget_app = app.clone();
+    let emit_sess = Arc::clone(&sess);
+    tauri::async_runtime::spawn(async move {
+        let mut pending: Vec<u8> = Vec::new();
+        let mut queue = EmitQueue::new();
+        let mut last_activity = Instant::now();
+        let mut exit_code: Option<i32> = None;
+
+        loop {
+            if !emit_alive.load(Ordering::SeqCst) {
+                break;
+            }
+
+            let wait = read_half.wait();
+            let timeout = tokio::time::timeout(Duration::from_millis(COALESCE_MS), wait);
+
+            match timeout.await {
+                Ok(Some(msg)) => match msg {
+                    ChannelMsg::Data { ref data } => {
+                        pending.extend_from_slice(data);
+                        last_activity = Instant::now();
+                        if pending.len() >= COALESCE_BYTES {
+                            flush_ssh_pending(&emit_app, &emit_id, &mut pending, &mut queue);
+                        }
+                    }
+                    ChannelMsg::ExtendedData { ref data, ext: 1 } => {
+                        pending.extend_from_slice(data);
+                        last_activity = Instant::now();
+                        if pending.len() >= COALESCE_BYTES {
+                            flush_ssh_pending(&emit_app, &emit_id, &mut pending, &mut queue);
+                        }
+                    }
+                    ChannelMsg::ExitStatus { exit_status } => {
+                        exit_code = Some(exit_status as i32);
+                    }
+                    ChannelMsg::Eof | ChannelMsg::Close => {
+                        break;
+                    }
+                    _ => {}
+                },
+                Ok(None) => break,
+                Err(_) => {
+                    if !pending.is_empty()
+                        && last_activity.elapsed() >= Duration::from_millis(COALESCE_MS)
+                    {
+                        flush_ssh_pending(&emit_app, &emit_id, &mut pending, &mut queue);
+                    }
+                }
+            }
+        }
+
+        flush_ssh_pending(&emit_app, &emit_id, &mut pending, &mut queue);
+        close_session_handles(&emit_sess).await;
+        emit_alive.store(false, Ordering::SeqCst);
+
+        if let Some(budget) = emit_budget_app.try_state::<TerminalBudget>() {
+            budget.release(&emit_id);
+        }
+
+        let _ = emit_app.emit(
+            "ssh:exit",
+            SshExitEvent {
+                terminal_id: emit_id,
+                code: exit_code,
+                generation: emit_gen,
+                message: None,
+            },
+        );
+    });
+
+    Ok(SshOpenResult {
+        reused: false,
+        generation,
+    })
+}
+
 // ── Commands ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -579,6 +912,12 @@ async fn open_ssh_connection(
     cols: u32,
     rows: u32,
 ) -> Result<SshOpenResult, String> {
+    // If bastion is configured, use bastion connection
+    if let Some(bastion_config) = &host.bastion {
+        return connect_through_bastion(app, manager, terminal_id, host, bastion_config, cols, rows).await;
+    }
+
+    // Direct connection (existing logic)
     let hostname = host.hostname.trim().to_string();
     if hostname.is_empty() {
         return Err("hostname is empty".into());

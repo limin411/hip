@@ -17,6 +17,44 @@ pub struct HostGroup {
     pub sort: i64,
 }
 
+/// Bastion (jump host) configuration for single-hop proxy.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BastionConfig {
+    /// Bastion host ID (references another TerminalHost in the same catalog).
+    pub host_id: String,
+    /// Optional: override bastion username (defaults to target host's username).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    /// Optional: override bastion port (defaults to target host's port).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+}
+
+/// Validate bastion config: no self-reference, no nesting.
+pub fn validate_bastion(
+    host: &TerminalHost,
+    catalog: &TerminalHostsCatalog,
+) -> Result<(), String> {
+    if let Some(bastion) = &host.bastion {
+        // Cannot point to self
+        if bastion.host_id == host.id {
+            return Err("Bastion cannot point to itself".into());
+        }
+        // Bastion must exist
+        let bastion_host = catalog
+            .hosts
+            .iter()
+            .find(|h| h.id == bastion.host_id)
+            .ok_or_else(|| format!("Bastion host not found: {}", bastion.host_id))?;
+        // Bastion itself cannot have a bastion (single-hop only)
+        if bastion_host.bastion.is_some() {
+            return Err("Nested bastion is not supported (single-hop only)".into());
+        }
+    }
+    Ok(())
+}
+
 /// Saved SSH host entry. Credentials are NOT stored here.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +73,9 @@ pub struct TerminalHost {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub remote_path: Option<String>,
     pub updated_at: i64,
+    /// Bastion (jump host) configuration for single-hop proxy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bastion: Option<BastionConfig>,
 }
 
 /// Recent successful launch entry (cap enforced on the frontend store).
@@ -206,6 +247,7 @@ mod tests {
                 private_key_path: Some("/Users/me/.ssh/id_ed25519".into()),
                 remote_path: Some("/var/www".into()),
                 updated_at: 1_720_000_000_000,
+                bastion: None,
             }],
             recents: vec![
                 RecentLaunch::Ssh {
@@ -242,6 +284,7 @@ mod tests {
                 private_key_path: None,
                 remote_path: None,
                 updated_at: 1,
+                bastion: None,
             }],
             recents: vec![
                 RecentLaunch::Ssh {
@@ -327,6 +370,7 @@ mod tests {
                 private_key_path: Some("/Users/me/.ssh/id_ed25519".into()),
                 remote_path: Some("/var/www".into()),
                 updated_at: 1_720_000_000_000,
+                bastion: None,
             }],
             recents: vec![RecentLaunch::Ssh {
                 host_id: "hst_1".into(),
@@ -342,5 +386,196 @@ mod tests {
         assert_eq!(v["hosts"][0]["privateKeyPath"], "/Users/me/.ssh/id_ed25519");
         assert_eq!(v["recents"][0]["type"], "ssh");
         assert_eq!(v["recents"][0]["hostId"], "hst_1");
+    }
+
+    #[test]
+    fn bastion_config_serde_roundtrip() {
+        let cat = TerminalHostsCatalog {
+            version: 1,
+            groups: vec![],
+            hosts: vec![
+                TerminalHost {
+                    id: "bastion_01".into(),
+                    label: "Jump Host".into(),
+                    group_id: None,
+                    hostname: "bastion.example.com".into(),
+                    port: 22,
+                    username: "ops".into(),
+                    auth_method: "privateKey".into(),
+                    private_key_path: Some("~/.ssh/id_ed25519".into()),
+                    remote_path: None,
+                    updated_at: 1_720_000_000_000,
+                    bastion: None,
+                },
+                TerminalHost {
+                    id: "target_01".into(),
+                    label: "Internal DB".into(),
+                    group_id: None,
+                    hostname: "10.0.1.100".into(),
+                    port: 22,
+                    username: "dbadmin".into(),
+                    auth_method: "password".into(),
+                    private_key_path: None,
+                    remote_path: None,
+                    updated_at: 1_720_000_000_000,
+                    bastion: Some(BastionConfig {
+                        host_id: "bastion_01".into(),
+                        username: None,
+                        port: None,
+                    }),
+                },
+            ],
+            recents: vec![],
+            terminal_records: vec![],
+        };
+
+        let p = tmp_path("bastion_roundtrip");
+        save_catalog(&p, &cat).unwrap();
+        let loaded = load_catalog(&p);
+        assert_eq!(loaded, cat);
+
+        // Verify bastion config is in the JSON
+        let body = std::fs::read_to_string(&p).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["hosts"][1]["bastion"]["hostId"], "bastion_01");
+    }
+
+    #[test]
+    fn validate_bastion_rejects_self_reference() {
+        let cat = TerminalHostsCatalog {
+            version: 1,
+            groups: vec![],
+            hosts: vec![TerminalHost {
+                id: "hst_1".into(),
+                label: "Self".into(),
+                group_id: None,
+                hostname: "localhost".into(),
+                port: 22,
+                username: "user".into(),
+                auth_method: "password".into(),
+                private_key_path: None,
+                remote_path: None,
+                updated_at: 1,
+                bastion: Some(BastionConfig {
+                    host_id: "hst_1".into(), // Self reference!
+                    username: None,
+                    port: None,
+                }),
+            }],
+            recents: vec![],
+            terminal_records: vec![],
+        };
+
+        let result = validate_bastion(&cat.hosts[0], &cat);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("cannot point to itself"));
+    }
+
+    #[test]
+    fn validate_bastion_rejects_nested_bastion() {
+        let cat = TerminalHostsCatalog {
+            version: 1,
+            groups: vec![],
+            hosts: vec![
+                TerminalHost {
+                    id: "bastion_1".into(),
+                    label: "Bastion 1".into(),
+                    group_id: None,
+                    hostname: "b1.example.com".into(),
+                    port: 22,
+                    username: "ops".into(),
+                    auth_method: "password".into(),
+                    private_key_path: None,
+                    remote_path: None,
+                    updated_at: 1,
+                    bastion: Some(BastionConfig {
+                        host_id: "bastion_2".into(), // Nested bastion!
+                        username: None,
+                        port: None,
+                    }),
+                },
+                TerminalHost {
+                    id: "bastion_2".into(),
+                    label: "Bastion 2".into(),
+                    group_id: None,
+                    hostname: "b2.example.com".into(),
+                    port: 22,
+                    username: "ops".into(),
+                    auth_method: "password".into(),
+                    private_key_path: None,
+                    remote_path: None,
+                    updated_at: 1,
+                    bastion: None,
+                },
+                TerminalHost {
+                    id: "target".into(),
+                    label: "Target".into(),
+                    group_id: None,
+                    hostname: "10.0.0.1".into(),
+                    port: 22,
+                    username: "user".into(),
+                    auth_method: "password".into(),
+                    private_key_path: None,
+                    remote_path: None,
+                    updated_at: 1,
+                    bastion: Some(BastionConfig {
+                        host_id: "bastion_1".into(), // Points to bastion that has its own bastion
+                        username: None,
+                        port: None,
+                    }),
+                },
+            ],
+            recents: vec![],
+            terminal_records: vec![],
+        };
+
+        let result = validate_bastion(&cat.hosts[2], &cat);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Nested bastion"));
+    }
+
+    #[test]
+    fn validate_bastion_accepts_valid_config() {
+        let cat = TerminalHostsCatalog {
+            version: 1,
+            groups: vec![],
+            hosts: vec![
+                TerminalHost {
+                    id: "bastion".into(),
+                    label: "Bastion".into(),
+                    group_id: None,
+                    hostname: "bastion.example.com".into(),
+                    port: 22,
+                    username: "ops".into(),
+                    auth_method: "password".into(),
+                    private_key_path: None,
+                    remote_path: None,
+                    updated_at: 1,
+                    bastion: None,
+                },
+                TerminalHost {
+                    id: "target".into(),
+                    label: "Target".into(),
+                    group_id: None,
+                    hostname: "10.0.0.1".into(),
+                    port: 22,
+                    username: "user".into(),
+                    auth_method: "password".into(),
+                    private_key_path: None,
+                    remote_path: None,
+                    updated_at: 1,
+                    bastion: Some(BastionConfig {
+                        host_id: "bastion".into(),
+                        username: Some("override_user".into()),
+                        port: Some(2222),
+                    }),
+                },
+            ],
+            recents: vec![],
+            terminal_records: vec![],
+        };
+
+        let result = validate_bastion(&cat.hosts[1], &cat);
+        assert!(result.is_ok());
     }
 }

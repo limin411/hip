@@ -1,0 +1,59 @@
+name: Release
+
+# Manually trigger to upload build artifacts to an existing GitHub Release.
+# Useful when build artifacts are already available but need to be attached to a release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g., v1.0.3)"
+        required: true
+        type: string
+
+jobs:
+  upload-release-assets:
+    name: Upload Release Assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Validate tag
+        run: |
+          if [[ ! "${{ inputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid tag format. Expected v1.2.3"
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: hip-macos-*
+          path: dist-release/macos
+          merge-multiple: true
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: hip-windows-*
+          path: dist-release/windows
+          merge-multiple: true
+
+      - name: List release assets
+        run: |
+          echo "=== macOS ==="
+          ls -lh dist-release/macos/ || echo "No macOS artifacts found"
+          echo "=== Windows ==="
+          ls -lh dist-release/windows/ || echo "No Windows artifacts found"
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          files: |
+            dist-release/macos/*
+            dist-release/windows/*
+          fail_on_unmatched_files: false

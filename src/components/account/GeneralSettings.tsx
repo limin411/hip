@@ -429,6 +429,39 @@ export function GeneralSettings() {
           </div>
         </div>
       ) : null}
+      {/* Terminal rendering enhancements */}
+      {showTerminalColor ? (
+        <>
+          <div className="flex items-center justify-between gap-6 px-8 py-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-body font-medium text-ink">{t('settings.terminalWebgl')}</div>
+              <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+                {t('settings.terminalWebglDesc')}
+              </div>
+            </div>
+            <Switch
+              checked={useHipConfigStore.getState().config.terminal?.webgl ?? true}
+              onCheckedChange={(checked) => {
+                void updateSection('terminal', (prev) => ({ ...(prev ?? {}), webgl: checked }))
+              }}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-6 px-8 py-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-body font-medium text-ink">{t('settings.terminalLigatures')}</div>
+              <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
+                {t('settings.terminalLigaturesDesc')}
+              </div>
+            </div>
+            <Switch
+              checked={useHipConfigStore.getState().config.terminal?.ligatures ?? true}
+              onCheckedChange={(checked) => {
+                void updateSection('terminal', (prev) => ({ ...(prev ?? {}), ligatures: checked }))
+              }}
+            />
+          </div>
+        </>
+      ) : null}
       <div
         className="flex items-center justify-between gap-6 px-8 py-4"
         data-testid="settings-trash-retention"

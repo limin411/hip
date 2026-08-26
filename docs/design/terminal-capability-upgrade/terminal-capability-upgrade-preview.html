@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>终端能力现代化升级 - 视觉原型</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+            --border: #30363d;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .section {
+            margin-bottom: 3rem;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 1.5rem;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+        
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        
+        .comparison-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-title {
+            font-weight: 600;
+        }
+        
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge-current {
+            background: var(--warning);
+            color: var(--bg-primary);
+        }
+        
+        .badge-new {
+            background: var(--success);
+            color: var(--bg-primary);
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        .terminal-mock {
+            background: #000;
+            border-radius: 6px;
+            overflow: hidden;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .terminal-titlebar {
+            background: var(--bg-tertiary);
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .terminal-dot-red { background: #ff5f56; }
+        .terminal-dot-yellow { background: #ffbd2e; }
+        .terminal-dot-green { background: #27c93f; }
+        
+        .terminal-content {
+            padding: 1rem;
+            min-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .prompt {
+            color: var(--success);
+        }
+        
+        .command {
+            color: var(--text-primary);
+        }
+        
+        .output {
+            color: var(--text-secondary);
+        }
+        
+        .link {
+            color: var(--accent);
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        
+        .link:hover {
+            color: #79c0ff;
+        }
+        
+        .ligature {
+            color: #ff7b72;
+        }
+        
+        .emoji {
+            font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+        }
+        
+        .sixel-image {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            color: white;
+            font-size: 12px;
+        }
+        
+        .feature-list {
+            list-style: none;
+        }
+        
+        .feature-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .check {
+            color: var(--success);
+        }
+        
+        .cross {
+            color: var(--danger);
+        }
+        
+        .tabs-demo {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        
+        .tabs-bar {
+            display: flex;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .tab {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-right: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+        }
+        
+        .tab:hover {
+            background: var(--bg-secondary);
+        }
+        
+        .tab.active {
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--accent);
+        }
+        
+        .tab-close {
+            opacity: 0.5;
+            cursor: pointer;
+        }
+        
+        .tab-close:hover {
+            opacity: 1;
+            color: var(--danger);
+        }
+        
+        .split-demo {
+            display: flex;
+            height: 400px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .split-pane {
+            flex: 1;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .split-pane-header {
+            background: var(--bg-tertiary);
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .split-pane-content {
+            flex: 1;
+            padding: 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            overflow-y: auto;
+        }
+        
+        .split-divider {
+            width: 4px;
+            background: var(--border);
+            cursor: col-resize;
+            transition: background 0.2s;
+        }
+        
+        .split-divider:hover {
+            background: var(--accent);
+        }
+        
+        .config-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .config-title {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .config-code {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        
+        .config-key {
+            color: #7ee787;
+        }
+        
+        .config-value {
+            color: #a5d6ff;
+        }
+        
+        .config-comment {
+            color: var(--text-secondary);
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 2rem;
+            padding-left: 1rem;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -2rem;
+            top: 0.5rem;
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 50%;
+            border: 2px solid var(--bg-primary);
+        }
+        
+        .timeline-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .timeline-date {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .timeline-content {
+            color: var(--text-secondary);
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 0.25rem;
+        }
+        
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        .metric-change {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .metric-change.positive {
+            color: var(--success);
+        }
+        
+        .metric-change.negative {
+            color: var(--danger);
+        }
+        
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .split-demo {
+                flex-direction: column;
+                height: auto;
+            }
+            
+            .split-divider {
+                width: 100%;
+                height: 4px;
+                cursor: row-resize;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>终端能力现代化升级</h1>
+            <p class="subtitle">从基础实现到现代终端标准的全面升级</p>
+        </header>
+        
+        <!-- 性能指标 -->
+        <section class="section">
+            <h2 class="section-title">性能提升</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">3-10x</div>
+                    <div class="metric-label">渲染性能提升</div>
+                    <div class="metric-change positive">WebGL 加速</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">60fps</div>
+                    <div class="metric-label">目标帧率</div>
+                    <div class="metric-change positive">从 15fps 提升</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">100%</div>
+                    <div class="metric-label">协议兼容性</div>
+                    <div class="metric-change positive">与现代终端一致</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">0</div>
+                    <div class="metric-label">闪烁问题</div>
+                    <div class="metric-change positive">Synchronized Output</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 渲染对比 -->
+        <section class="section">
+            <h2 class="section-title">渲染性能对比</h2>
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <span class="card-title">当前实现</span>
+                        <span class="badge badge-current">Canvas 渲染</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="feature-list">
+                            <li><span class="cross">✗</span> GPU 加速</li>
+                            <li><span class="cross">✗</span> 字体连字</li>
+                            <li><span class="cross">✗</span> Unicode 11 宽度</li>
+                            <li><span class="check">✓</span> 基础渲染</li>
+                            <li><span class="check">✓</span> 滚动回看</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <span class="card-title">升级后</span>
+                        <span class="badge badge-new">WebGL 渲染</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="feature-list">
+                            <li><span class="check">✓</span> GPU 加速渲染</li>
+                            <li><span class="check">✓</span> 字体连字支持</li>
+                            <li><span class="check">✓</span> Unicode 11 宽度</li>
+                            <li><span class="check">✓</span> 基础渲染</li>
+                            <li><span class="check">✓</span> 滚动回看</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 连字效果 -->
+        <section class="section">
+            <h2 class="section-title">字体连字效果</h2>
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <span class="card-title">当前显示</span>
+                        <span class="badge badge-current">无连字</span>
+                    </div>
+                    <div class="terminal-mock">
+                        <div class="terminal-titlebar">
+                            <span class="terminal-dot terminal-dot-red"></span>
+                            <span class="terminal-dot terminal-dot-yellow"></span>
+                            <span class="terminal-dot terminal-dot-green"></span>
+                        </div>
+                        <div class="terminal-content">
+                            <span class="prompt">❯</span> <span class="command">const fn = (x) => {</span><br>
+                            <span class="command">&nbsp;&nbsp;if (x !== null && x >= 0) {</span><br>
+                            <span class="command">&nbsp;&nbsp;&nbsp;&nbsp;return x.toString();</span><br>
+                            <span class="command">&nbsp;&nbsp;}</span><br>
+                            <span class="command">};</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <span class="card-title">升级后显示</span>
+                        <span class="badge badge-new">连字启用</span>
+                    </div>
+                    <div class="terminal-mock">
+                        <div class="terminal-titlebar">
+                            <span class="terminal-dot terminal-dot-red"></span>
+                            <span class="terminal-dot terminal-dot-yellow"></span>
+                            <span class="terminal-dot terminal-dot-green"></span>
+                        </div>
+                        <div class="terminal-content">
+                            <span class="prompt">❯</span> <span class="command">const fn <span class="ligature">=></span> (x) <span class="ligature">=></span> {</span><br>
+                            <span class="command">&nbsp;&nbsp;if (x <span class="ligature">!==</span> null && x <span class="ligature">>=</span> 0) {</span><br>
+                            <span class="command">&nbsp;&nbsp;&nbsp;&nbsp;return x.toString();</span><br>
+                            <span class="command">&nbsp;&nbsp;}</span><br>
+                            <span class="command">};</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 协议支持 -->
+        <section class="section">
+            <h2 class="section-title">协议支持对比</h2>
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <span class="card-title">当前协议</span>
+                        <span class="badge badge-current">基础</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="feature-list">
+                            <li><span class="check">✓</span> OSC 0/2 标题</li>
+                            <li><span class="cross">✗</span> OSC 8 超链接</li>
+                            <li><span class="cross">✗</span> OSC 52 剪贴板读取</li>
+                            <li><span class="cross">✗</span> Synchronized Output</li>
+                            <li><span class="cross">✗</span> Kitty Keyboard Protocol</li>
+                            <li><span class="cross">✗</span> 图片协议</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <span class="card-title">升级后协议</span>
+                        <span class="badge badge-new">完整</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="feature-list">
+                            <li><span class="check">✓</span> OSC 0/2 标题</li>
+                            <li><span class="check">✓</span> OSC 8 超链接</li>
+                            <li><span class="check">✓</span> OSC 52 剪贴板完整</li>
+                            <li><span class="check">✓</span> Synchronized Output</li>
+                            <li><span class="check">✓</span> VS Code Shell Integration</li>
+                            <li><span class="check">✓</span> Sixel 图片</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 超链接效果 -->
+        <section class="section">
+            <h2 class="section-title">超链接效果</h2>
+            <div class="terminal-mock">
+                <div class="terminal-titlebar">
+                    <span class="terminal-dot terminal-dot-red"></span>
+                    <span class="terminal-dot terminal-dot-yellow"></span>
+                    <span class="terminal-dot terminal-dot-green"></span>
+                    <span style="margin-left: auto; font-size: 12px; color: var(--text-secondary);">OSC 8 超链接</span>
+                </div>
+                <div class="terminal-content">
+                    <span class="prompt">❯</span> <span class="command">npm outdated</span><br>
+                    <span class="output">Package      Current  Wanted  Latest</span><br>
+                    <span class="output">──────────── ─────── ─────── ──────</span><br>
+                    <span class="output">@xterm/xterm    5.5.0   5.5.0   5.5.0</span><br>
+                    <span class="output">typescript      5.3.3   5.4.5   5.5.2  </span><span class="link" onclick="alert('打开: https://www.typescriptlang.org')">🔗</span><br>
+                    <span class="output">vite            5.2.0   5.3.1   5.4.0  </span><span class="link" onclick="alert('打开: https://vitejs.dev')">🔗</span><br>
+                    <br>
+                    <span class="output">更多文档: </span><span class="link" onclick="alert('打开: https://docs.npmjs.com')">https://docs.npmjs.com</span>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 图片支持 -->
+        <section class="section">
+            <h2 class="section-title">图片显示效果</h2>
+            <div class="terminal-mock">
+                <div class="terminal-titlebar">
+                    <span class="terminal-dot terminal-dot-red"></span>
+                    <span class="terminal-dot terminal-dot-yellow"></span>
+                    <span class="terminal-dot terminal-dot-green"></span>
+                    <span style="margin-left: auto; font-size: 12px; color: var(--text-secondary);">Sixel 图片</span>
+                </div>
+                <div class="terminal-content">
+                    <span class="prompt">❯</span> <span class="command">ls -la *.png</span><br>
+                    <span class="output">-rw-r--r-- 1 user staff 12345 Jun 15 10:30 screenshot.png</span><br>
+                    <span class="output">-rw-r--r-- 1 user staff 67890 Jun 15 11:45 chart.png</span><br>
+                    <br>
+                    <span class="prompt">❯</span> <span class="command">cat screenshot.png | img2sixel</span><br>
+                    <br>
+                    <div class="sixel-image">
+                        📷 [图片预览]<br>
+                        <small>Sixel 渲染的图片内容</small>
+                    </div>
+                    <br>
+                    <span class="prompt">❯</span> <span class="command">gnuplot -e "set terminal sixel; plot sin(x)"</span><br>
+                    <div class="sixel-image">
+                        📈 [图表预览]<br>
+                        <small>gnuplot Sixel 输出</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 标签页 -->
+        <section class="section">
+            <h2 class="section-title">标签页架构</h2>
+            <div class="tabs-demo">
+                <div class="tabs-bar">
+                    <div class="tab active">
+                        <span>bash</span>
+                        <span class="tab-close">×</span>
+                    </div>
+                    <div class="tab">
+                        <span>zsh</span>
+                        <span class="tab-close">×</span>
+                    </div>
+                    <div class="tab">
+                        <span>ssh server</span>
+                        <span class="tab-close">×</span>
+                    </div>
+                    <div class="tab" style="opacity: 0.5;">+</div>
+                </div>
+                <div class="terminal-mock" style="border-radius: 0 0 6px 6px;">
+                    <div class="terminal-content">
+                        <span class="prompt">❯</span> <span class="command">echo "Hello from tab 1"</span><br>
+                        <span class="output">Hello from tab 1</span><br>
+                        <span class="prompt">❯</span> <span class="command">_</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 分屏 -->
+        <section class="section">
+            <h2 class="section-title">分屏布局</h2>
+            <div class="split-demo">
+                <div class="split-pane">
+                    <div class="split-pane-header">bash - 服务器监控</div>
+                    <div class="split-pane-content">
+                        <span class="prompt">❯</span> <span class="command">htop</span><br>
+                        <span class="output">Tasks: 123, 456 thr, 1 running</span><br>
+                        <span class="output">Load average: 1.23 2.34 3.45</span><br>
+                        <span class="output">Uptime: 01:23:45:67</span><br>
+                        <br>
+                        <span class="output">PID   USER  PR  NI  VIRT  RES  SHR S %CPU %MEM</span><br>
+                        <span class="output">1234  root  20   0  123M  45M  12M S  5.0  2.3</span><br>
+                        <span class="output">5678  user  20   0  456M 123M  34M S  2.1  6.2</span>
+                    </div>
+                </div>
+                <div class="split-divider"></div>
+                <div class="split-pane">
+                    <div class="split-pane-header">bash - 代码编辑</div>
+                    <div class="split-pane-content">
+                        <span class="prompt">❯</span> <span class="command">vim app.ts</span><br>
+                        <span class="output">"app.ts" 45L, 1234B</span><br>
+                        <br>
+                        <span class="command">import { Terminal } from '@xterm/xterm'</span><br>
+                        <span class="command">import { WebglAddon } from '@xterm/addon-webgl'</span><br>
+                        <br>
+                        <span class="command">const term = new Terminal({</span><br>
+                        <span class="command">&nbsp;&nbsp;cursorBlink: true,</span><br>
+                        <span class="command">&nbsp;&nbsp;fontSize: 14,</span><br>
+                        <span class="command">})</span><br>
+                        <br>
+                        <span style="color: var(--accent);">-- INSERT --</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 配置示例 -->
+        <section class="section">
+            <h2 class="section-title">配置示例</h2>
+            <div class="config-section">
+                <div class="config-title">hip.toml 终端配置</div>
+                <div class="config-code">
+                    <span class="config-comment"># 终端配置</span><br>
+                    <span class="config-key">[terminal]</span><br>
+                    <span class="config-key">shell</span> = <span class="config-value">"default"</span><br>
+                    <span class="config-key">colorTheme</span> = <span class="config-value">"follow"</span><br>
+                    <span class="config-key">bell</span> = <span class="config-value">"visual"</span><br>
+                    <br>
+                    <span class="config-comment"># 渲染设置</span><br>
+                    <span class="config-key">[terminal.rendering]</span><br>
+                    <span class="config-key">webgl</span> = <span class="config-value">true</span>  <span class="config-comment"># GPU 加速</span><br>
+                    <span class="config-key">ligatures</span> = <span class="config-value">true</span>  <span class="config-comment"># 字体连字</span><br>
+                    <span class="config-key">unicodeVersion</span> = <span class="config-value">"11"</span>  <span class="config-comment"># Unicode 版本</span><br>
+                    <br>
+                    <span class="config-comment"># 协议设置</span><br>
+                    <span class="config-key">[terminal.protocol]</span><br>
+                    <span class="config-key">hyperlinks</span> = <span class="config-value">true</span>  <span class="config-comment"># OSC 8 超链接</span><br>
+                    <span class="config-key">clipboardRead</span> = <span class="config-value">"ask"</span>  <span class="config-comment"># 剪贴板读取策略</span><br>
+                    <br>
+                    <span class="config-comment"># 快捷键自定义</span><br>
+                    <span class="config-key">[terminal.keybindings]</span><br>
+                    <span class="config-key">copy</span> = <span class="config-value">"Ctrl+Shift+C"</span><br>
+                    <span class="config-key">paste</span> = <span class="config-value">"Ctrl+Shift+V"</span><br>
+                    <span class="config-key">search</span> = <span class="config-value">"Ctrl+F"</span><br>
+                    <span class="config-key">newTab</span> = <span class="config-value">"Ctrl+T"</span><br>
+                    <span class="config-key">closeTab</span> = <span class="config-value">"Ctrl+W"</span><br>
+                    <span class="config-key">nextTab</span> = <span class="config-value">"Ctrl+Tab"</span><br>
+                    <span class="config-key">splitVertical</span> = <span class="config-value">"Ctrl+\\"</span><br>
+                    <span class="config-key">splitHorizontal</span> = <span class="config-value">"Ctrl+Shift+\\"</span>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 实施时间线 -->
+        <section class="section">
+            <h2 class="section-title">实施时间线</h2>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-title">Phase 1: 渲染性能提升</div>
+                    <div class="timeline-date">Week 1-2</div>
+                    <div class="timeline-content">
+                        WebGL 渲染启用、字体连字支持、Unicode 宽度修正
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-title">Phase 2: 协议支持补全</div>
+                    <div class="timeline-date">Week 3-4</div>
+                    <div class="timeline-content">
+                        OSC 8 超链接、OSC 52 剪贴板、Synchronized Output、Shell Integration
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-title">Phase 3: 多媒体 + 标签页</div>
+                    <div class="timeline-date">Week 5-7</div>
+                    <div class="timeline-content">
+                        Sixel 图片支持、标签页架构、多会话管理
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-title">Phase 4: 分屏 + 持久化</div>
+                    <div class="timeline-date">Week 8-9</div>
+                    <div class="timeline-content">
+                        分屏布局、会话持久化、状态恢复
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-title">Phase 5: 增强特性</div>
+                    <div class="timeline-date">Week 10</div>
+                    <div class="timeline-content">
+                        键盘协议增强、自定义快捷键、主题导出
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 验收清单 -->
+        <section class="section">
+            <h2 class="section-title">验收清单</h2>
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <span class="card-title">P0 验收点</span>
+                        <span class="badge badge-new">必须</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="feature-list">
+                            <li><span class="check">✓</span> WebGL 帧率 ≥ 30fps</li>
+                            <li><span class="check">✓</span> 连字正确显示</li>
+                            <li><span class="check">✓</span> Emoji 宽度正确</li>
+                            <li><span class="check">✓</span> URL 可点击</li>
+                            <li><span class="check">✓</span> 剪贴板读写正常</li>
+                            <li><span class="check">✓</span> TUI 无闪烁</li>
+                            <li><span class="check">✓</span> 退出码自动捕获</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <span class="card-title">P1 验收点</span>
+                        <span class="badge badge-current">重要</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="feature-list">
+                            <li><span class="check">✓</span> Sixel 图片显示</li>
+                            <li><span class="check">✓</span> 标签页创建/切换</li>
+                            <li><span class="check">✓</span> 分屏布局</li>
+                            <li><span class="check">✓</span> 会话持久化</li>
+                            <li><span class="check">✓</span> 快捷键自定义</li>
+                            <li><span class="check">✓</span> 主题导出</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <footer style="text-align: center; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--text-secondary);">
+            <p>终端能力现代化升级方案 - hip</p>
+            <p style="font-size: 0.875rem; margin-top: 0.5rem;">2026-08-25</p>
+        </footer>
+    </div>
+    
+    <script>
+        // 交互演示
+        document.querySelectorAll('.link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault()
+                alert('链接点击: ' + (link.textContent || link.getAttribute('onclick')))
+            })
+        })
+        
+        // 标签页切换演示
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+                tab.classList.add('active')
+            })
+        })
+        
+        console.log('终端能力现代化升级 - 视觉原型已加载')
+    </script>
+</body>
+</html>

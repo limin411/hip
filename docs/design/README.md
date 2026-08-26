@@ -16,6 +16,7 @@
 | `table-right-panel/` | 表格 × 右侧面板关联性整改（表格不再被当文档渲染：表格信息面板/列清单↔表格联动/反链语义） | `table-right-panel-{spec,plan,preview}`（preview 为问题对照 + 右侧 rail 联动原型） |
 | `doc-terminal-capability-gap/` | 终端能力补齐（对照 alacritty 差距分析） | `terminal-capability-gap-spec.md` + `-plan.md`（P0 已完成 2026-08-10，P1–P3 待排期）+ `terminal-capability-gap-preview.html`（高保真原型） |
 | `terminal-shared-pty/` | 终端管理 · 运维助手共享终端能力整改（围栏完成信号 / 接管交还 / 排队 / 规则审批） | `terminal-shared-pty-{spec,plan,preview}`（P0–P1 已实施 2026-08-12：PR-0..5 全部落地，8058 单测 + 285 cargo 通过；剩余 P2 跟随项：上下文注入/TOCTOU 原子化） |
+| `terminal-capability-upgrade/` | 终端能力现代化升级（WebGL 渲染 / 连字 / OSC 协议 / Sixel 图片 / 标签页 / 分屏 / 会话持久化） | `terminal-capability-upgrade-{spec,plan,preview}`（待评审；全面对标 Kitty/Alacritty/WezTerm 等现代终端） |
 
 ## 其它系列
 

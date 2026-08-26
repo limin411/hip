@@ -192,6 +192,35 @@ export interface TerminalConfig {
   approveRules?: string[]
   /** Always-deny command rules; evaluated before approve rules. */
   denyRules?: string[]
+  /**
+   * Enable GPU-accelerated WebGL rendering.
+   * - `true` (default): attempt WebGL, fallback to Canvas if unavailable
+   * - `false`: force Canvas rendering
+   * JSON/TS: `webgl`. TOML: `webgl`.
+   */
+  webgl?: boolean
+  /**
+   * Enable font ligatures for programming fonts.
+   * - `true` (default): load LigaturesAddon if available
+   * - `false`: disable ligatures
+   * JSON/TS: `ligatures`. TOML: `ligatures`.
+   */
+  ligatures?: boolean
+  /**
+   * Unicode version for width calculation.
+   * - `'11'` (default): Unicode 11 width rules (correct emoji/CJK)
+   * - `'6'`: legacy Unicode 6 width rules
+   * JSON/TS: `unicodeVersion`. TOML: `unicode_version`.
+   */
+  unicodeVersion?: '6' | '11'
+  /**
+   * Clipboard read policy for OSC 52.
+   * - `'ask'` (default): prompt user before reading clipboard
+   * - `'allow'`: allow clipboard read without confirmation
+   * - `'deny'`: deny all clipboard read requests
+   * JSON/TS: `clipboardRead`. TOML: `clipboard_read`.
+   */
+  clipboardRead?: 'ask' | 'allow' | 'deny'
 }
 
 /**

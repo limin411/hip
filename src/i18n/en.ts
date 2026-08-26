@@ -871,6 +871,19 @@ export const en = {
         visual: 'Visual flash bar',
         off: 'Off',
       },
+      terminalWebgl: 'GPU acceleration',
+      terminalWebglDesc:
+        'Use WebGL for faster terminal rendering. Falls back to Canvas if not supported.',
+      terminalLigatures: 'Font ligatures',
+      terminalLigaturesDesc:
+        'Display programming ligatures (=>, ->, !=, etc.) in the terminal.',
+      terminalUnicode: 'Unicode version',
+      terminalUnicodeDesc:
+        'Unicode width calculation rules. Unicode 11 provides correct emoji and CJK character widths.',
+      terminalUnicodes: {
+        '11': 'Unicode 11 (recommended)',
+        '6': 'Unicode 6 (legacy)',
+      },
       trashRetention: 'Recycle bin retention',
       trashRetentionDesc:
         'Soft-deleted sessions are permanently removed after this many days (1–365).',

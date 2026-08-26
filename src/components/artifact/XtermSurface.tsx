@@ -20,6 +20,13 @@ import {
 import { bindTerminalRestarter } from './terminalRestartUi'
 import { bindTerminalCanvas } from './terminalCanvasUi'
 import {
+  loadTerminalEnhancements,
+} from './terminalEnhancements'
+import {
+  loadTerminalProtocols,
+  disposeTerminalProtocols,
+} from './terminalProtocols'
+import {
   CONTEXT_MENUS,
   ControlledContextMenu,
 } from '@/components/context-menu'
@@ -86,6 +93,8 @@ export function XtermSurface({
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddonType | null>(null)
   const searchRef = useRef<SearchAddonType | null>(null)
+  const enhancementAddonsRef = useRef<Awaited<ReturnType<typeof loadTerminalEnhancements>> | null>(null)
+  const protocolsRef = useRef<Awaited<ReturnType<typeof loadTerminalProtocols>> | null>(null)
   const cursorRef = useRef(0)
   const openRef = useRef(open)
   const writeRef = useRef(write)
@@ -212,6 +221,22 @@ export function XtermSurface({
       term.open(el)
       termRef.current = term
       fitRef.current = fit
+
+      // Load terminal enhancement addons (WebGL, Ligatures, Unicode11).
+      // These are optional and will gracefully degrade if not supported.
+      const enhancementAddons = await loadTerminalEnhancements(term)
+      enhancementAddonsRef.current = enhancementAddons
+
+      // Load terminal protocol handlers (OSC 8 Hyperlinks, OSC 52 Clipboard, Synchronized Output).
+      // These enable modern terminal features like clickable URLs and clipboard access.
+      const protocols = await loadTerminalProtocols(term, {
+        onLinkClick: async (uri) => {
+          // Open links in default browser
+          const { openUri } = await import('./terminalProtocols')
+          await openUri(uri)
+        },
+      })
+      protocolsRef.current = protocols
 
       // Native viewport scrollbar: WKWebView paints an opaque light gutter, and
       // xterm re-measures with `width || 15` so a hidden bar still reserves 15px.
@@ -488,6 +513,18 @@ export function XtermSurface({
       if (attached === terminalId) {
         st.setAttached(null)
       }
+      // Dispose protocols and addons BEFORE term.dispose()
+      // term.dispose() internally calls addon.dispose(), so we must not
+      // dispose addons separately to avoid double-dispose errors.
+      if (protocolsRef.current) {
+        disposeTerminalProtocols(protocolsRef.current)
+        protocolsRef.current = null
+      }
+      // Note: enhancementAddons (WebGL, Ligatures, Unicode11) are disposed
+      // by term.dispose() automatically via xterm.js AddonManager.
+      // We just clear the ref without calling dispose.
+      enhancementAddonsRef.current = null
+      // xterm.js 6.0.0 fixed the WebGL addon dispose issue (#5305)
       term?.dispose()
       termRef.current = null
       fitRef.current = null

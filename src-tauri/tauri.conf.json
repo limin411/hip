@@ -46,7 +46,8 @@
     "externalBin": ["binaries/sidecar"],
     "resources": {
       "resources/hip-sidecar/*": "hip-sidecar/",
-      "resources/whisper/**/*": "whisper/"
+      "resources/whisper/**/*": "whisper/",
+      "resources/fonts/*.ttf": "fonts/"
     },
     "icon": [
       "icons/32x32.png",
@@ -63,7 +64,9 @@
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",
-        "startMenuFolder": "hip"
+        "startMenuFolder": "hip",
+        "installerHooks": "./windows/hooks.nsh",
+        "installMode": "perMachine"
       }
     }
   },

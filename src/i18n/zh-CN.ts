@@ -1146,6 +1146,11 @@ export const zhCN = {
         customName: '名称',
         customModels: '模型 id（逗号分隔）',
         addProvider: '添加',
+        refreshCatalog: '从网络刷新模型目录',
+        refresh: '刷新',
+        catalogRefreshing: '正在刷新目录…',
+        catalogRefreshedAt: '上次刷新: {{when}}',
+        catalogRefreshNever: '从未从网络刷新',
         purpose: {
           base: {
             currentModel: '当前对话模型',

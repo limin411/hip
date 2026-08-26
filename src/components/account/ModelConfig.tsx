@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { RefreshCw } from 'lucide-react'
 import { useProvidersStore } from '@/store/providersStore'
 import { groupProviders } from '@/lib/providerGroups'
 import { Badge } from '@/components/ui/Badge'
@@ -21,6 +22,9 @@ export function ModelConfig() {
     setEnabled,
     setApiKind,
     setActiveModel,
+    catalogRefreshing,
+    catalogRefreshedAt,
+    refreshCatalog,
   } = useProvidersStore()
   const [selected, setSelected] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
@@ -44,8 +48,30 @@ export function ModelConfig() {
 
   return (
     <div className="flex h-full min-h-0 flex-col p-6" data-testid="model-config-cards">
-      <h2 className="text-title font-semibold text-ink">{t('settings.model')}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-title font-semibold text-ink">{t('settings.model')}</h2>
+        <button
+          onClick={() => void refreshCatalog()}
+          disabled={catalogRefreshing}
+          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-caption text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:opacity-50"
+          title={t('settings.modelConfig.refreshCatalog')}
+        >
+          <RefreshCw size={14} className={catalogRefreshing ? 'animate-spin' : ''} />
+          {t('settings.modelConfig.refresh')}
+        </button>
+      </div>
       <p className="mt-1 text-body text-ink-secondary">{t('settings.modelConfig.intro')}</p>
+      {catalogRefreshing ? (
+        <p className="mt-1 text-caption text-accent-strong">{t('settings.modelConfig.catalogRefreshing')}</p>
+      ) : catalogRefreshedAt > 0 ? (
+        <p className="mt-1 text-caption text-ink-tertiary">
+          {t('settings.modelConfig.catalogRefreshedAt', {
+            when: new Date(catalogRefreshedAt).toLocaleString(),
+          })}
+        </p>
+      ) : (
+        <p className="mt-1 text-caption text-ink-tertiary">{t('settings.modelConfig.catalogRefreshNever')}</p>
+      )}
 
       <div
         className="mt-5 flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3"

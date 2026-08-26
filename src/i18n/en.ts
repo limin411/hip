@@ -1171,6 +1171,11 @@ export const en = {
         customName: 'Name',
         customModels: 'Model ids (comma-separated)',
         addProvider: 'Add',
+        refreshCatalog: 'Refresh model catalog from network',
+        refresh: 'Refresh',
+        catalogRefreshing: 'Refreshing catalog…',
+        catalogRefreshedAt: 'Last refreshed: {{when}}',
+        catalogRefreshNever: 'Never refreshed from network',
         purpose: {
           base: {
             currentModel: 'Current chat model',

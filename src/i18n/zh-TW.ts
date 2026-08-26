@@ -1164,6 +1164,11 @@ export const zhTW = {
       "customName": "名稱",
       "customModels": "模型 id（逗號分隔）",
       "addProvider": "新增",
+      "refreshCatalog": '從網路重新整理模型目錄',
+      "refresh": '重新整理',
+      "catalogRefreshing": '正在重新整理目錄…',
+      "catalogRefreshedAt": '上次重新整理: {{when}}',
+      "catalogRefreshNever": '從未從網路重新整理',
       "purpose": {
         "base": {
           "currentModel": "當前對話模型",

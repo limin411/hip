@@ -1160,6 +1160,11 @@ export const ja = {
       "customName": "名前",
       "customModels": "モデルID（カンマ区切り）",
       "addProvider": "追加",
+      "refreshCatalog": 'ネットワークからモデルカタログを更新',
+      "refresh": '更新',
+      "catalogRefreshing": 'カタログを更新中…',
+      "catalogRefreshedAt": '前回の更新: {{when}}',
+      "catalogRefreshNever": 'ネットワークから更新されたことはありません',
       "purpose": {
         "base": {
           "currentModel": "現在のチャットモデル",

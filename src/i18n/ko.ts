@@ -1160,6 +1160,11 @@ export const ko = {
       "customName": "이름",
       "customModels": "모델 ID (쉼표로 구분)",
       "addProvider": "추가",
+      "refreshCatalog": '네트워크에서 모델 카탈로그 새로고침',
+      "refresh": '새로고침',
+      "catalogRefreshing": '카탈로그 새로고침 중…',
+      "catalogRefreshedAt": '마지막 새로고침: {{when}}',
+      "catalogRefreshNever": '네트워크에서 새로고침된 적 없음',
       "purpose": {
         "base": {
           "currentModel": "현재 채팅 모델",

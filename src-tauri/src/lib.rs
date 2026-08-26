@@ -236,6 +236,13 @@ fn delete_secret(app: tauri::AppHandle, key: String) -> Result<(), String> {
 }
 
 const MODELS_URL: &str = "https://models.dev/api.json";
+/// Fallback URLs for regions where models.dev is unreachable (e.g., mainland China).
+/// Tried in order; first successful response wins.
+const MODELS_FALLBACK_URLS: &[&str] = &[
+    "https://ghfast.top/https://raw.githubusercontent.com/anthropics/model-catalog/main/models.json",
+    "https://ghproxy.com/https://raw.githubusercontent.com/anthropics/model-catalog/main/models.json",
+    "https://mirror.ghproxy.com/https://raw.githubusercontent.com/anthropics/model-catalog/main/models.json",
+];
 /// Bundled fallback when no on-disk cache exists yet (first launch / wiped cache).
 const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
 
@@ -626,21 +633,44 @@ fn write_catalog_cache(path: &std::path::Path, body: &str) -> Result<(), String>
 /// Force-fetch models.dev (or `HIP_MODELS_URL`), validate, write cache, return body.
 /// Used for background revalidation on every app open — does not fall back to cache on failure
 /// (callers already have local catalog); returns Err so the UI can keep the previous catalog.
+/// Falls back to MODELS_FALLBACK_URLS if the primary URL fails.
 async fn download_catalog(app: &tauri::AppHandle) -> Result<String, String> {
-    let url = std::env::var("HIP_MODELS_URL").unwrap_or_else(|_| MODELS_URL.to_string());
-    let resp = reqwest::get(&url)
+    let primary_url = std::env::var("HIP_MODELS_URL").unwrap_or_else(|_| MODELS_URL.to_string());
+    
+    // Try primary URL first, then fallback URLs
+    let mut urls_to_try = vec![primary_url];
+    urls_to_try.extend(MODELS_FALLBACK_URLS.iter().map(|s| s.to_string()));
+    
+    let mut last_error = String::new();
+    for url in urls_to_try {
+        match try_fetch_catalog(&url).await {
+            Ok(body) => {
+                if let Some(c) = catalog_cache_path(app) {
+                    write_catalog_cache(&c, &body)?;
+                }
+                return Ok(body);
+            }
+            Err(e) => {
+                eprintln!("[tauri] catalog fetch from {url} failed: {e}");
+                last_error = e;
+            }
+        }
+    }
+    Err(format!("all catalog URLs failed, last error: {last_error}"))
+}
+
+/// Try to fetch and validate catalog from a single URL.
+async fn try_fetch_catalog(url: &str) -> Result<String, String> {
+    let resp = reqwest::get(url)
         .await
-        .map_err(|e| format!("catalog fetch failed: {e}"))?
+        .map_err(|e| format!("fetch failed: {e}"))?
         .error_for_status()
-        .map_err(|e| format!("catalog HTTP error: {e}"))?;
+        .map_err(|e| format!("HTTP error: {e}"))?;
     let body = resp
         .text()
         .await
-        .map_err(|e| format!("catalog body read failed: {e}"))?;
+        .map_err(|e| format!("body read failed: {e}"))?;
     validate_catalog_json(&body)?;
-    if let Some(c) = catalog_cache_path(app) {
-        write_catalog_cache(&c, &body)?;
-    }
     Ok(body)
 }
 

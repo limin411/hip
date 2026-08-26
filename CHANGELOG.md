@@ -9,6 +9,12 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- ...
+
+## [1.0.3] - 2026-08-26
+
+### Added
+
 - Product screenshots (Chat / Code / session / Settings / Documents) and a short
   in-app operation tour in README locales (`docs/images/`).
 
@@ -45,10 +51,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
     pinned v3.5.0 with sha256 verification); OFL/MIT license texts ship with the assets.
 
 - **Flat design visual overhaul**:
-  - Surfaces are solid — native window vibrancy (macOS Sidebar / Win11 Mica /
+  - Surfaces are solid — native window vibrancy (macOS Sidebar / Win11 Mica / 
     Win10 Acrylic) removed; window theme sync kept. `data-vibrancy` is always `solid`.
   - Hierarchy via 1px borders and value steps instead of shadows/translucency:
-    radii 2–6px (buttons/inputs 2px, cards 4px, overlays 6px), `shadow-panel` /
+    radii 2–6px (buttons/inputs 2px, cards 4px, overlays 6px), `shadow-panel` / 
     `shadow-menu` removed, overlay shadow weakened to one light tier.
   - Effort-max holographic chrome flattened to solid purple (no shimmer/glow/pulse).
   - Motion is fade-only and fast: durations 100/120/200ms, no translate/scale,
@@ -80,7 +86,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - **Composer voice dictation** (local [whisper.cpp](https://github.com/ggml-org/whisper.cpp)):
   opt-in in Settings → Voice (default off). Model download + status check for
   tiny/base/small under `~/.hip/models/whisper/`; mic appears only when enabled.
-  **Release packages bundle `whisper-cli` by default** (`yarn package:macos` /
+  **Release packages bundle `whisper-cli` by default** (`yarn package:macos` / 
   `package:windows`; opt out with `HIP_BUNDLE_WHISPER=0`). Models are still not
   shipped — download in Settings. Dev can use Homebrew or `scripts/make-whisper-bin.sh`.
   Audio stays on-device; no cloud ASR.
@@ -106,5 +112,6 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - Detailed historical notes for earlier development were not maintained in this file;
   see git history on `main` / `dev.1.0.1` for prior work.
 
-[Unreleased]: https://github.com/limin411/hip/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/limin411/hip/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/limin411/hip/releases/tag/v1.0.3
 [1.0.1]: https://github.com/limin411/hip/releases/tag/v1.0.1

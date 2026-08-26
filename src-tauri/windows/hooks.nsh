@@ -9,9 +9,10 @@
   DetailPrint "Installing bundled fonts..."
 
   ; 复制字体文件到系统 Fonts 目录
-  SetOutPath "$FONTS"
-  File "/oname=JetBrainsMonoNerdFontMono-Regular.ttf" "$INSTDIR\resources\fonts\JetBrainsMonoNerdFontMono-Regular.ttf"
-  File "/oname=JetBrainsMonoNerdFontMono-Bold.ttf" "$INSTDIR\resources\fonts\JetBrainsMonoNerdFontMono-Bold.ttf"
+  ; 注意：主安装脚本已将字体复制到 $INSTDIR\fonts\
+  ; 这里用 CopyFiles 从应用目录复制到系统字体目录
+  CopyFiles "$INSTDIR\fonts\JetBrainsMonoNerdFontMono-Regular.ttf" "$FONTS\JetBrainsMonoNerdFontMono-Regular.ttf"
+  CopyFiles "$INSTDIR\fonts\JetBrainsMonoNerdFontMono-Bold.ttf" "$FONTS\JetBrainsMonoNerdFontMono-Bold.ttf"
 
   ; 注册字体到注册表（需要管理员权限写入 HKLM）
   WriteRegStr HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" \

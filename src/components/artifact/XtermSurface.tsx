@@ -37,8 +37,10 @@ import { cn } from '@/lib/utils'
 const NERD_FONT_FAMILY = '"JetBrainsMono Nerd Font Mono"'
 /** 终端字号：fonts.load 与 Terminal 构造共用同一常量（§6.3 防测量错位） */
 const TERMINAL_FONT_SIZE = 13
-/** 字体栈：内置 Nerd Font 优先（p10k/starship 等图标），其余沿 --font-code 回退 */
-export const TERMINAL_FONT_STACK = `${NERD_FONT_FAMILY}, var(--font-code)`
+/** 字体栈：内置 Nerd Font 优先（p10k/starship 等图标），然后是常用等宽字体回退。
+ *  注意：不能用 CSS var() —— CanvasRenderingContext2D.font 不解析 CSS 变量，
+ *  会导致 WebGL addon 的字形纹理图集用 fallback 字体渲染。 */
+export const TERMINAL_FONT_STACK = `${NERD_FONT_FAMILY}, 'JetBrains Mono Variable', 'Noto Sans Mono', 'Noto Sans Mono CJK SC', 'Noto Sans Mono CJK TC', 'Noto Sans Mono CJK JP', 'Noto Sans Mono CJK KR', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace`
 /** 字体加载兜底超时：字体失败不阻塞终端启动 */
 const FONT_LOAD_TIMEOUT_MS = 1500
 

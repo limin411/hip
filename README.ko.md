@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./public/logo.svg" alt="hip 마스코트" width="88" />
+  <img src="./public/logo-animated.svg" alt="hip 마스코트"/>
 </p>
 
 # hip

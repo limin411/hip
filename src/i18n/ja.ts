@@ -2061,6 +2061,29 @@ export const ja = {
       "uploadHere": "このフォルダにアップロード",
       "emptyDir": "空のフォルダ"
     },
+    "navigation": {
+      "up": "親ディレクトリへ移動",
+      "back": "戻る",
+      "forward": "進む",
+      "pathInput": "パス入力を切り替え",
+      "root": "ルートディレクトリへ移動"
+    },
+    "breadcrumb": {
+      "root": "ルート",
+      "collapsed": "非表示のディレクトリ"
+    },
+    "pathInput": {
+      "placeholder": "パスを入力（例：/var/log、~、..）",
+      "go": "パスへ移動",
+      "clear": "入力をクリア",
+      "emptyError": "パスを入力してください",
+      "invalidPath": "無効なパスです",
+      "hint": {
+        "enter": "Enter：移動",
+        "escape": "Esc：キャンセル",
+        "special": "~：ホーム、..：親、.：現在"
+      }
+    },
     "localFs": {
       "panelTitle": "ファイル",
       "launchDir": "起動ディレクトリ",

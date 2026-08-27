@@ -1,0 +1,27 @@
+{
+  "terminals": {
+    "navigation": {
+      "up": "返回上一层目录",
+      "back": "后退",
+      "forward": "前进",
+      "pathInput": "切换路径输入框",
+      "root": "返回根目录"
+    },
+    "breadcrumb": {
+      "root": "根目录",
+      "collapsed": "隐藏的目录"
+    },
+    "pathInput": {
+      "placeholder": "输入路径（如 /var/log、~、..）",
+      "go": "跳转到路径",
+      "clear": "清除输入",
+      "emptyError": "请输入路径",
+      "invalidPath": "无效的路径",
+      "hint": {
+        "enter": "回车：跳转",
+        "escape": "Esc：取消",
+        "special": "~：主目录，..：上级，.：当前"
+      }
+    }
+  }
+}

@@ -2064,6 +2064,29 @@ export const zhTW = {
       "uploadHere": "上傳到此資料夾",
       "emptyDir": "空資料夾"
     },
+    "navigation": {
+      "up": "返回上一層目錄",
+      "back": "後退",
+      "forward": "前進",
+      "pathInput": "切換路徑輸入框",
+      "root": "返回根目錄"
+    },
+    "breadcrumb": {
+      "root": "根目錄",
+      "collapsed": "隱藏的目錄"
+    },
+    "pathInput": {
+      "placeholder": "輸入路徑（如 /var/log、~、..）",
+      "go": "跳轉到路徑",
+      "clear": "清除輸入",
+      "emptyError": "請輸入路徑",
+      "invalidPath": "無效的路徑",
+      "hint": {
+        "enter": "Enter：跳轉",
+        "escape": "Esc：取消",
+        "special": "~：主目錄，..：上級，.：目前"
+      }
+    },
     "localFs": {
       "panelTitle": "檔案",
       "launchDir": "啟動目錄",

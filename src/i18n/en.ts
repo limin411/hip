@@ -2146,6 +2146,29 @@ export const en = {
         uploadHere: 'Upload into this folder',
         emptyDir: 'Empty folder',
       },
+      navigation: {
+        up: 'Go to parent directory',
+        back: 'Go back',
+        forward: 'Go forward',
+        pathInput: 'Toggle path input',
+        root: 'Go to root directory',
+      },
+      breadcrumb: {
+        root: 'Root',
+        collapsed: 'Hidden directories',
+      },
+      pathInput: {
+        placeholder: 'Enter path (e.g., /var/log, ~, ..)',
+        go: 'Go to path',
+        clear: 'Clear input',
+        emptyError: 'Please enter a path',
+        invalidPath: 'Invalid path',
+        hint: {
+          enter: 'Enter: Go',
+          escape: 'Esc: Cancel',
+          special: '~: Home, ..: Parent, .: Current',
+        },
+      },
       localFs: {
         panelTitle: 'Files',
         launchDir: 'Launch directory',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
@@ -7,6 +7,10 @@ import {
   FolderOpen,
   RefreshCw,
   Upload,
+  ArrowUp,
+  ArrowLeft,
+  ArrowRight,
+  MapPin,
 } from 'lucide-react'
 import type { SftpEntry } from '@/ipc/sftp'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
@@ -20,6 +24,8 @@ import {
 import { loadLocalDir, refreshLocalDir } from '@/components/terminals/termFsActions'
 import { fileIconForName } from '@/lib/fileIcon'
 import { cn } from '@/lib/utils'
+import { TerminalBreadcrumb } from './TerminalBreadcrumb'
+import { PathInput } from './PathInput'
 
 export { refreshSftpDir, refreshLocalDir }
 
@@ -244,6 +250,9 @@ export function TerminalFileTree({
     const key = slice.rootPath ?? initialPath ?? '.'
     return !!slice.loading[key] || !!slice.loading['.'] || !!slice.loading['']
   })
+  // Navigation history state
+  const canGoBack = useTerminalFsStore((s) => s.canGoBack(terminalId))
+  const canGoForward = useTerminalFsStore((s) => s.canGoForward(terminalId))
   // SSH files rail mounts as soon as the tab is focused; ssh_open happens later in
   // XtermSurface. Gate listing on status=running so we never treat "not open yet"
   // as a permanent session_closed (Rust uses the same string for missing sessions).
@@ -269,6 +278,61 @@ export function TerminalFileTree({
     load(rootPath ?? startPath)
   }, [load, rootPath, startPath])
 
+  // Navigation functions
+  const navigateTo = useCallback((path: string) => {
+    useTerminalFsStore.getState().setRootPath(terminalId, path)
+    useTerminalFsStore.getState().pushNavigation(terminalId, path)
+    load(path)
+  }, [terminalId, load])
+
+  const navigateToParent = useCallback(() => {
+    if (!rootPath || rootPath === '/') return
+    const normalized = rootPath.replace(/\\/g, '/').replace(/\/+$/, '')
+    const lastSlash = normalized.lastIndexOf('/')
+    if (lastSlash <= 0) return
+    const parentPath = normalized.slice(0, lastSlash) || '/'
+    navigateTo(parentPath)
+  }, [rootPath, navigateTo])
+
+  const goBack = useCallback(() => {
+    const path = useTerminalFsStore.getState().goBack(terminalId)
+    if (path) {
+      useTerminalFsStore.getState().setRootPath(terminalId, path)
+      load(path)
+    }
+  }, [terminalId, load])
+
+  const goForward = useCallback(() => {
+    const path = useTerminalFsStore.getState().goForward(terminalId)
+    if (path) {
+      useTerminalFsStore.getState().setRootPath(terminalId, path)
+      load(path)
+    }
+  }, [terminalId, load])
+
+  const [isPathInputActive, setIsPathInputActive] = useState(false)
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.key === 'ArrowUp') {
+        e.preventDefault()
+        navigateToParent()
+      } else if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        goBack()
+      } else if (e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault()
+        goForward()
+      } else if (e.ctrlKey && e.key === 'l') {
+        e.preventDefault()
+        setIsPathInputActive(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [navigateToParent, goBack, goForward])
+
   useEffect(() => {
     if (!sftpReady) return
     if (!rootPath && !rootEntries) {
@@ -281,6 +345,8 @@ export function TerminalFileTree({
         useTerminalFsStore.getState().setError(terminalId, null)
       }
       load(startPath)
+      // Push initial path to navigation history
+      useTerminalFsStore.getState().pushNavigation(terminalId, startPath)
     }
   }, [terminalId, startPath, rootPath, rootEntries, load, sftpReady, backend])
 
@@ -354,7 +420,7 @@ export function TerminalFileTree({
       : (rootPath ?? startPath)
 
   // Match FileTree root row + ManagedTerminalSession chrome (h-8, px-2) so the
-  // path / “username” strip lines up with the left terminal toolbar across the split.
+  // path / "username" strip lines up with the left terminal toolbar across the split.
   const rootHeader = (
     <span
       className="flex min-w-0 flex-1 cursor-default items-center gap-1.5 truncate rounded px-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover"
@@ -398,6 +464,49 @@ export function TerminalFileTree({
           </DeclarativeContextMenu>
         )}
         <div className="flex shrink-0 items-center gap-0.5">
+          {/* Navigation buttons */}
+          <button
+            type="button"
+            title={t('terminals.navigation.up') + ' (Alt+↑)'}
+            data-testid="navigation-up"
+            onClick={navigateToParent}
+            disabled={!rootPath || rootPath === '/'}
+            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-50"
+          >
+            <ArrowUp size={13} strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            title={t('terminals.navigation.back') + ' (Alt+←)'}
+            data-testid="navigation-back"
+            onClick={goBack}
+            disabled={!canGoBack}
+            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-50"
+          >
+            <ArrowLeft size={13} strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            title={t('terminals.navigation.forward') + ' (Alt+→)'}
+            data-testid="navigation-forward"
+            onClick={goForward}
+            disabled={!canGoForward}
+            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-50"
+          >
+            <ArrowRight size={13} strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            title={t('terminals.navigation.pathInput') + ' (Ctrl+L)'}
+            data-testid="navigation-path-input"
+            onClick={() => setIsPathInputActive(prev => !prev)}
+            className={cn(
+              'rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink',
+              isPathInputActive && 'bg-state-hover text-ink'
+            )}
+          >
+            <MapPin size={13} strokeWidth={1.75} />
+          </button>
           {backend === 'sftp' ? (
             <button
               type="button"
@@ -431,6 +540,23 @@ export function TerminalFileTree({
           </button>
         </div>
       </div>
+      {/* Breadcrumb navigation */}
+      <TerminalBreadcrumb
+        terminalId={terminalId}
+        currentPath={rootPath}
+        backend={backend}
+        onNavigate={navigateTo}
+      />
+      {/* Path input (conditional) */}
+      {isPathInputActive && (
+        <PathInput
+          terminalId={terminalId}
+          currentPath={rootPath}
+          backend={backend}
+          onNavigate={navigateTo}
+          onCancel={() => setIsPathInputActive(false)}
+        />
+      )}
       <div className="min-h-0 flex-1 overflow-auto py-0.5">
         {rootEntries?.map((e) => (
           <Node

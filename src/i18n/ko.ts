@@ -2061,6 +2061,29 @@ export const ko = {
       "uploadHere": "이 폴더에 업로드",
       "emptyDir": "빈 폴더"
     },
+    "navigation": {
+      "up": "상위 디렉터리로 이동",
+      "back": "뒤로",
+      "forward": "앞으로",
+      "pathInput": "경로 입력 전환",
+      "root": "루트 디렉터리로 이동"
+    },
+    "breadcrumb": {
+      "root": "루트",
+      "collapsed": "숨겨진 디렉터리"
+    },
+    "pathInput": {
+      "placeholder": "경로 입력 (예: /var/log, ~, ..)",
+      "go": "경로로 이동",
+      "clear": "입력 지우기",
+      "emptyError": "경로를 입력하세요",
+      "invalidPath": "유효하지 않은 경로입니다",
+      "hint": {
+        "enter": "Enter: 이동",
+        "escape": "Esc: 취소",
+        "special": "~: 홈, ..: 상위, .: 현재"
+      }
+    },
     "localFs": {
       "panelTitle": "파일",
       "launchDir": "시작 디렉터리",

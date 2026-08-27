@@ -130,6 +130,22 @@ See also `src-tauri/resources/whisper/README.md` for the full scenario matrix an
 3. Attach `.dmg` / Windows installer (and checksums if you generate them).
 4. Verify download + first-run on a clean machine when possible.
 
+## Branch naming conventions
+
+| Pattern | Purpose | Examples |
+|---------|---------|----------|
+| `main` | Stable / production branch | `main` |
+| `dev` | Active development branch | `dev` |
+| `release/X.Y.Z` | Release branches for version X.Y.Z | `release/1.0.5` |
+| `feature/<name>` | Feature branches | `feature/new-auth` |
+| `fix/<name>` | Bug fix branches | `fix/login-error` |
+| `chore/<name>` | Maintenance branches | `chore/update-deps` |
+
+**Rules:**
+- Release branches must use the format `release/X.Y.Z` (e.g., `release/1.0.5`, NOT `release.1.0.5` or `release-1.0.5`)
+- Feature/fix/chore branches should be descriptive and use kebab-case
+- Always branch from `dev` unless explicitly targeting a release
+
 ## Smoke after packaging
 
 ```bash

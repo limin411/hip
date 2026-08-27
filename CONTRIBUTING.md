@@ -91,14 +91,29 @@ Agent-oriented notes for this repo: [`AGENTS.md`](./AGENTS.md), [`CLAUDE.md`](./
 
 ## Branch and PR workflow
 
-1. Branch from the current development line (today: **`dev.1.0.1`**). There is no
-   `dev` branch. Stable / GitHub default is **`main`**. CI runs on `main`, `dev`,
-   and `dev.*`.
+1. Branch from the current development line (today: **`dev`**). Stable / GitHub
+   default is **`main`**. CI runs on `main`, `dev`, and `dev.*`.
 2. Keep diffs **surgical** — no drive-by refactors or unrelated formatting.
 3. Match existing code style (TypeScript, Rust, TOML). See [`.editorconfig`](./.editorconfig).
 4. Add or update tests when behavior changes.
 5. If you edit `packages/product-content/**`, run `yarn product:content` and commit regenerated embeds.
-6. Open a PR against `dev.1.0.1` (or the branch maintainers specify). Fill in the PR template.
+6. Open a PR against `dev` (or the branch maintainers specify). Fill in the PR template.
+
+### Branch naming conventions
+
+| Pattern | Purpose | Examples |
+|---------|---------|----------|
+| `main` | Stable / production branch | `main` |
+| `dev` | Active development branch | `dev` |
+| `release/X.Y.Z` | Release branches for version X.Y.Z | `release/1.0.5` |
+| `feature/<name>` | Feature branches | `feature/new-auth` |
+| `fix/<name>` | Bug fix branches | `fix/login-error` |
+| `chore/<name>` | Maintenance branches | `chore/update-deps` |
+
+**Rules:**
+- Release branches must use the format `release/X.Y.Z` (e.g., `release/1.0.5`, NOT `release.1.0.5` or `release-1.0.5`)
+- Feature/fix/chore branches should be descriptive and use kebab-case
+- Always branch from `dev` unless explicitly targeting a release
 
 ### PR checklist (summary)
 

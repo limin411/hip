@@ -221,6 +221,13 @@ export interface TerminalConfig {
    * JSON/TS: `clipboardRead`. TOML: `clipboard_read`.
    */
   clipboardRead?: 'ask' | 'allow' | 'deny'
+  /**
+   * Enable shell integration for command detection.
+   * - `true` (default): register OSC 633 handler for VSCode terminal integration
+   * - `false`: disable OSC 633 handler
+   * JSON/TS: `shellIntegration`. TOML: `shell_integration`.
+   */
+  shellIntegration?: boolean
 }
 
 /**

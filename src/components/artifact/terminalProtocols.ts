@@ -1,5 +1,5 @@
 /**
- * Terminal protocol handlers (OSC 8, OSC 52, Synchronized Output, Shell Integration).
+ * Terminal protocol handlers (OSC 8, OSC 52, OSC 633, Synchronized Output, Shell Integration).
  *
  * Spec: docs/design/terminal-capability-upgrade/terminal-capability-upgrade-spec.md §T2
  *
@@ -17,6 +17,10 @@ import {
   type ClipboardReadConfirmCallback,
 } from './terminalOsc52'
 import {
+  registerOsc633Handler,
+  type Osc633Events,
+} from './terminalOsc633'
+import {
   verifySyncOutputSupport,
 } from './terminalSyncOutput'
 import { useHipConfigStore } from '@/store/hipConfigStore'
@@ -28,6 +32,7 @@ export interface LoadedProtocols {
     dispose: () => void
     respondToRead: (requestId: string, data: string | null) => void
   }
+  osc633?: { dispose: () => void }
   syncOutput?: { dispose: () => void }
 }
 
@@ -35,6 +40,7 @@ export interface LoadedProtocols {
 interface ProtocolConfig {
   hyperlinks: boolean
   clipboardRead: ClipboardReadPolicy
+  shellIntegration: boolean
 }
 
 /** Get protocol configuration */
@@ -45,6 +51,7 @@ function getProtocolConfig(): ProtocolConfig {
   return {
     hyperlinks: true, // Always enabled
     clipboardRead: (terminal?.clipboardRead as ClipboardReadPolicy) ?? 'ask',
+    shellIntegration: terminal?.shellIntegration !== false, // Default enabled
   }
 }
 
@@ -60,6 +67,7 @@ export async function loadTerminalProtocols(
   options?: {
     onLinkClick?: (uri: string) => void
     onClipboardReadConfirm?: ClipboardReadConfirmCallback
+    onOsc633Events?: Osc633Events
   },
 ): Promise<LoadedProtocols> {
   const config = getProtocolConfig()
@@ -88,6 +96,16 @@ export async function loadTerminalProtocols(
     console.warn('[terminal] Failed to register OSC 52 handler:', e)
   }
 
+  // OSC 633 Shell Integration (VSCode terminal protocol)
+  if (config.shellIntegration) {
+    try {
+      protocols.osc633 = registerOsc633Handler(term, options?.onOsc633Events)
+      console.debug('[terminal] OSC 633 shell integration registered')
+    } catch (e) {
+      console.warn('[terminal] Failed to register OSC 633 handler:', e)
+    }
+  }
+
   // Synchronized Output - built-in to xterm.js 5.5.0+, no handler needed
   // Just verify support
   if (verifySyncOutputSupport(term)) {
@@ -103,6 +121,7 @@ export async function loadTerminalProtocols(
 export function disposeTerminalProtocols(protocols: LoadedProtocols): void {
   protocols.osc8?.dispose()
   protocols.osc52?.dispose()
+  protocols.osc633?.dispose()
   protocols.syncOutput?.dispose()
 }
 

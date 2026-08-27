@@ -11,6 +11,29 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 - ...
 
+## [1.0.5] - 2026-08-27
+
+### Added
+
+- **内置模型快照扩展**：从 15 个提供者扩展到 203 个提供者，支持离线启动时显示完整模型列表。
+  - 新增国内提供者：阿里、腾讯、智谱、小米等
+  - 新增国际主流提供者：Azure、Amazon Bedrock、GitHub Copilot 等
+- **Release 工作流**：新增 GitHub Actions release 工作流，支持自动构建和上传发布资产。
+
+## [1.0.4] - 2026-08-27
+
+### Added
+
+- **终端运维助手改进**：
+  - 实现一个键盘原则（PR-8）和 TOCTOU 修复（PR-9）
+  - 添加 driver 状态门禁 agent 写入
+  - 实现 sftp_write 原子操作（EXCLUDE 标志）
+  - 添加 78 个测试用例
+- **终端 Shell 集成**：添加 OSC 633 shell 集成支持
+  - 注册 OSC 633 handler 在 xterm.js 中
+  - 添加 shellIntegration 配置选项
+  - 默认启用 shell 集成
+
 ## [1.0.3] - 2026-08-26
 
 ### Added
@@ -112,6 +135,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - Detailed historical notes for earlier development were not maintained in this file;
   see git history on `main` / `dev.1.0.1` for prior work.
 
-[Unreleased]: https://github.com/limin411/hip/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/limin411/hip/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/limin411/hip/releases/tag/v1.0.5
+[1.0.4]: https://github.com/limin411/hip/releases/tag/v1.0.4
 [1.0.3]: https://github.com/limin411/hip/releases/tag/v1.0.3
 [1.0.1]: https://github.com/limin411/hip/releases/tag/v1.0.1

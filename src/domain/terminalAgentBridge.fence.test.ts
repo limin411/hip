@@ -216,6 +216,86 @@ describe('terminal bridge handed-off state machine (PR-2, spec T2)', () => {
   })
 })
 
+describe('terminal bridge one-keyboard principle (PR-8, spec T3.3)', () => {
+  beforeEach(() => {
+    vi.mocked(sshWrite).mockClear().mockResolvedValue(undefined as never)
+    useTerminalAgentStore.setState({ execFlightByTerminal: {}, driverByTerminal: {} })
+    useTerminalStore.setState({ bySession: {}, userInterleaved: {} })
+    seedStores()
+    vi.useRealTimers()
+  })
+
+  it('rejects writes when user holds the keyboard (driver = user)', async () => {
+    // First exec starts normally.
+    const { sent: sent1 } = bridgeRequest({ command: 'df -h', waitMs: 5000 })
+    await sleep(300)
+    // User types into the shared terminal → handed_off, driver = user.
+    useTerminalStore.getState().noteUserInput(TM_ID)
+    await sleep(400)
+    expect(useTerminalAgentStore.getState().driverByTerminal[TM_ID]).toBe('user')
+    // Second exec while user holds the keyboard should be queued (T3).
+    const sent2: ClientMessage[] = []
+    handleTerminalBridgeMessage(
+      {
+        type: 'session:terminalExec:request',
+        sessionId: SESSION_ID,
+        callId: 'call-2',
+        command: 'uptime',
+        waitMs: 5000,
+        poll: true,
+      },
+      (m) => sent2.push(m),
+    )
+    await sleep(300)
+    // Should be queued, not rejected.
+    expect(sent2.some((m) => m.type === 'session:uiToolResult')).toBe(false)
+    expect(useTerminalAgentStore.getState().execQueueByTerminal[TM_ID]?.length).toBe(1)
+    // Complete the first exec.
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(500)
+    expect(sent1.find((m) => m.type === 'session:uiToolResult')).toMatchObject({ status: 'user_interleaved' })
+    // After first completes, second is dequeued and runs.
+    await sleep(500)
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(500)
+    const result = sent2.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'completed' })
+    const written = vi.mocked(sshWrite).mock.calls.map((c) => c[1])
+    expect(written.some((w) => w.includes('uptime'))).toBe(true)
+  })
+
+  it('allows writes when agent holds the keyboard (driver = agent)', async () => {
+    // First exec completes normally.
+    const { sent: sent1 } = bridgeRequest({ command: 'df -h', waitMs: 5000 })
+    await sleep(300)
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(500)
+    expect(sent1.find((m) => m.type === 'session:uiToolResult')).toMatchObject({ status: 'completed' })
+    // Driver should be back to agent after flight completes.
+    expect(useTerminalAgentStore.getState().driverByTerminal[TM_ID]).toBe('user')
+    // Second exec should work because agent holds the keyboard.
+    const sent2: ClientMessage[] = []
+    handleTerminalBridgeMessage(
+      {
+        type: 'session:terminalExec:request',
+        sessionId: SESSION_ID,
+        callId: 'call-2',
+        command: 'uptime',
+        waitMs: 5000,
+        poll: true,
+      },
+      (m) => sent2.push(m),
+    )
+    await sleep(300)
+    useTerminalStore.getState().appendRing(TM_ID, `${FENCE_END}0${FENCE_TERM}`)
+    await sleep(500)
+    const result = sent2.find((m) => m.type === 'session:uiToolResult')
+    expect(result).toMatchObject({ status: 'completed' })
+    const written = vi.mocked(sshWrite).mock.calls.map((c) => c[1])
+    expect(written.some((w) => w.includes('uptime'))).toBe(true)
+  })
+})
+
 describe('terminal bridge exec queue (PR-3, spec T3)', () => {
   beforeEach(() => {
     vi.mocked(sshWrite).mockClear().mockResolvedValue(undefined as never)

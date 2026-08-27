@@ -378,6 +378,16 @@ async function runFlight(
         return
       }
     }
+    // One-keyboard principle (T3.3): reject writes while the user holds the keyboard.
+    // This prevents the agent from writing while the user is typing (handed_off state).
+    const currentDriver = useTerminalAgentStore.getState().driverByTerminal[tmId]
+    if (currentDriver === 'user') {
+      finish('error', {
+        mayStillRun: false,
+        error: 'handed_off: user holds the keyboard — wait for the user to hand back control',
+      })
+      return
+    }
     await sshWrite(tmId, `${useFence ? wrapForFence(command) : wrapEc ? wrapForEc(command) : command}\n`)
   } catch (err) {
     finish('error', { mayStillRun: false, error: errorMessage(err) })

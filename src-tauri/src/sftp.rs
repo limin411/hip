@@ -337,6 +337,7 @@ pub async fn sftp_read_file(
 }
 
 /// Write a remote text file via SFTP (P2; HITL + overwrite confirm handled in the UI).
+/// TOCTOU fix (PR-9): use EXCLUDE flag for atomic create-new when !force.
 #[tauri::command]
 pub async fn sftp_write_file(
     manager: State<'_, SshManager>,
@@ -350,22 +351,43 @@ pub async fn sftp_write_file(
     }
     let (_sess, sftp) = require_sftp(&manager, &terminal_id).await?;
     let remote = normalize_remote_path(&sftp, &path).await?;
-    let exists = sftp
-        .metadata(&remote)
-        .await
-        .map(|m| !m.is_dir())
-        .unwrap_or(false);
-    if exists && !force {
-        return Err("AlreadyExists".into());
-    }
 
-    let mut file = sftp
-        .open_with_flags(
-            &remote,
-            OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE,
-        )
-        .await
-        .map_err(|e| format!("SFTP create remote failed: {e}"))?;
+    // TOCTOU fix (PR-9): use EXCLUDE flag for atomic create-new when !force.
+    // This prevents the race condition between exists check and write.
+    let open_flags = if force {
+        OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
+    } else {
+        // EXCLUDE fails if file already exists — atomic create-new.
+        OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE
+    };
+
+    let mut file = match sftp.open_with_flags(&remote, open_flags).await {
+        Ok(f) => f,
+        Err(e) => {
+            // If EXCLUDE fails because file exists, return AlreadyExists.
+            if !force && e.to_string().contains("already exists") {
+                return Err("AlreadyExists".into());
+            }
+            // Fallback: try without EXCLUDE for servers that don't support it.
+            if !force {
+                // Check existence before fallback.
+                let exists = sftp
+                    .metadata(&remote)
+                    .await
+                    .map(|m| !m.is_dir())
+                    .unwrap_or(false);
+                if exists {
+                    return Err("AlreadyExists".into());
+                }
+            }
+            sftp.open_with_flags(
+                &remote,
+                OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE,
+            )
+            .await
+            .map_err(|e| format!("SFTP create remote failed: {e}"))?
+        }
+    };
     file.write_all(content.as_bytes())
         .await
         .map_err(|e| format!("SFTP write failed: {e}"))?;

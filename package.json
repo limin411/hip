@@ -1,7 +1,7 @@
 {
   "name": "hip",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Desktop AI workbench (Tauri shell + React UI + Node sidecar)",
   "license": "MIT",
   "author": "ljm",

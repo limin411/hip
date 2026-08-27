@@ -279,11 +279,49 @@ export function TerminalFileTree({
   }, [load, rootPath, startPath])
 
   // Navigation functions
-  const navigateTo = useCallback((path: string) => {
-    useTerminalFsStore.getState().setRootPath(terminalId, path)
-    useTerminalFsStore.getState().pushNavigation(terminalId, path)
-    load(path)
-  }, [terminalId, load])
+  const navigateTo = useCallback(async (path: string) => {
+    const store = useTerminalFsStore.getState()
+    const oldPath = store.byTerminal[terminalId]?.rootPath ?? null
+    
+    // Update rootPath immediately for UI feedback
+    store.setRootPath(terminalId, path)
+    store.pushNavigation(terminalId, path)
+    
+    try {
+      // Try to load the directory
+      if (backend === 'local') {
+        await loadLocalDir(terminalId, path || '.')
+      } else {
+        await loadSftpDir(terminalId, path)
+      }
+      
+      // After loading, get fresh state to check results
+      const freshState = useTerminalFsStore.getState()
+      const slice = freshState.byTerminal[terminalId]
+      
+      // Check if loading succeeded by looking at entries
+      const entries = slice?.entriesByDir[path]
+      const hasEntries = entries && entries.length > 0
+      
+      // If no entries were loaded, check for errors
+      if (!hasEntries) {
+        const currentError = slice?.error
+        const currentDirError = slice?.dirErrors?.[path]
+        
+        // If there's an error, navigation failed - restore old path
+        if (currentError || currentDirError) {
+          if (oldPath) {
+            freshState.setRootPath(terminalId, oldPath)
+          }
+        }
+      }
+    } catch (e) {
+      // Navigation failed, restore old path
+      if (oldPath) {
+        useTerminalFsStore.getState().setRootPath(terminalId, oldPath)
+      }
+    }
+  }, [terminalId, backend])
 
   const navigateToParent = useCallback(() => {
     if (!rootPath || rootPath === '/') return
@@ -291,24 +329,22 @@ export function TerminalFileTree({
     const lastSlash = normalized.lastIndexOf('/')
     if (lastSlash <= 0) return
     const parentPath = normalized.slice(0, lastSlash) || '/'
-    navigateTo(parentPath)
+    void navigateTo(parentPath)
   }, [rootPath, navigateTo])
 
   const goBack = useCallback(() => {
     const path = useTerminalFsStore.getState().goBack(terminalId)
     if (path) {
-      useTerminalFsStore.getState().setRootPath(terminalId, path)
-      load(path)
+      void navigateTo(path)
     }
-  }, [terminalId, load])
+  }, [terminalId, navigateTo])
 
   const goForward = useCallback(() => {
     const path = useTerminalFsStore.getState().goForward(terminalId)
     if (path) {
-      useTerminalFsStore.getState().setRootPath(terminalId, path)
-      load(path)
+      void navigateTo(path)
     }
-  }, [terminalId, load])
+  }, [terminalId, navigateTo])
 
   const [isPathInputActive, setIsPathInputActive] = useState(false)
 

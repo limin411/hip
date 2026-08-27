@@ -1,0 +1,203 @@
+name: Release
+
+# When a GitHub Release is published, build platform installers and upload
+# them as release assets.  Reuses the same sidecar + Tauri build pipeline
+# as build.yml but attaches artifacts to the Release instead of Actions storage.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach assets to (e.g. v1.0.4)"
+        required: true
+        type: string
+      bundle_whisper:
+        description: "Bundle whisper-cli engine (cmake build; slower)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
+permissions:
+  contents: write
+
+jobs:
+  package-macos:
+    name: release-macos
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Enable Yarn (classic)
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: release-macos
+
+      - name: Install yarn deps
+        run: yarn install --frozen-lockfile
+
+      - name: Resolve whisper bundling
+        id: whisper
+        shell: bash
+        run: |
+          set -euo pipefail
+          want=0
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.bundle_whisper }}" = "true" ]; then
+            want=1
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            want=1
+          fi
+          echo "bundle=${want}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install cmake (whisper)
+        if: steps.whisper.outputs.bundle == '1'
+        run: brew install cmake
+
+      - name: Package macOS (.app + .dmg)
+        env:
+          HIP_SKIP_SIGN: "1"
+          HIP_BUNDLE_WHISPER: ${{ steps.whisper.outputs.bundle }}
+        run: yarn package:macos
+
+      - name: Collect artifacts
+        id: collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-ci/macos
+          APP="src-tauri/target/release/bundle/macos/hip.app"
+          if [ ! -d "${APP}" ]; then
+            echo "error: missing ${APP}" >&2
+            ls -la src-tauri/target/release/bundle/macos/ 2>/dev/null || true
+            exit 1
+          fi
+          tar -C src-tauri/target/release/bundle/macos -czf dist-ci/macos/hip.app.tar.gz hip.app
+          shopt -s nullglob
+          dmgs=(src-tauri/target/release/bundle/dmg/hip_*.dmg)
+          if [ "${#dmgs[@]}" -eq 0 ]; then
+            echo "error: no hip_*.dmg under bundle/dmg" >&2
+            ls -la src-tauri/target/release/bundle/dmg/ 2>/dev/null || true
+            exit 1
+          fi
+          cp -v "${dmgs[@]}" dist-ci/macos/
+          RUNTIME="${APP}/Contents/Resources/hip-sidecar"
+          test -f "${RUNTIME}/node"
+          test -f "${RUNTIME}/index.js"
+          ls -lh dist-ci/macos/
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "${TAG}" \
+            dist-ci/macos/*.dmg \
+            dist-ci/macos/*.tar.gz \
+            --clobber
+
+  package-windows:
+    name: release-windows
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Enable Yarn (classic)
+        shell: bash
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: release-windows
+
+      - name: Install yarn deps
+        run: yarn install --frozen-lockfile
+
+      - name: Resolve whisper bundling
+        id: whisper
+        shell: bash
+        run: |
+          set -euo pipefail
+          want=0
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.bundle_whisper }}" = "true" ]; then
+            want=1
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            want=1
+          fi
+          echo "bundle=${want}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install cmake (whisper)
+        if: steps.whisper.outputs.bundle == '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+          echo "C:/Program Files/CMake/bin" >> "${GITHUB_PATH}"
+          cmake --version
+
+      - name: Package Windows (NSIS)
+        shell: pwsh
+        env:
+          HIP_BUNDLE_WHISPER: ${{ steps.whisper.outputs.bundle }}
+        run: yarn package:windows
+
+      - name: Collect artifacts
+        id: collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-ci/windows
+          NSIS="src-tauri/target/release/bundle/nsis"
+          if [ ! -d "${NSIS}" ]; then
+            echo "error: missing ${NSIS}" >&2
+            ls -la src-tauri/target/release/bundle/ 2>/dev/null || true
+            exit 1
+          fi
+          shopt -s nullglob
+          setups=("${NSIS}"/*.exe)
+          if [ "${#setups[@]}" -eq 0 ]; then
+            echo "error: no NSIS .exe under ${NSIS}" >&2
+            ls -la "${NSIS}" || true
+            exit 1
+          fi
+          cp -v "${setups[@]}" dist-ci/windows/
+          ls -lh dist-ci/windows/
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "${TAG}" \
+            dist-ci/windows/*.exe \
+            --clobber

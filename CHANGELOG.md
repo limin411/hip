@@ -11,6 +11,12 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 - ...
 
+## [1.0.6] - 2026-08-27
+
+### Added
+
+- 版本 1.0.6 发布准备
+
 ## [1.0.5] - 2026-08-27
 
 ### Added
@@ -135,7 +141,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 - Detailed historical notes for earlier development were not maintained in this file;
   see git history on `main` / `dev.1.0.1` for prior work.
 
-[Unreleased]: https://github.com/limin411/hip/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/limin411/hip/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/limin411/hip/releases/tag/v1.0.6
 [1.0.5]: https://github.com/limin411/hip/releases/tag/v1.0.5
 [1.0.4]: https://github.com/limin411/hip/releases/tag/v1.0.4
 [1.0.3]: https://github.com/limin411/hip/releases/tag/v1.0.3

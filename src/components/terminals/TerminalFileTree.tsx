@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ChevronDown,
-  ChevronRight,
   Folder,
-  FolderOpen,
   RefreshCw,
   Upload,
   ArrowUp,
-  ArrowLeft,
-  ArrowRight,
   MapPin,
+  ChevronRight,
 } from 'lucide-react'
 import type { SftpEntry } from '@/ipc/sftp'
 import { useTerminalFsStore } from '@/store/terminalFsStore'
@@ -37,58 +33,53 @@ function basename(p: string): string {
   return parts[parts.length - 1] || p
 }
 
-/** Shared row chrome for local + SFTP tree entries. */
-function EntryRow({
+function getParentPath(path: string): string {
+  if (!path || path === '/') return '/'
+  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '')
+  const lastSlash = normalized.lastIndexOf('/')
+  if (lastSlash <= 0) return '/'
+  return normalized.slice(0, lastSlash) || '/'
+}
+
+/** 单个文件/目录行 */
+function FileEntryRow({
   entry,
-  depth,
-  open,
-  loading,
-  testId,
-  onClick,
+  onNavigate,
+  terminalId,
+  rootCwd,
 }: {
   entry: SftpEntry
-  depth: number
-  open: boolean
-  loading: boolean
-  testId: string
-  onClick: () => void
+  onNavigate: (path: string) => void
+  terminalId: string
+  rootCwd?: string
 }) {
   const fileIcon = fileIconForName(entry.name)
-  return (
+  const backend: TerminalFileTreeBackend = rootCwd !== undefined ? 'local' : 'sftp'
+
+  const handleClick = () => {
+    if (entry.isDir) {
+      // 点击目录 -> 进入该目录
+      onNavigate(entry.path)
+    }
+  }
+
+  const row = (
     <div
-      data-testid={testId}
+      data-testid={backend === 'local' ? 'term-fs-entry' : 'sftp-entry'}
       data-path={entry.path}
       data-dir={entry.isDir ? '1' : '0'}
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors duration-chrome',
         'text-ink hover:bg-state-hover',
       )}
-      style={{ paddingLeft: depth * 12 + 4 }}
     >
       {entry.isDir ? (
-        open ? (
-          <ChevronDown size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-        ) : (
-          <ChevronRight size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
-        )
-      ) : (
-        <span className="w-3.5 shrink-0" />
-      )}
-      {entry.isDir ? (
-        open ? (
-          <FolderOpen
-            size={15}
-            strokeWidth={1.75}
-            className="shrink-0 text-amber-600/80 dark:text-amber-400/90"
-          />
-        ) : (
-          <Folder
-            size={15}
-            strokeWidth={1.75}
-            className="shrink-0 text-amber-600/80 dark:text-amber-400/90"
-          />
-        )
+        <Folder
+          size={15}
+          strokeWidth={1.75}
+          className="shrink-0 text-amber-600/80 dark:text-amber-400/90"
+        />
       ) : (
         <fileIcon.Icon
           size={15}
@@ -98,21 +89,16 @@ function EntryRow({
           data-file-name={entry.name}
         />
       )}
-      <span className="truncate" title={entry.path}>
+      <span className="truncate flex-1" title={entry.path}>
         {entry.name}
       </span>
-      {loading ? <span className="ml-auto text-caption text-ink-tertiary">…</span> : null}
+      {entry.isDir && (
+        <ChevronRight size={13} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
+      )}
     </div>
   )
-}
 
-function withEntryMenu(
-  backend: TerminalFileTreeBackend,
-  terminalId: string,
-  entry: SftpEntry,
-  rootCwd: string | undefined,
-  children: ReactNode,
-) {
+  // 包装右键菜单
   if (backend === 'local') {
     return (
       <DeclarativeContextMenu
@@ -125,10 +111,11 @@ function withEntryMenu(
           rootCwd: rootCwd ?? '',
         }}
       >
-        {children}
+        {row}
       </DeclarativeContextMenu>
     )
   }
+
   return (
     <DeclarativeContextMenu
       kind="sftpEntry"
@@ -139,83 +126,8 @@ function withEntryMenu(
         isDir: entry.isDir,
       }}
     >
-      {children}
+      {row}
     </DeclarativeContextMenu>
-  )
-}
-
-function Node({
-  entry,
-  terminalId,
-  depth,
-  backend,
-  rootCwd,
-}: {
-  entry: SftpEntry
-  terminalId: string
-  depth: number
-  backend: TerminalFileTreeBackend
-  rootCwd?: string
-}) {
-  const open = useTerminalFsStore((s) => !!s.byTerminal[terminalId]?.expanded[entry.path])
-  const children = useTerminalFsStore(
-    (s) => s.byTerminal[terminalId]?.entriesByDir[entry.path],
-  )
-  const loading = useTerminalFsStore(
-    (s) => !!s.byTerminal[terminalId]?.loading[entry.path],
-  )
-  const dirError = useTerminalFsStore(
-    (s) => s.byTerminal[terminalId]?.dirErrors?.[entry.path] ?? null,
-  )
-
-  const onClick = () => {
-    if (!entry.isDir) return
-    useTerminalFsStore.getState().toggleExpanded(terminalId, entry.path)
-    const slice = useTerminalFsStore.getState().byTerminal[terminalId]
-    const hasChildren = !!slice?.entriesByDir[entry.path]
-    if (!hasChildren) {
-      if (backend === 'local') void loadLocalDir(terminalId, entry.path)
-      else void loadSftpDir(terminalId, entry.path)
-    }
-  }
-
-  const row = (
-    <EntryRow
-      entry={entry}
-      depth={depth}
-      open={open}
-      loading={loading}
-      testId={backend === 'local' ? 'term-fs-tree-entry' : 'sftp-tree-entry'}
-      onClick={onClick}
-    />
-  )
-
-  return (
-    <div>
-      {withEntryMenu(backend, terminalId, entry, rootCwd, row)}
-      {entry.isDir && open && dirError ? (
-        <p
-          className="truncate px-2 py-0.5 text-caption text-danger/90"
-          style={{ paddingLeft: (depth + 1) * 12 + 4 }}
-          data-testid={backend === 'local' ? 'term-fs-dir-error' : 'sftp-dir-error'}
-          title={dirError}
-        >
-          {dirError}
-        </p>
-      ) : null}
-      {entry.isDir &&
-        open &&
-        children?.map((c) => (
-          <Node
-            key={c.path}
-            entry={c}
-            terminalId={terminalId}
-            depth={depth + 1}
-            backend={backend}
-            rootCwd={rootCwd}
-          />
-        ))}
-    </div>
   )
 }
 
@@ -225,13 +137,7 @@ export function TerminalFileTree({
   backend = 'sftp',
 }: {
   terminalId: string
-  /**
-   * SFTP: host remotePath or empty (home / `.`).
-   * Local: launch cwd for labels / open-folder only — listing always uses `.`
-   * so absolute non-canon paths never hit the jail before realpath.
-   */
   initialPath?: string
-  /** SFTP remote tree vs local launch-cwd tree. */
   backend?: TerminalFileTreeBackend
 }) {
   const { t } = useTranslation()
@@ -250,19 +156,11 @@ export function TerminalFileTree({
     const key = slice.rootPath ?? initialPath ?? '.'
     return !!slice.loading[key] || !!slice.loading['.'] || !!slice.loading['']
   })
-  // Navigation history state
-  const canGoBack = useTerminalFsStore((s) => s.canGoBack(terminalId))
-  const canGoForward = useTerminalFsStore((s) => s.canGoForward(terminalId))
-  // SSH files rail mounts as soon as the tab is focused; ssh_open happens later in
-  // XtermSurface. Gate listing on status=running so we never treat "not open yet"
-  // as a permanent session_closed (Rust uses the same string for missing sessions).
+
   const ptyStatus = useTerminalStore((s) => s.bySession[terminalId]?.status ?? 'idle')
-  const sftpConnecting =
-    backend === 'sftp' && (ptyStatus === 'idle' || ptyStatus === 'starting')
+  const sftpConnecting = backend === 'sftp' && (ptyStatus === 'idle' || ptyStatus === 'starting')
   const sftpReady = backend !== 'sftp' || ptyStatus === 'running'
 
-  // Local: always list with "." (session root). Absolute initialPath is label/rootCwd only.
-  // SFTP: empty → "." (server home); else host remotePath.
   const startPath = backend === 'local' ? '.' : initialPath?.trim() || '.'
 
   const load = useCallback(
@@ -274,106 +172,76 @@ export function TerminalFileTree({
   )
 
   const reload = useCallback(() => {
-    // Prefer resolved root; local falls back to "." not absolute launch cwd.
     load(rootPath ?? startPath)
   }, [load, rootPath, startPath])
 
-  // Navigation functions
-  const navigateTo = useCallback(async (path: string) => {
-    const store = useTerminalFsStore.getState()
-    const oldPath = store.byTerminal[terminalId]?.rootPath ?? null
-    
-    // Update rootPath immediately for UI feedback
-    store.setRootPath(terminalId, path)
-    store.pushNavigation(terminalId, path)
-    
-    try {
-      // Try to load the directory
-      if (backend === 'local') {
-        await loadLocalDir(terminalId, path || '.')
-      } else {
-        await loadSftpDir(terminalId, path)
-      }
-      
-      // After loading, get fresh state to check results
-      const freshState = useTerminalFsStore.getState()
-      const slice = freshState.byTerminal[terminalId]
-      
-      // Check if loading succeeded by looking at entries
-      const entries = slice?.entriesByDir[path]
-      const hasEntries = entries && entries.length > 0
-      
-      // If no entries were loaded, check for errors
-      if (!hasEntries) {
-        const currentError = slice?.error
-        const currentDirError = slice?.dirErrors?.[path]
-        
-        // If there's an error, navigation failed - restore old path
-        if (currentError || currentDirError) {
-          if (oldPath) {
+  // 导航到指定目录
+  const navigateTo = useCallback(
+    async (path: string) => {
+      const store = useTerminalFsStore.getState()
+      const oldPath = store.byTerminal[terminalId]?.rootPath ?? null
+
+      // 更新 rootPath
+      store.setRootPath(terminalId, path)
+
+      try {
+        // 加载目录
+        if (backend === 'local') {
+          await loadLocalDir(terminalId, path || '.')
+        } else {
+          await loadSftpDir(terminalId, path)
+        }
+
+        // 检查加载是否成功
+        const freshState = useTerminalFsStore.getState()
+        const slice = freshState.byTerminal[terminalId]
+        const entries = slice?.entriesByDir[path]
+        const hasEntries = entries && entries.length > 0
+
+        if (!hasEntries) {
+          const currentError = slice?.error
+          const currentDirError = slice?.dirErrors?.[path]
+          if ((currentError || currentDirError) && oldPath) {
             freshState.setRootPath(terminalId, oldPath)
           }
         }
+      } catch (e) {
+        if (oldPath) {
+          useTerminalFsStore.getState().setRootPath(terminalId, oldPath)
+        }
       }
-    } catch (e) {
-      // Navigation failed, restore old path
-      if (oldPath) {
-        useTerminalFsStore.getState().setRootPath(terminalId, oldPath)
-      }
-    }
-  }, [terminalId, backend])
+    },
+    [terminalId, backend],
+  )
 
+  // 返回上一级
   const navigateToParent = useCallback(() => {
     if (!rootPath || rootPath === '/') return
-    const normalized = rootPath.replace(/\\/g, '/').replace(/\/+$/, '')
-    const lastSlash = normalized.lastIndexOf('/')
-    if (lastSlash <= 0) return
-    const parentPath = normalized.slice(0, lastSlash) || '/'
+    const parentPath = getParentPath(rootPath)
     void navigateTo(parentPath)
   }, [rootPath, navigateTo])
 
-  const goBack = useCallback(() => {
-    const path = useTerminalFsStore.getState().goBack(terminalId)
-    if (path) {
-      void navigateTo(path)
-    }
-  }, [terminalId, navigateTo])
-
-  const goForward = useCallback(() => {
-    const path = useTerminalFsStore.getState().goForward(terminalId)
-    if (path) {
-      void navigateTo(path)
-    }
-  }, [terminalId, navigateTo])
-
   const [isPathInputActive, setIsPathInputActive] = useState(false)
 
-  // Keyboard shortcuts
+  // 键盘快捷键：Alt+↑ 返回上一级，Ctrl+L 切换路径输入
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && e.key === 'ArrowUp') {
         e.preventDefault()
         navigateToParent()
-      } else if (e.altKey && e.key === 'ArrowLeft') {
-        e.preventDefault()
-        goBack()
-      } else if (e.altKey && e.key === 'ArrowRight') {
-        e.preventDefault()
-        goForward()
       } else if (e.ctrlKey && e.key === 'l') {
         e.preventDefault()
-        setIsPathInputActive(prev => !prev)
+        setIsPathInputActive((prev) => !prev)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [navigateToParent, goBack, goForward])
+  }, [navigateToParent])
 
+  // 初始加载
   useEffect(() => {
     if (!sftpReady) return
     if (!rootPath && !rootEntries) {
-      // Drop a stale pre-connect "session_closed" so the tree can recover without
-      // closing/reopening the right panel.
       if (
         backend === 'sftp' &&
         useTerminalFsStore.getState().getSlice(terminalId).error === 'session_closed'
@@ -381,13 +249,10 @@ export function TerminalFileTree({
         useTerminalFsStore.getState().setError(terminalId, null)
       }
       load(startPath)
-      // Push initial path to navigation history
-      useTerminalFsStore.getState().pushNavigation(terminalId, startPath)
     }
   }, [terminalId, startPath, rootPath, rootEntries, load, sftpReady, backend])
 
-  // Only surface permanent closed after connect finished (or session died). While
-  // idle/starting the same error means "not open yet" — show loading instead.
+  // SSH 会话关闭状态
   if (backend === 'sftp' && error === 'session_closed' && !sftpConnecting) {
     return (
       <div
@@ -409,9 +274,12 @@ export function TerminalFileTree({
     )
   }
 
-  // While SSH is still opening, suppress generic error chrome for a stale
-  // session_closed so the loading state can show instead.
-  if (error && !rootEntries && !(backend === 'sftp' && error === 'session_closed' && sftpConnecting)) {
+  // 错误状态
+  if (
+    error &&
+    !rootEntries &&
+    !(backend === 'sftp' && error === 'session_closed' && sftpConnecting)
+  ) {
     return (
       <div
         className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center"
@@ -439,110 +307,57 @@ export function TerminalFileTree({
     : backend === 'local'
       ? t('terminals.localFs.launchDir')
       : t('terminals.sftp.loading')
-  // Menu path: resolved root when known; local still uses "." until first ls (not absolute cwd).
-  const rootMenuPath = rootPath ?? startPath
-  const rootMenuName = rootPath ? basename(rootPath) : startPath
   const treeTestId = backend === 'local' ? 'term-fs-file-tree' : 'sftp-file-tree'
-  const rootTestId = backend === 'local' ? 'term-fs-tree-root' : 'sftp-tree-root'
   const emptyTestId = backend === 'local' ? 'term-fs-tree-empty' : 'sftp-tree-empty'
   const refreshTestId = backend === 'local' ? 'term-fs-refresh' : 'sftp-refresh'
   const labelRootCwd = rootPath ?? initialPath ?? ''
 
-  const rootTitle =
-    backend === 'local'
-      ? rootPath
-        ? `${t('terminals.localFs.launchDir')}: ${rootPath}`
-        : initialPath ?? startPath
-      : (rootPath ?? startPath)
-
-  // Match FileTree root row + ManagedTerminalSession chrome (h-8, px-2) so the
-  // path / "username" strip lines up with the left terminal toolbar across the split.
-  const rootHeader = (
-    <span
-      className="flex min-w-0 flex-1 cursor-default items-center gap-1.5 truncate rounded px-0.5 text-caption font-medium text-ink-tertiary hover:bg-state-hover"
-      title={rootTitle}
-      data-testid={rootTestId}
-    >
-      <Folder size={13} strokeWidth={1.75} className="shrink-0" aria-hidden />
-      <span className="truncate text-ink-secondary">{rootLabel}</span>
-    </span>
-  )
+  // 判断是否可以返回上一级
+  const canGoUp = rootPath && rootPath !== '/'
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid={treeTestId}>
+      {/* 工具栏 */}
       <div className="flex h-8 shrink-0 items-center justify-between gap-1 border-b border-border/80 px-2">
-        {backend === 'local' ? (
-          <DeclarativeContextMenu
-            kind="termFsEntry"
-            payload={{
-              terminalId,
-              path: rootMenuPath,
-              name: rootMenuName,
-              isDir: true,
-              rootCwd: labelRootCwd,
-            }}
-            className="min-w-0 flex-1"
-          >
-            {rootHeader}
-          </DeclarativeContextMenu>
-        ) : (
-          <DeclarativeContextMenu
-            kind="sftpEntry"
-            payload={{
-              terminalId,
-              path: rootMenuPath,
-              name: rootMenuName,
-              isDir: true,
-            }}
-            className="min-w-0 flex-1"
-          >
-            {rootHeader}
-          </DeclarativeContextMenu>
-        )}
-        <div className="flex shrink-0 items-center gap-0.5">
-          {/* Navigation buttons */}
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          {/* 返回上一级按钮 */}
           <button
             type="button"
             title={t('terminals.navigation.up') + ' (Alt+↑)'}
             data-testid="navigation-up"
             onClick={navigateToParent}
-            disabled={!rootPath || rootPath === '/'}
-            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-50"
+            disabled={!canGoUp}
+            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-30"
           >
             <ArrowUp size={13} strokeWidth={1.75} />
           </button>
-          <button
-            type="button"
-            title={t('terminals.navigation.back') + ' (Alt+←)'}
-            data-testid="navigation-back"
-            onClick={goBack}
-            disabled={!canGoBack}
-            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-50"
+
+          {/* 当前路径 */}
+          <span
+            className="truncate flex-1 text-caption font-medium text-ink-secondary"
+            title={rootPath ?? ''}
+            data-testid="current-path"
           >
-            <ArrowLeft size={13} strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            title={t('terminals.navigation.forward') + ' (Alt+→)'}
-            data-testid="navigation-forward"
-            onClick={goForward}
-            disabled={!canGoForward}
-            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink disabled:opacity-50"
-          >
-            <ArrowRight size={13} strokeWidth={1.75} />
-          </button>
+            {rootLabel}
+          </span>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-0.5">
+          {/* 路径输入按钮 */}
           <button
             type="button"
             title={t('terminals.navigation.pathInput') + ' (Ctrl+L)'}
             data-testid="navigation-path-input"
-            onClick={() => setIsPathInputActive(prev => !prev)}
+            onClick={() => setIsPathInputActive((prev) => !prev)}
             className={cn(
               'rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink',
-              isPathInputActive && 'bg-state-hover text-ink'
+              isPathInputActive && 'bg-state-hover text-ink',
             )}
           >
             <MapPin size={13} strokeWidth={1.75} />
           </button>
+
+          {/* 上传按钮（仅 SFTP） */}
           {backend === 'sftp' ? (
             <button
               type="button"
@@ -558,6 +373,8 @@ export function TerminalFileTree({
               <Upload size={13} strokeWidth={1.75} />
             </button>
           ) : null}
+
+          {/* 刷新按钮 */}
           <button
             type="button"
             title={
@@ -576,14 +393,16 @@ export function TerminalFileTree({
           </button>
         </div>
       </div>
-      {/* Breadcrumb navigation */}
+
+      {/* 面包屑导航 */}
       <TerminalBreadcrumb
         terminalId={terminalId}
         currentPath={rootPath}
         backend={backend}
         onNavigate={navigateTo}
       />
-      {/* Path input (conditional) */}
+
+      {/* 路径输入框（条件渲染） */}
       {isPathInputActive && (
         <PathInput
           terminalId={terminalId}
@@ -593,17 +412,21 @@ export function TerminalFileTree({
           onCancel={() => setIsPathInputActive(false)}
         />
       )}
-      <div className="min-h-0 flex-1 overflow-auto py-0.5">
-        {rootEntries?.map((e) => (
-          <Node
-            key={e.path}
-            entry={e}
+
+      {/* 文件列表 */}
+      <div className="min-h-0 flex-1 overflow-auto py-0.5 px-1">
+        {/* 当前目录的文件/文件夹列表 */}
+        {rootEntries?.map((entry) => (
+          <FileEntryRow
+            key={entry.path}
+            entry={entry}
+            onNavigate={navigateTo}
             terminalId={terminalId}
-            depth={0}
-            backend={backend}
-            rootCwd={labelRootCwd}
+            rootCwd={backend === 'local' ? labelRootCwd : undefined}
           />
         ))}
+
+        {/* 加载中 */}
         {!rootEntries && (loadingRoot || sftpConnecting) ? (
           <p
             className="px-2 py-2 text-caption text-ink-tertiary"
@@ -612,6 +435,8 @@ export function TerminalFileTree({
             {backend === 'local' ? t('terminals.localFs.loading') : t('terminals.sftp.loading')}
           </p>
         ) : null}
+
+        {/* 空目录 */}
         {rootEntries && rootEntries.length === 0 && !loadingRoot ? (
           <p className="px-2 py-2 text-caption text-ink-tertiary" data-testid={emptyTestId}>
             {backend === 'local' ? t('terminals.localFs.emptyDir') : t('terminals.sftp.emptyDir')}

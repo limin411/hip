@@ -61,7 +61,7 @@ describe('TerminalFileTree entry icons (project-parity type icons)', () => {
     render(<TerminalFileTree terminalId="tm_ssh" backend="sftp" initialPath="/var/www" />)
 
     const folderRow = screen
-      .getAllByTestId('sftp-tree-entry')
+      .getAllByTestId('sftp-entry')
       .find((r) => r.getAttribute('data-dir') === '1')
     expect(folderRow).toBeTruthy()
     expect(folderRow?.innerHTML).toContain('text-amber-600/80')

@@ -23,10 +23,6 @@ interface TerminalFsSlice {
   /** Nested expand failures (Issue 7). */
   dirErrors: Record<string, string>
   error: string | null
-  /** Navigation history for back/forward. */
-  navigationHistory: string[]
-  /** Current index in navigation history. */
-  historyIndex: number
 }
 
 const EMPTY: TerminalFsSlice = {
@@ -36,8 +32,6 @@ const EMPTY: TerminalFsSlice = {
   loading: {},
   dirErrors: {},
   error: null,
-  navigationHistory: [],
-  historyIndex: -1,
 }
 
 interface TerminalFsStore {
@@ -56,13 +50,6 @@ interface TerminalFsStore {
   upsertTransfer: (t: TerminalTransfer) => void
   removeTransfer: (opId: string) => void
   clearTransfersFor: (terminalId: string) => void
-
-  /** Navigation history management */
-  pushNavigation: (terminalId: string, path: string) => void
-  goBack: (terminalId: string) => string | null
-  goForward: (terminalId: string) => string | null
-  canGoBack: (terminalId: string) => boolean
-  canGoForward: (terminalId: string) => boolean
 }
 
 function patch(
@@ -150,55 +137,4 @@ export const useTerminalFsStore = create<TerminalFsStore>((set, get) => ({
     set((st) => ({
       transfers: st.transfers.filter((t) => t.terminalId !== terminalId),
     })),
-
-  pushNavigation: (id, path) =>
-    set((st) => ({
-      byTerminal: patch(st.byTerminal, id, (s) => {
-        const newHistory = s.navigationHistory.slice(0, s.historyIndex + 1)
-        newHistory.push(path)
-        return {
-          ...s,
-          navigationHistory: newHistory,
-          historyIndex: newHistory.length - 1,
-        }
-      }),
-    })),
-
-  goBack: (id) => {
-    const slice = get().byTerminal[id] ?? EMPTY
-    if (slice.historyIndex <= 0) return null
-    const newIndex = slice.historyIndex - 1
-    const path = slice.navigationHistory[newIndex]
-    set((st) => ({
-      byTerminal: patch(st.byTerminal, id, (s) => ({
-        ...s,
-        historyIndex: newIndex,
-      })),
-    }))
-    return path
-  },
-
-  goForward: (id) => {
-    const slice = get().byTerminal[id] ?? EMPTY
-    if (slice.historyIndex >= slice.navigationHistory.length - 1) return null
-    const newIndex = slice.historyIndex + 1
-    const path = slice.navigationHistory[newIndex]
-    set((st) => ({
-      byTerminal: patch(st.byTerminal, id, (s) => ({
-        ...s,
-        historyIndex: newIndex,
-      })),
-    }))
-    return path
-  },
-
-  canGoBack: (id) => {
-    const slice = get().byTerminal[id] ?? EMPTY
-    return slice.historyIndex > 0
-  },
-
-  canGoForward: (id) => {
-    const slice = get().byTerminal[id] ?? EMPTY
-    return slice.historyIndex < slice.navigationHistory.length - 1
-  },
 }))

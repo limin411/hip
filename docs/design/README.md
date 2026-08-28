@@ -17,6 +17,7 @@
 | `doc-terminal-capability-gap/` | 终端能力补齐（对照 alacritty 差距分析） | `terminal-capability-gap-spec.md` + `-plan.md`（P0 已完成 2026-08-10，P1–P3 待排期）+ `terminal-capability-gap-preview.html`（高保真原型） |
 | `terminal-shared-pty/` | 终端管理 · 运维助手共享终端能力整改（围栏完成信号 / 接管交还 / 排队 / 规则审批） | `terminal-shared-pty-{spec,plan,preview}`（P0–P1 已实施 2026-08-12：PR-0..5 全部落地，8058 单测 + 285 cargo 通过；剩余 P2 跟随项：上下文注入/TOCTOU 原子化） |
 | `terminal-capability-upgrade/` | 终端能力现代化升级（WebGL 渲染 / 连字 / OSC 协议 / Sixel 图片 / 标签页 / 分屏 / 会话持久化） | `terminal-capability-upgrade-{spec,plan,preview}`（待评审；全面对标 Kitty/Alacritty/WezTerm 等现代终端） |
+| `terminal-ghostty-kernel/` | 终端内核替换：集成 libghostty-vt（原生 VT 解析 + LZ4 scrollback + Kitty Graphics/Keyboard + Sixel + Grid diff 渲染） | `terminal-ghostty-kernel-{spec,plan}`（草案待评审；替换 xterm.js VT 解析层为 Ghostty 原生内核，xterm.js 降级为纯渲染层，5–6 周工期；关键发现：`libghostty-vt` Rust crate 已在 crates.io 发布） |
 
 ## 其它系列
 

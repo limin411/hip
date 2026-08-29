@@ -10,12 +10,13 @@ description: >-
 
 ## Steps
 
-### 1. Bump version
+### 1. Bump version (3 个文件！)
 
-Update version in **both** files:
+Update version in **all three** files:
 
 - `package.json` → `"version": "X.Y.Z"`
 - `src-tauri/Cargo.toml` → `version = "X.Y.Z"`
+- `src-tauri/tauri.conf.json` → `"version": "X.Y.Z"` ← **容易漏！这是 Tauri 实际打包版本**
 
 ### 2. Verify build
 
@@ -58,7 +59,7 @@ Release URL: https://github.com/limin411/hip/releases
 
 ## Gotchas
 
-- **Two files** for version bump — `package.json` AND `src-tauri/Cargo.toml`. Missing one causes mismatch.
+- **三个文件** for version bump — `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`。漏掉 `tauri.conf.json` 会导致打包版本号错误（2026-08 实际踩坑）。
 - **Cargo.lock** auto-updates on `cargo build` — commit it too.
 - `gh` CLI must be authenticated: `gh auth status`.
 - Tag name must match `vX.Y.Z` format (with `v` prefix).

@@ -87,6 +87,9 @@ export function XtermSurface({
   const colorTheme = useHipConfigStore((s) =>
     normalizeTerminalColorThemeId(s.config.terminal?.colorTheme),
   )
+  const hipLoaded = useHipConfigStore((s) => s.loaded)
+  const webgl = useHipConfigStore((s) => s.config.terminal?.webgl)
+  const ligatures = useHipConfigStore((s) => s.config.terminal?.ligatures)
   const status = useTerminalStore((s) => s.bySession[terminalId]?.status ?? 'idle')
   const exitCode = useTerminalStore((s) => s.bySession[terminalId]?.exitCode)
   const lastError = useTerminalStore((s) => s.bySession[terminalId]?.lastError)
@@ -155,7 +158,9 @@ export function XtermSurface({
   }, [])
 
   // Boot xterm + backend open when terminalId is ready (lazy import modules).
+  // Wait for hip.toml so WebGL / ligatures are not decided against an empty store.
   useEffect(() => {
+    if (!hipLoaded) return
     const el = containerRef.current
     if (!el) return
 
@@ -328,8 +333,19 @@ export function XtermSurface({
       })
 
       // P0.3: OSC 0/2 title → terminalStore (chrome / window title consumers).
+      // Native setTitle can steal focus on packaged WebView2; restore if we still own it.
       titleDisp = xterm.onTitleChange((title) => {
         useTerminalStore.getState().setTitle(terminalId, title)
+        requestAnimationFrame(() => {
+          if (disposed) return
+          const active = document.activeElement
+          const container = containerRef.current
+          const inside =
+            container != null && active instanceof Node && container.contains(active)
+          if (!active || active === document.body || inside) {
+            xterm.focus()
+          }
+        })
       })
 
       // P0.4: Bell → visual flash unless [terminal].bell = "off".
@@ -352,9 +368,12 @@ export function XtermSurface({
             void writeRef.current(text).catch(() => {})
           }
         },
+        focus: () => {
+          term?.focus()
+        },
       })
 
-      // INVARIANT: MO / non-React paths must use getState() — boot effect deps are [terminalId, cwd].
+      // INVARIANT: MO / non-React paths must use getState() — boot effect deps are [terminalId, cwd, hipLoaded, webgl, ligatures].
       const applyTheme = () => {
         if (!term) return
         const pref = useHipConfigStore.getState().config.terminal?.colorTheme
@@ -489,7 +508,9 @@ export function XtermSurface({
         ) {
           useTerminalStore.getState().noteUserInput(terminalId)
         }
-        void writeRef.current(data).catch(() => {})
+        void writeRef.current(data).catch((err) => {
+          console.warn(`[terminal] write failed terminalId=${terminalId}`, err)
+        })
       })
 
       // Focus so keyboard works immediately after open.
@@ -532,7 +553,7 @@ export function XtermSurface({
       fitRef.current = null
       // Do NOT kill backend — keep-alive (D6).
     }
-  }, [terminalId, cwd])
+  }, [terminalId, cwd, hipLoaded, webgl, ligatures])
 
   useEffect(() => {
     const pref = useHipConfigStore.getState().config.terminal?.colorTheme
@@ -717,6 +738,9 @@ export function XtermSurface({
           data-no-drag
           data-tauri-drag-region="false"
           data-context-menu-kind="terminal"
+          onMouseDown={() => {
+            termRef.current?.focus()
+          }}
           onContextMenu={onCanvasContextMenu}
         />
       </div>

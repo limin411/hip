@@ -35,6 +35,10 @@ import { normalizeTerminalColorThemeId } from '@/components/artifact/terminalThe
 import { normalizeCodeBlockThemeId } from '@/domain/knowledge/codeBlockTheme'
 import { normalizeDocWidthId } from '@/domain/knowledge/docWidth'
 import { Switch } from '@/components/ui/Switch'
+import {
+  TERMINAL_LIGATURES_DEFAULT,
+  TERMINAL_WEBGL_DEFAULT,
+} from '@/components/artifact/terminalEnhancements'
 
 // 英文优先：English 置顶，中文次之（与产品字体/文案定位一致）
 const LANGUAGE_KEYS: AppLanguage[] = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko']
@@ -75,6 +79,12 @@ export function GeneralSettings() {
   )
   // P0.5: bell pref — visual (default) | off.
   const terminalBell = useHipConfigStore((s) => s.config.terminal?.bell ?? 'visual')
+  const terminalWebgl = useHipConfigStore(
+    (s) => s.config.terminal?.webgl ?? TERMINAL_WEBGL_DEFAULT,
+  )
+  const terminalLigatures = useHipConfigStore(
+    (s) => s.config.terminal?.ligatures ?? TERMINAL_LIGATURES_DEFAULT,
+  )
   const trashRetention = resolveTrashRetentionDays(
     useHipConfigStore((s) => s.config.trash?.retentionDays),
   )
@@ -432,7 +442,7 @@ export function GeneralSettings() {
       {/* Terminal rendering enhancements */}
       {showTerminalColor ? (
         <>
-          <div className="flex items-center justify-between gap-6 px-8 py-4">
+          <div className="flex items-center justify-between gap-6 px-8 py-4" data-testid="settings-terminal-webgl-row">
             <div className="min-w-0 flex-1">
               <div className="text-body font-medium text-ink">{t('settings.terminalWebgl')}</div>
               <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
@@ -440,13 +450,14 @@ export function GeneralSettings() {
               </div>
             </div>
             <Switch
-              checked={useHipConfigStore.getState().config.terminal?.webgl ?? true}
+              checked={terminalWebgl}
               onCheckedChange={(checked) => {
                 void updateSection('terminal', (prev) => ({ ...(prev ?? {}), webgl: checked }))
               }}
+              data-testid="settings-terminal-webgl"
             />
           </div>
-          <div className="flex items-center justify-between gap-6 px-8 py-4">
+          <div className="flex items-center justify-between gap-6 px-8 py-4" data-testid="settings-terminal-ligatures-row">
             <div className="min-w-0 flex-1">
               <div className="text-body font-medium text-ink">{t('settings.terminalLigatures')}</div>
               <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">
@@ -454,10 +465,11 @@ export function GeneralSettings() {
               </div>
             </div>
             <Switch
-              checked={useHipConfigStore.getState().config.terminal?.ligatures ?? true}
+              checked={terminalLigatures}
               onCheckedChange={(checked) => {
                 void updateSection('terminal', (prev) => ({ ...(prev ?? {}), ligatures: checked }))
               }}
+              data-testid="settings-terminal-ligatures"
             />
           </div>
         </>

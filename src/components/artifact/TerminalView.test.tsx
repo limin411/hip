@@ -168,7 +168,7 @@ describe('TerminalView', () => {
     ptyResize.mockReset().mockResolvedValue(undefined)
     ptyKill.mockReset().mockResolvedValue(undefined)
     useTerminalStore.setState({ bySession: {}, attachedSessionId: null, attachedTerminalId: null })
-    useHipConfigStore.setState({ config: { version: 1 } })
+    useHipConfigStore.setState({ config: { version: 1 }, loaded: true })
     // Reset captured xterm handlers between renders (each render rebinds).
     termMocks.last.searchAddon = null
     termMocks.last.keyHandler = null
@@ -324,7 +324,7 @@ describe('TerminalView surface integrations (P0.1 search / P0.3 title / P0.4 bel
     cleanup()
     mockSession = { config: { cwd: '/Users/me/hip' } }
     useTerminalStore.setState({ bySession: {}, attachedSessionId: null, attachedTerminalId: null })
-    useHipConfigStore.setState({ config: { version: 1 } })
+    useHipConfigStore.setState({ config: { version: 1 }, loaded: true })
     termMocks.last.searchAddon = null
     termMocks.last.keyHandler = null
     termMocks.last.titleHandler = null
@@ -414,7 +414,7 @@ describe('TerminalView surface integrations (P0.1 search / P0.3 title / P0.4 bel
   })
 
   it('bell is suppressed when [terminal].bell = off (P0.4/P0.5)', async () => {
-    useHipConfigStore.setState({ config: { version: 1, terminal: { bell: 'off' } } })
+    useHipConfigStore.setState({ config: { version: 1, terminal: { bell: 'off' } }, loaded: true })
     await mountHosted()
     termMocks.last.bellHandler!()
     expect(screen.queryByTestId('terminal-bell-flash')).toBeNull()

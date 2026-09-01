@@ -15,6 +15,8 @@ const hipConfigState = {
       shell: 'default' as const,
       colorTheme: 'follow' as const,
       bell: 'visual' as const,
+      webgl: undefined as boolean | undefined,
+      ligatures: undefined as boolean | undefined,
     },
     codeBlock: { colorTheme: 'follow' as const },
     knowledge: { docWidth: 'default' as const },
@@ -255,3 +257,57 @@ describe('GeneralSettings terminal bell (P0.5)', () => {
   })
 })
 
+
+describe('GeneralSettings terminal webgl / ligatures', () => {
+  beforeEach(() => {
+    updateSection.mockClear()
+    load.mockClear()
+    hipConfigState.config.terminal = { shell: 'default', colorTheme: 'follow', bell: 'visual' }
+  })
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('GPU switch is on by default and persists webgl via functional merge', async () => {
+    render(<GeneralSettings />)
+    const sw = screen.getByTestId('settings-terminal-webgl')
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(sw)
+    await waitFor(() => {
+      expect(updateSection).toHaveBeenCalledWith('terminal', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      shell?: string
+      webgl?: boolean
+    }) => { shell?: string; webgl?: boolean }
+    expect(updater({ shell: 'zsh', webgl: true })).toEqual({
+      shell: 'zsh',
+      webgl: false,
+    })
+  })
+
+  it('GPU switch reflects subscribed webgl=false (not a one-shot getState read)', () => {
+    hipConfigState.config.terminal = {
+      shell: 'default',
+      colorTheme: 'follow',
+      bell: 'visual',
+      webgl: false,
+    }
+    render(<GeneralSettings />)
+    expect(screen.getByTestId('settings-terminal-webgl')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('ligatures switch is on by default and persists via functional merge', async () => {
+    render(<GeneralSettings />)
+    const sw = screen.getByTestId('settings-terminal-ligatures')
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(sw)
+    await waitFor(() => {
+      expect(updateSection).toHaveBeenCalledWith('terminal', expect.any(Function))
+    })
+    const updater = updateSection.mock.calls[0][1] as (prev: {
+      ligatures?: boolean
+    }) => { ligatures?: boolean }
+    expect(updater({ ligatures: true })).toEqual({ ligatures: false })
+  })
+})

@@ -19,6 +19,7 @@ import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { XtermSurface } from '@/components/artifact/XtermSurface'
+import { focusTerminalCanvas } from '@/components/artifact/terminalCanvasUi'
 import { cn } from '@/lib/utils'
 import { HostKeyMismatchModal } from './HostKeyMismatchModal'
 
@@ -69,6 +70,10 @@ export function ManagedTerminalSession({ terminalId }: { terminalId: string }) {
       try {
         const { getCurrentWindow } = await import('@tauri-apps/api/window')
         await getCurrentWindow().setTitle(next)
+        const active = document.activeElement
+        if (!active || active === document.body) {
+          focusTerminalCanvas(terminalId)
+        }
       } catch {
         /* non-Tauri env (unit tests / web preview) */
       }

@@ -12,3 +12,14 @@ pub(crate) struct BoundModel {
     #[serde(rename = "modelID")]
     pub(crate) model_id: String,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub(crate) struct ActiveModel {
+    // Protocol (packages/protocol) uses capital-ID/URL keys, not plain camelCase.
+    #[serde(rename = "providerID")]
+    pub(crate) provider_id: String,
+    #[serde(rename = "modelID")]
+    pub(crate) model_id: String,
+    #[serde(rename = "baseURL")]
+    pub(crate) base_url: String,
+}

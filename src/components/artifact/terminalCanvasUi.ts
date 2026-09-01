@@ -16,6 +16,8 @@ export type TerminalCanvasApi = {
   hasSelection: () => boolean
   /** Paste text into the terminal (prefer xterm.paste for bracketed-paste). */
   paste: (text: string) => void
+  /** Restore keyboard focus to the live xterm instance. */
+  focus?: () => void
 }
 
 const apis = new Map<string, TerminalCanvasApi>()
@@ -40,4 +42,9 @@ export function getTerminalCanvasSelection(terminalId: string): string {
 /** No-ops if that terminal's canvas is not mounted. */
 export function pasteToTerminalCanvas(terminalId: string, text: string): void {
   apis.get(terminalId)?.paste(text)
+}
+
+/** No-ops if that terminal's canvas is not mounted. */
+export function focusTerminalCanvas(terminalId: string): void {
+  apis.get(terminalId)?.focus?.()
 }

@@ -1,1 +1,1 @@
-PLACEHOLDER_READ_FROM_DISK
+SEE_FILE_/tmp/hip_config_content_only.rs

@@ -268,10 +268,10 @@ describe('GeneralSettings terminal webgl / ligatures', () => {
     cleanup()
   })
 
-  it('GPU switch is on by default and persists webgl via functional merge', async () => {
+  it('GPU switch is off by default and persists webgl via functional merge', async () => {
     render(<GeneralSettings />)
     const sw = screen.getByTestId('settings-terminal-webgl')
-    expect(sw).toHaveAttribute('aria-checked', 'true')
+    expect(sw).toHaveAttribute('aria-checked', 'false')
     fireEvent.click(sw)
     await waitFor(() => {
       expect(updateSection).toHaveBeenCalledWith('terminal', expect.any(Function))

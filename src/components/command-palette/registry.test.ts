@@ -50,7 +50,6 @@ const labels: GlobalCommandLabels = {
     skill: 'Settings: Skills',
     plugins: 'Settings: Plugins',
     hooks: 'Settings: Hooks',
-    im: 'Settings: IM Connectors',
     memory: 'Settings: Memory',
   },
   context: {

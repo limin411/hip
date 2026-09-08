@@ -100,7 +100,6 @@ export type SettingsPageId =
   | 'skill'
   | 'plugins'
   | 'hooks'
-  | 'im'
 
 /** Order matches SettingsPanel NAV_GROUPS (basics → agents). */
 const SETTINGS_PAGE_IDS: readonly SettingsPageId[] = [
@@ -116,7 +115,6 @@ const SETTINGS_PAGE_IDS: readonly SettingsPageId[] = [
   'skill',
   'plugins',
   'hooks',
-  'im',
 ]
 
 function normalizeSettingsPage(v: unknown): SettingsPageId {

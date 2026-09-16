@@ -7,7 +7,6 @@ import {
   localTodayYmd,
   sortWorkItems,
 } from '@/domain/work-items'
-import { useUiStore } from '@/store/uiStore'
 import { useWorkItemStore } from '@/store/workItemStore'
 import { useWorkItemViewStore } from '@/store/workItemViewStore'
 import { useWorkItemUiPrefsStore } from '@/store/workItemUiPrefsStore'
@@ -22,40 +21,28 @@ import { WorkItemDeleteConfirmHost } from './WorkItemDeleteConfirmHost'
 
 const NARROW_MQ = '(max-width: 719px)'
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  const tag = target.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
-  if (target.isContentEditable) return true
-  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
-}
-
 /**
- * Calendar-first work item surface (flag-gated from AppLayout).
- * Loads catalog + color prefs on mount; keyboard shortcuts when activeView is tasks.
+ * Calendar-first work item surface.
+ *
+ * NOTE: currently not mounted anywhere — AppLayout has no 'tasks' view
+ * (see ActiveView in uiStore). Kept for when the surface is re-wired.
+ * Loads catalog + color prefs on mount.
  */
 export function WorkItemsPage() {
   const { t, i18n } = useTranslation()
-  const activeView = useUiStore((s) => s.activeView)
   const loaded = useWorkItemStore((s) => s.loaded)
   const loading = useWorkItemStore((s) => s.loading)
   const error = useWorkItemStore((s) => s.error)
   const items = useWorkItemStore((s) => s.items)
   const filterId = useWorkItemStore((s) => s.filterId)
   const search = useWorkItemStore((s) => s.search)
-  const complete = useWorkItemStore((s) => s.complete)
-  const reopen = useWorkItemStore((s) => s.reopen)
 
   const viewMode = useWorkItemViewStore((s) => s.viewMode)
   const setViewMode = useWorkItemViewStore((s) => s.setViewMode)
   const calendarCursor = useWorkItemViewStore((s) => s.calendarCursor)
   const shiftCalendarMonth = useWorkItemViewStore((s) => s.shiftCalendarMonth)
   const setCalendarCursor = useWorkItemViewStore((s) => s.setCalendarCursor)
-  const highlightId = useWorkItemViewStore((s) => s.highlightId)
-  const setHighlightId = useWorkItemViewStore((s) => s.setHighlightId)
   const requestCreate = useWorkItemViewStore((s) => s.requestCreate)
-  const requestEdit = useWorkItemViewStore((s) => s.requestEdit)
-  const modal = useWorkItemViewStore((s) => s.modal)
 
   const loadPrefs = useWorkItemUiPrefsStore((s) => s.load)
   const colors = useWorkItemUiPrefsStore((s) => s.statusColors)
@@ -77,90 +64,12 @@ export function WorkItemsPage() {
     () => sortWorkItems(filterItems(items, filterId, today, search)),
     [items, filterId, today, search],
   )
-  const visible = viewMode === 'list' ? listItems : calendarItems
-
   const filterTitle = t(`workItems.filters.${filterId}` as 'workItems.filters.all', {
     defaultValue: filterId,
   })
 
   const narrow =
     typeof window !== 'undefined' ? window.matchMedia(NARROW_MQ).matches : false
-
-  useEffect(() => {
-    if (activeView !== 'tasks') return
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return
-      if (modal.mode !== 'closed') return
-      if (isEditableTarget(e.target)) {
-        if (e.key === 'Escape' && e.target instanceof HTMLElement) {
-          e.target.blur()
-          e.preventDefault()
-        }
-        return
-      }
-
-      const key = e.key
-      if (key === 'n' || key === 'N') {
-        e.preventDefault()
-        requestCreate()
-        return
-      }
-      if (key === 'Escape') {
-        e.preventDefault()
-        setHighlightId(null)
-        return
-      }
-      if (key === 'Enter') {
-        if (!highlightId) {
-          if (visible.length === 0) return
-          e.preventDefault()
-          requestEdit(visible[0]!.id)
-          return
-        }
-        e.preventDefault()
-        requestEdit(highlightId)
-        return
-      }
-      if (key === 'j' || key === 'ArrowDown' || key === 'k' || key === 'ArrowUp') {
-        if (viewMode !== 'list' || visible.length === 0) return
-        e.preventDefault()
-        const idx = highlightId ? visible.findIndex((i) => i.id === highlightId) : -1
-        const delta = key === 'j' || key === 'ArrowDown' ? 1 : -1
-        const next =
-          idx < 0
-            ? delta > 0
-              ? 0
-              : visible.length - 1
-            : Math.max(0, Math.min(visible.length - 1, idx + delta))
-        setHighlightId(visible[next]!.id)
-        return
-      }
-      if (key === ' ' || key === 'c' || key === 'C') {
-        if (!highlightId) return
-        e.preventDefault()
-        const item = items.find((i) => i.id === highlightId)
-        if (!item) return
-        if (item.status === 'done') void reopen(item.id)
-        else void complete(item.id)
-      }
-    }
-
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [
-    activeView,
-    complete,
-    highlightId,
-    items,
-    modal.mode,
-    reopen,
-    requestCreate,
-    requestEdit,
-    setHighlightId,
-    viewMode,
-    visible,
-  ])
 
   if (!loaded && loading) {
     return (

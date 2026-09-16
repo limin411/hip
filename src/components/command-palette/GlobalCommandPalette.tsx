@@ -12,7 +12,6 @@ import { useProvidersStore } from '@/store/providersStore'
 import {
   enterSection,
   enterTerminalsSection,
-  enterAutomationsSection,
   openHistoryFromChrome,
   openSettingsFromChrome,
   openSettingsOverlay,

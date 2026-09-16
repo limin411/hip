@@ -1,6 +1,8 @@
 /**
  * Sidebar filters for work-item tracking: smart status filters only.
- * Rendered by AppSidebar when WORK_ITEM_TRACKING && sidebarSection === 'tasks'.
+ *
+ * NOTE: currently not mounted anywhere — AppSidebar has no 'tasks' section
+ * (see SidebarSection in uiStore). Kept for when the surface is re-wired.
  *
  * Color dots + optional recolor (status keys only; 全部 has multi-color / no recolor).
  */

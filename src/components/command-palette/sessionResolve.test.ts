@@ -13,9 +13,9 @@ describe('resolvePaletteSessionId', () => {
   })
 
   it('falls back chat then code on other work surfaces', () => {
-    expect(resolvePaletteSessionId('knowledge', 'c1', 'd1')).toBe('c1')
-    expect(resolvePaletteSessionId('knowledge', null, 'd1')).toBe('d1')
-    expect(resolvePaletteSessionId('tasks', null, null)).toBeNull()
-    expect(resolvePaletteSessionId('tasks', null, 'd1')).toBe('d1')
+    expect(resolvePaletteSessionId('terminals', 'c1', 'd1')).toBe('c1')
+    expect(resolvePaletteSessionId('terminals', null, 'd1')).toBe('d1')
+    expect(resolvePaletteSessionId('automation', null, null)).toBeNull()
+    expect(resolvePaletteSessionId('automation', null, 'd1')).toBe('d1')
   })
 })

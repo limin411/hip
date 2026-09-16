@@ -107,12 +107,6 @@ vi.mock('@/store/workItemUiPrefsStore', () => {
   return { useWorkItemUiPrefsStore }
 })
 
-vi.mock('@/store/uiStore', () => {
-  const useUiStore = (sel: (s: { activeView: string }) => unknown) =>
-    sel({ activeView: 'tasks' })
-  return { useUiStore }
-})
-
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,

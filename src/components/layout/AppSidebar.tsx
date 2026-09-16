@@ -19,7 +19,6 @@ import {
   PanelLeftClose,
   Search,
   Terminal,
-  Timer,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
 import { isMacPlatform } from '@/lib/platform'

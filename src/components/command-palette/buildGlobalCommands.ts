@@ -20,22 +20,12 @@ export type GlobalCommandLabels = {
   groupAppearance: string
   groupSkills: string
   groupFavorites: string
-  groupKnowledge: string
-  /** 文档 group heading for search hits (V2-S1). */
-  groupDocs?: string
-  /** 最近 group heading for recent docs (V2-S1). */
-  groupRecentDocs?: string
   groupRecent?: string
   navChat: string
   navCode: string
   navHistory: string
   navTrash: string
   navSettings: string
-  navKnowledge: string
-  knowledgeHome: string
-  knowledgeNewDoc: string
-  knowledgeIndexing: string
-  knowledgeNeedSpace: string
   actionNewConversation: string
   actionKeyboardShortcuts: string
   actionChangeTheme: string
@@ -45,9 +35,6 @@ export type GlobalCommandLabels = {
   openTerminals?: string
   newLocalTerminal?: string
   quickConnect?: string
-  /** Work item tracking (K19) — optional when flag off / labels omitted. */
-  openWorkItems?: string
-  newWorkItem?: string
   /** Automations page — optional when flag off / labels omitted. */
   openAutomations?: string
   themeLight: string
@@ -121,39 +108,18 @@ export type GlobalCommandContext = {
   skills?: SkillMeta[]
   /** Skill id → enabled; missing key means enabled. */
   skillsEnabled?: Record<string, boolean>
-  /** Shell helpers (preferred over bare setActiveView for leave-knowledge flush). */
+  /** Shell helpers (preferred over bare setActiveView). */
   enterSection?: (section: 'projects' | 'chats') => void | Promise<void>
   openHistoryFromChrome?: () => void | Promise<void>
   openTrashFromChrome?: () => void | Promise<void>
   openSettingsFromChrome?: () => void | Promise<void>
   /** Canonical Settings overlay open (page wins when provided). */
   openSettingsOverlay?: (page?: SettingsPageId) => void
-  enterKnowledge?: () => void | Promise<void>
-  /** Open knowledge surface (chip + activeView). Fallback when enterKnowledge missing. */
-  openKnowledgeView?: () => void
-  openKnowledgeDoc?: (item: {
-    spaceId: string
-    docId: string
-    title: string
-    spaceName: string
-    /** ⌘K search query — workspace scrolls + flashes the match (V2-S1). */
-    query?: string
-  }) => void
-  knowledgeOpenHome?: () => void
-  knowledgeCreateDoc?: () => void
-  searchKnowledgeDocs?: (q: string) => KnowledgeDocHit[]
-  knowledgeIndexReady?: boolean
-  /** Recently opened docs (V2-S1 recent group). */
-  recentDocs?: Array<{ spaceId: string; docId: string; title: string; spaceName: string; at: number }>
   /** Terminal management (K17). */
   enterTerminals?: () => void | Promise<void>
   openLocalTerminal?: () => void | Promise<void>
   /** Open terminals section for quick-connect (popover lives in sidebar). */
   openQuickConnect?: () => void | Promise<void>
-  /** Work item tracking (K19). */
-  enterWorkItems?: () => void | Promise<void>
-  /** Enter work items section then create a new item. */
-  newWorkItem?: () => void | Promise<void>
   /** Automations section (flag-gated). */
   enterAutomations?: () => void | Promise<void>
   /** Open a nested palette page (theme / model / sessions). */
@@ -425,39 +391,6 @@ export function buildGlobalCommandGroups(
         }
       },
     },
-    {
-      id: 'nav-knowledge',
-      label: labels.navKnowledge,
-      icon: 'package',
-      keywords: ['knowledge', 'notes', 'docs', '知识库', '知識庫', '文档管理', '文檔管理', 'markdown'],
-      group: 'navigation',
-      run: () => {
-        if (ctx.enterKnowledge) void ctx.enterKnowledge()
-        else ctx.openKnowledgeView?.()
-      },
-    },
-    {
-      id: 'knowledge-go-home',
-      label: labels.knowledgeHome,
-      icon: 'package',
-      keywords: ['knowledge', 'home', 'spaces', '知识库首页', '知識庫首頁', '文档管理首页', '文檔管理首頁'],
-      group: 'navigation',
-      when: { views: ['knowledge'] },
-      run: () => {
-        ctx.knowledgeOpenHome?.()
-      },
-    },
-    {
-      id: 'knowledge-new-doc',
-      label: labels.knowledgeNewDoc,
-      icon: 'plus',
-      keywords: ['knowledge', 'new', 'doc', '新建文档', '新增文件'],
-      group: 'actions',
-      when: { views: ['knowledge'] },
-      run: () => {
-        ctx.knowledgeCreateDoc?.()
-      },
-    },
   ]
 
   // Terminal management (K17) — only when labels + handlers are provided (flag on).
@@ -480,30 +413,6 @@ export function buildGlobalCommandGroups(
       group: 'navigation',
       run: () => {
         void ctx.enterTerminals?.()
-      },
-    })
-  }
-
-  // Work item tracking (K19) — only when labels + handlers are provided (flag on).
-  if (labels.openWorkItems && ctx.enterWorkItems) {
-    navigation.push({
-      id: 'nav-work-items',
-      label: labels.openWorkItems,
-      icon: 'check-square',
-      keywords: [
-        'work',
-        'items',
-        'tasks',
-        'todo',
-        '事项',
-        '事項',
-        'タスク',
-        '할 일',
-        labels.openWorkItems,
-      ],
-      group: 'navigation',
-      run: () => {
-        void ctx.enterWorkItems?.()
       },
     })
   }
@@ -625,30 +534,6 @@ export function buildGlobalCommandGroups(
       run: () => {
         if (ctx.openQuickConnect) void ctx.openQuickConnect()
         else void ctx.enterTerminals?.()
-      },
-    })
-  }
-
-  if (labels.newWorkItem && ctx.newWorkItem) {
-    actions.push({
-      id: 'action-new-work-item',
-      label: labels.newWorkItem,
-      icon: 'plus',
-      keywords: [
-        'work',
-        'item',
-        'new',
-        'todo',
-        'task',
-        '新建事项',
-        '新增事項',
-        '新規',
-        '새 항목',
-        labels.newWorkItem,
-      ],
-      group: 'actions',
-      run: () => {
-        void ctx.newWorkItem?.()
       },
     })
   }

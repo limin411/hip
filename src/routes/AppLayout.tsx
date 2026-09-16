@@ -17,11 +17,10 @@ import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { MainToolbar } from '@/components/layout/MainToolbar'
 import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
-import { KnowledgePage } from '@/components/knowledge/KnowledgePage'
+
 import { OverlayShellHost } from '@/components/layout/OverlayShellHost'
 import { SettingsPage } from '@/components/account/SettingsPage'
-import { KnowledgeOutlinePanel } from '@/components/knowledge/KnowledgeOutlinePanel'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+
 import {
   GlobalCommandPalette,
   GlobalHotkeysBinder,
@@ -31,8 +30,7 @@ import { ManagedTerminalDialogHost } from '@/components/terminals/ManagedTermina
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { TerminalManagementPage } from '@/components/terminals/TerminalManagementPage'
-import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
-import { WorkItemsPage } from '@/components/work-items/WorkItemsPage'
+
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { AutomationsPage } from '@/components/automation/AutomationsPage'
 import { AutomationRunHost } from '@/components/automation/AutomationRunHost'
@@ -136,10 +134,8 @@ export function AppLayout() {
     }
   }, [])
 
-  const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
   const terminalPanelOpen = useUiStore((s) => s.terminalPanelOpen)
   const sidebarOpen = useUiStore((s) => s.sidebarOpen)
-  const knowledgeMode = useKnowledgeStore((s) => s.mode)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   const focusedManaged = useManagedTerminalStore((s) =>
     s.focusedId ? s.terminals.find((t) => t.id === s.focusedId) : undefined,
@@ -152,12 +148,6 @@ export function AppLayout() {
     !settingsOpen && activeView === 'code' && activeSession?.codePanelOpen === true
   const chatOpen =
     !settingsOpen && activeView === 'chat' && activeSession?.chatPanelOpen === true
-  // Only in a space workspace — home has no doc outline.
-  const knowledgeOpen =
-    !settingsOpen &&
-    activeView === 'knowledge' &&
-    knowledgeMode === 'workspace' &&
-    knowledgePanelOpen
   // Terminal files rail: focused managed session + toolbar toggle (like KB outline).
   const terminalsOpen =
     !settingsOpen &&
@@ -166,18 +156,16 @@ export function AppLayout() {
     !!focusedManagedId &&
     !!focusedManaged &&
     terminalPanelOpen
-  const rightOpen = codeOpen || chatOpen || knowledgeOpen || terminalsOpen
+  const rightOpen = codeOpen || chatOpen || terminalsOpen
 
   // —— Right rail open/close animation state ——
-  type DrawerKind = 'code' | 'knowledge' | 'terminals' | 'chat'
+  type DrawerKind = 'code' | 'terminals' | 'chat'
   // Which rail kind renders right now (all four flags are false while closed).
   const liveDrawerKind: DrawerKind = codeOpen
     ? 'code'
-    : knowledgeOpen
-      ? 'knowledge'
-      : terminalsOpen
-        ? 'terminals'
-        : 'chat'
+    : terminalsOpen
+      ? 'terminals'
+      : 'chat'
   // Last open kind, kept so the exit animation renders the same content.
   const lastDrawerKindRef = useRef<DrawerKind>('chat')
   useEffect(() => {
@@ -286,10 +274,6 @@ export function AppLayout() {
   }, [rightOpen, beginRailAnim])
 
   const handleCollapse = () => {
-    if (activeView === 'knowledge') {
-      useUiStore.getState().setKnowledgePanelOpen(false)
-      return
-    }
     if (activeView === 'terminals') {
       useUiStore.getState().setTerminalPanelOpen(false)
       return
@@ -304,10 +288,6 @@ export function AppLayout() {
   }
 
   const handleExpand = () => {
-    if (activeView === 'knowledge') {
-      useUiStore.getState().setKnowledgePanelOpen(true)
-      return
-    }
     if (activeView === 'terminals') {
       useUiStore.getState().setTerminalPanelOpen(true)
       return
@@ -321,7 +301,6 @@ export function AppLayout() {
     // Settings: sidebar category rail + main column body (not a modal shell).
     if (overlay === 'settings') return <SettingsPage />
     // History / Trash remain modal shells (OverlayShellHost).
-    if (activeView === 'knowledge') return <KnowledgePage />
     if (activeView === 'terminals') {
       if (TERMINAL_MANAGEMENT) {
         return <TerminalManagementPage />
@@ -331,16 +310,6 @@ export function AppLayout() {
           titleKey="sidebar.nav.terminals"
           descriptionKey="placeholder.terminals"
           testId="placeholder-terminals"
-        />
-      )
-    }
-    if (activeView === 'tasks') {
-      if (WORK_ITEM_TRACKING) return <WorkItemsPage />
-      return (
-        <PlaceholderPage
-          titleKey="sidebar.nav.tasks"
-          descriptionKey="placeholder.tasks"
-          testId="placeholder-tasks"
         />
       )
     }
@@ -438,8 +407,6 @@ export function AppLayout() {
               >
                 {drawerKind === 'code' ? (
                   <ArtifactPanel />
-                ) : drawerKind === 'knowledge' ? (
-                  <KnowledgeOutlinePanel />
                 ) : drawerKind === 'terminals' && focusedManaged ? (
                   <TerminalRightPanel
                     terminalId={focusedManaged.id}

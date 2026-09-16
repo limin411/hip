@@ -5,22 +5,19 @@
  */
 import { sessionService, useDomainStore } from '@/domain'
 import { coerceUnderlyingFromEntry } from '@/lib/overlayNav'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { type NavEntry, useNavHistoryStore } from '@/store/navHistoryStore'
 import { useUiStore, type ActiveView } from '@/store/uiStore'
-import { useWorkItemStore } from '@/store/workItemStore'
 
 export function captureNavEntry(): NavEntry {
   const ui = useUiStore.getState()
   const domain = useDomainStore.getState()
-  const kb = useKnowledgeStore.getState()
   const managed = useManagedTerminalStore.getState()
   return {
     activeView: ui.activeView,
     sidebarSection: ui.sidebarSection,
     sessionId: domain.activeSessionId,
-    knowledgeSpaceId: kb.activeSpaceId,
+    knowledgeSpaceId: null,
     settingsPage: ui.settingsPage,
     managedTerminalId: managed.focusedId,
   }
@@ -47,36 +44,7 @@ export function seedColdLaunchNavHistory(): void {
   useNavHistoryStore.getState().reset(captureNavEntry())
 }
 
-async function flushKnowledgeIfNeeded(leavingKnowledge: boolean): Promise<void> {
-  if (!leavingKnowledge) return
-  try {
-    await useKnowledgeStore.getState().flushSave()
-  } catch {
-    // non-Tauri / not loaded
-  }
-}
 
-/** K19: finalize + drain work-item save chain when leaving tasks (mirrors leaveWorkItems). */
-async function flushWorkItemsIfNeeded(leavingTasks: boolean): Promise<void> {
-  if (!leavingTasks) return
-  try {
-    await useWorkItemStore.getState().flushSave()
-  } catch {
-    // non-Tauri / not loaded
-  }
-}
-
-async function restoreKnowledge(spaceId: string | null): Promise<void> {
-  useUiStore.getState().openKnowledgeView()
-  useUiStore.getState().setSidebarSection('knowledge')
-  const kb = useKnowledgeStore.getState()
-  if (!kb.loaded) {
-    await kb.loadSpaces()
-  }
-  if (spaceId && useKnowledgeStore.getState().spaces.some((s) => s.id === spaceId)) {
-    await useKnowledgeStore.getState().openSpace(spaceId)
-  }
-}
 
 /**
  * Restore a history entry. Suppresses recording while applying.
@@ -88,15 +56,6 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
   try {
     // Always clear overlay first — back/forward restores work surface, not shells.
     useUiStore.getState().setOverlay(null)
-
-    const prevView = useUiStore.getState().activeView
-    if (prevView === 'knowledge' && entry.activeView !== 'knowledge') {
-      await flushKnowledgeIfNeeded(true)
-    }
-    // K19: leave tasks (finalize + save chain) before restoring non-tasks entry.
-    if (prevView === 'tasks' && entry.activeView !== 'tasks') {
-      await flushWorkItemsIfNeeded(true)
-    }
 
     // Legacy special-view frames: settings/history/trash reopen as overlays over coerced surface.
     const legacyOverlay =
@@ -125,11 +84,6 @@ export async function applyNavEntry(entry: NavEntry): Promise<void> {
 
     // After legacy branch, activeView is a real work surface.
     const view = entry.activeView as ActiveView
-
-    if (view === 'knowledge') {
-      await restoreKnowledge(entry.knowledgeSpaceId)
-      return
-    }
 
     useUiStore.getState().setSidebarSection(entry.sidebarSection)
     useUiStore.getState().setActiveView(view)

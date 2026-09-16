@@ -30,8 +30,6 @@ import { terminalAgentSessionProvider } from './providers/terminalAgentSession'
 import { sftpEntryProvider } from './providers/sftpEntry'
 import { termFsEntryProvider } from './providers/termFsEntry'
 import { toolCallProvider } from './providers/toolCall'
-import { workItemProvider } from './providers/workItem'
-import { workItemBlankProvider } from './providers/workItemBlank'
 import { trashEntryProvider } from './providers/trashEntry'
 
 /**
@@ -59,8 +57,6 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   sftpEntryProvider,
   termFsEntryProvider,
   toolCallProvider,
-  workItemProvider,
-  workItemBlankProvider,
   trashEntryProvider,
 ]
 

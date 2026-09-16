@@ -61,9 +61,7 @@ export function coerceUnderlyingFromEntry(entry: NavEntry): WorkSurface {
     }
   }
   if (
-    entry.sidebarSection === 'knowledge' ||
     entry.sidebarSection === 'terminals' ||
-    entry.sidebarSection === 'tasks' ||
     entry.sidebarSection === 'automation'
   ) {
     return {

@@ -10,16 +10,8 @@ import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
 import {
-  isKnowledgeIndexReady,
-  searchKnowledgeDocs,
-  useKnowledgeStore,
-} from '@/store/knowledgeStore'
-import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
-import {
-  enterKnowledge,
   enterSection,
   enterTerminalsSection,
-  enterWorkItemsSection,
   enterAutomationsSection,
   openHistoryFromChrome,
   openSettingsFromChrome,
@@ -27,7 +19,6 @@ import {
   openTrashFromChrome,
 } from '@/components/layout/sidebarActions'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
-import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
@@ -51,7 +42,7 @@ import { detectIsMac } from './keys'
 import { filterGroupsByMode, parsePaletteQuery } from './queryPrefix'
 import { rankGroups } from './rankGlobalCommands'
 import { buildRecentGroup } from './recent'
-import { buildAllGroups, buildKnowledgeRecentDocsGroup } from './registry'
+import { buildAllGroups } from './registry'
 import { resolvePaletteSessionId } from './sessionResolve'
 import { ShortcutsHelpDialog } from './ShortcutsHelpDialog'
 import type { GlobalCommand, PalettePageId } from './types'
@@ -74,11 +65,8 @@ export function GlobalCommandPalette() {
   const chatSessionId = useUiStore((s) => s.chatSessionId)
   const codeSessionId = useUiStore((s) => s.codeSessionId)
   const setActiveView = useUiStore((s) => s.setActiveView)
-  const openKnowledgeView = useUiStore((s) => s.openKnowledgeView)
   const setTheme = useUiStore((s) => s.setTheme)
   const setSettingsPage = useUiStore((s) => s.setSettingsPage)
-  const knowledgeIndexStatus = useKnowledgeStore((s) => s.indexStatus)
-  const recentDocs = useKnowledgeStore((s) => s.recent)
   const draft = useDraftStore((s) => s.draft)
   const setDraftModelKey = useDraftStore((s) => s.setModelKey)
   const catalog = useProvidersStore((s) => s.catalog)
@@ -127,19 +115,11 @@ export function GlobalCommandPalette() {
       groupSkills: t('commandPalette.groups.skills'),
       groupFavorites: t('commandPalette.groups.favorites'),
       groupRecent: t('commandPalette.groups.recent'),
-      groupDocs: t('commandPalette.groups.docs'),
-      groupRecentDocs: t('commandPalette.groups.recentDocs'),
-      groupKnowledge: t('commandPalette.groups.knowledge'),
       navChat: t('nav.chat'),
       navCode: t('nav.code'),
       navHistory: t('nav.history'),
       navTrash: t('nav.trash'),
       navSettings: t('nav.settings'),
-      navKnowledge: t('commandPalette.navKnowledge'),
-      knowledgeHome: t('commandPalette.knowledgeHome'),
-      knowledgeNewDoc: t('commandPalette.knowledgeNewDoc'),
-      knowledgeIndexing: t('commandPalette.knowledgeIndexing'),
-      knowledgeNeedSpace: t('commandPalette.knowledgeNeedSpace'),
       actionNewConversation: t('commandPalette.actions.newConversation'),
       actionKeyboardShortcuts: t('commandPalette.actions.keyboardShortcuts'),
       actionChangeTheme: t('commandPalette.actions.changeTheme'),
@@ -150,12 +130,6 @@ export function GlobalCommandPalette() {
             openTerminals: t('commandPalette.openTerminals'),
             newLocalTerminal: t('commandPalette.newLocalTerminal'),
             quickConnect: t('commandPalette.quickConnect'),
-          }
-        : {}),
-      ...(WORK_ITEM_TRACKING
-        ? {
-            openWorkItems: t('commandPalette.openWorkItems'),
-            newWorkItem: t('commandPalette.newWorkItem'),
           }
         : {}),
       ...(AUTOMATION_PAGE
@@ -244,54 +218,6 @@ export function GlobalCommandPalette() {
       openTrashFromChrome: () => void openTrashFromChrome(),
       openSettingsFromChrome: () => void openSettingsFromChrome(),
       openSettingsOverlay: (page?: SettingsPageId) => openSettingsOverlay(page),
-      enterKnowledge: () => void enterKnowledge(),
-      openKnowledgeView: () => {
-        openKnowledgeView()
-        void useKnowledgeStore.getState().loadSpaces()
-      },
-      openKnowledgeDoc: (item: {
-        spaceId: string
-        docId: string
-        title: string
-        spaceName: string
-        query?: string
-      }) => {
-        if (item.query) {
-          useKnowledgeStore.getState().setPendingReveal({
-            query: item.query,
-            spaceId: item.spaceId,
-            docId: item.docId,
-          })
-        }
-        openKnowledgeView()
-        void useKnowledgeStore.getState().openRecent({
-          spaceId: item.spaceId,
-          docId: item.docId,
-          title: item.title,
-          spaceName: item.spaceName,
-          at: Date.now(),
-        })
-      },
-      knowledgeOpenHome: () => {
-        openKnowledgeView()
-        void useKnowledgeStore.getState().openHome()
-      },
-      knowledgeCreateDoc: () => {
-        const st = useKnowledgeStore.getState()
-        if (!st.activeSpaceId || st.mode !== 'workspace') {
-          toast.message(t('commandPalette.knowledgeNeedSpace'))
-          return
-        }
-        const parentId = resolveParentForNew({
-          treeFocusId: st.treeFocusId,
-          activeDocId: st.activeDocId,
-          nodes: st.nodes,
-        })
-        void st.requestCreateDoc(parentId, t('knowledge.doc.untitled'))
-      },
-      searchKnowledgeDocs: (q: string) => searchKnowledgeDocs(q),
-      knowledgeIndexReady: knowledgeIndexStatus === 'ready' || isKnowledgeIndexReady(),
-      recentDocs,
       ...(TERMINAL_MANAGEMENT
         ? {
             enterTerminals: () => void enterTerminalsSection({ library: true }),
@@ -316,18 +242,6 @@ export function GlobalCommandPalette() {
             },
           }
         : {}),
-      ...(WORK_ITEM_TRACKING
-        ? {
-            enterWorkItems: () => void enterWorkItemsSection(),
-            newWorkItem: async () => {
-              await enterWorkItemsSection()
-              const { useWorkItemViewStore } = await import(
-                '@/store/workItemViewStore'
-              )
-              useWorkItemViewStore.getState().requestCreate()
-            },
-          }
-        : {}),
       ...(AUTOMATION_PAGE
         ? {
             enterAutomations: () => void enterAutomationsSection(),
@@ -341,7 +255,6 @@ export function GlobalCommandPalette() {
       labels,
       sessionId,
       setActiveView,
-      openKnowledgeView,
       setTheme,
       setSettingsPage,
       t,
@@ -349,12 +262,10 @@ export function GlobalCommandPalette() {
       parsed.needle,
       skills,
       skillsEnabled,
-      knowledgeIndexStatus,
       modelOptions,
       currentModelKey,
       setDraftModelKey,
       search,
-      recentDocs,
     ],
   )
 
@@ -384,8 +295,6 @@ export function GlobalCommandPalette() {
       const head: typeof built = []
       if (fav) head.push(fav)
       if (recent) head.push(recent)
-      const recentDocsGroup = buildKnowledgeRecentDocsGroup(ctx)
-      if (recentDocsGroup) head.push(recentDocsGroup)
       return head.length > 0 ? [...head, ...built] : built
     }
     return built
@@ -397,7 +306,6 @@ export function GlobalCommandPalette() {
     parsed.needle,
     labels.groupFavorites,
     labels.groupRecent,
-    labels.groupRecentDocs,
     favoriteIds,
     usage,
   ])

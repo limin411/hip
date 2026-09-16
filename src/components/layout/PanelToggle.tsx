@@ -5,7 +5,7 @@ import type { ArtifactTab, ChatTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useFocusStore } from '@/store/focusStore'
 import { Button } from '@/components/ui/Button'
@@ -19,7 +19,7 @@ import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 
 type PanelTabOption = {
-  value: ArtifactTab | ChatTab | 'knowledge-outline' | 'terminal-files'
+  value: ArtifactTab | ChatTab | 'terminal-files'
   label: string
   gated?: boolean
 }
@@ -29,9 +29,7 @@ export type PanelToggleSlot = 'toolbar' | 'panel'
 /** Whether the shell right rail is open for the current view. */
 export function useRightPanelOpen(): boolean {
   const activeView = useUiStore((s) => s.activeView)
-  const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
   const terminalPanelOpen = useUiStore((s) => s.terminalPanelOpen)
-  const kbMode = useKnowledgeStore((s) => s.mode)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   const activeSessionId = useActiveSessionId()
   const codePanelOpen = useDomainStore((s) =>
@@ -41,9 +39,6 @@ export function useRightPanelOpen(): boolean {
     activeSessionId ? s.sessions.find((x) => x.id === activeSessionId)?.chatPanelOpen === true : false,
   )
 
-  if (activeView === 'knowledge') {
-    return kbMode === 'workspace' && knowledgePanelOpen
-  }
   if (activeView === 'terminals') {
     return TERMINAL_MANAGEMENT && !!focusedManagedId && terminalPanelOpen
   }
@@ -68,17 +63,12 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   const setTab = useUiStore((s) => s.setTab)
   const chatActiveTab = useUiStore((s) => s.chatActiveTab)
   const setChatActiveTab = useUiStore((s) => s.setChatActiveTab)
-  const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
-  const setKnowledgePanelOpen = useUiStore((s) => s.setKnowledgePanelOpen)
   const terminalPanelOpen = useUiStore((s) => s.terminalPanelOpen)
   const setTerminalPanelOpen = useUiStore((s) => s.setTerminalPanelOpen)
   const setTerminalPanelTab = useUiStore((s) => s.setTerminalPanelTab)
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const resetChatActiveTab = useUiStore((s) => s.resetChatActiveTab)
-  const kbMode = useKnowledgeStore((s) => s.mode)
-  const kbActiveDocId = useKnowledgeStore((s) => s.activeDocId)
-  const kbNodes = useKnowledgeStore((s) => s.nodes)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   const focusedManagedKind = useManagedTerminalStore((s) =>
     s.focusedId ? s.terminals.find((t) => t.id === s.focusedId)?.kind : undefined,
@@ -95,10 +85,6 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
   if (slot === 'panel' && !panelOpen) return null
 
   const collapse = () => {
-    if (activeView === 'knowledge') {
-      setKnowledgePanelOpen(false)
-      return
-    }
     if (activeView === 'terminals') {
       setTerminalPanelOpen(false)
       return
@@ -121,63 +107,6 @@ export function PanelToggle({ slot = 'toolbar' }: { slot?: PanelToggleSlot }) {
     <PanelRight size={17} />
   )
   const triggerTitle = panelOpen ? t('artifact.closePanel') : t('chat.togglePanel')
-
-  // Knowledge: no session required; show outline/canvas when a space workspace is open.
-  if (activeView === 'knowledge') {
-    if (kbMode !== 'workspace') return null
-    const activeNode = kbNodes?.find((n) => n.id === kbActiveDocId)
-    const isBoard =
-      activeNode?.kind === 'board' ||
-      (kbActiveDocId != null && kbActiveDocId.startsWith('brd_'))
-    const knowledgePanelLabel = isBoard
-      ? t('knowledge.board.panelTitle')
-      : t('knowledge.outline.title')
-    // Expanded: one-click collapse at the former X slot (single option surface).
-    if (panelOpen) {
-      return (
-        <Button
-          variant="ghost"
-          size="icon"
-          title={triggerTitle}
-          data-tauri-drag-region="false"
-          data-no-drag
-          data-testid="knowledge-outline-panel-close"
-          onClick={collapse}
-          aria-expanded={true}
-        >
-          {triggerIcon}
-        </Button>
-      )
-    }
-    return (
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            title={triggerTitle}
-            data-tauri-drag-region="false"
-            data-no-drag
-            data-testid="toggle-panel"
-            aria-expanded={false}
-          >
-            {triggerIcon}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" data-testid="panel-tab-menu">
-          <DropdownMenuItem
-            onSelect={() => setKnowledgePanelOpen(true)}
-            data-testid="panel-tab-knowledge-outline"
-          >
-            <span className="flex w-4 shrink-0 items-center justify-center">
-              {knowledgePanelOpen ? <Check size={14} className="text-accent" /> : null}
-            </span>
-            {knowledgePanelLabel}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    )
-  }
 
   // Terminal management: files tree in the shell right rail (same chrome as chat/code/KB).
   // Only when a managed session is focused — HostLibrary landing has no files panel.

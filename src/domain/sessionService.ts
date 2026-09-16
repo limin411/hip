@@ -297,12 +297,10 @@ export class SessionService {
     }
 
     // Cold launch / reconnect with no active session: New Conversation.
-    // Force-clear knowledge (and other non-chat shells) + any residual overlay.
+    // Force-clear non-chat shells + any residual overlay.
     const st = useUiStore.getState()
     const special =
-      st.activeView === 'knowledge' ||
       st.activeView === 'terminals' ||
-      st.activeView === 'tasks' ||
       st.activeView === 'automation'
     if (special || st.overlay != null) {
       useUiStore.setState({

@@ -15,28 +15,12 @@ const DROP_ORDER = [
   'workItem.cancel',
   'workItem.setInProgress',
   'workItem.openUrl',
-  'workItem.openKnowledge',
   'workItem.openSession',
   'workItem.archive',
   'workItem.unarchive',
 ] as const
 
-/** Dynamic imports avoid loading sidebarActions → sessionService at module init (tests). */
-async function openWorkItemKnowledgeLink(spaceId: string, docId: string): Promise<void> {
-  const [{ leaveWorkItems }, { useUiStore }, { useKnowledgeStore }] = await Promise.all([
-    import('@/components/layout/sidebarActions'),
-    import('@/store/uiStore'),
-    import('@/store/knowledgeStore'),
-  ])
-  if (useUiStore.getState().activeView === 'tasks') {
-    await leaveWorkItems()
-  }
-  useUiStore.getState().openKnowledgeView()
-  useUiStore.getState().setSidebarSection('knowledge')
-  const kb = useKnowledgeStore.getState()
-  if (!kb.loaded) await kb.loadSpaces()
-  await useKnowledgeStore.getState().openSpace(spaceId, { selectDocId: docId })
-}
+
 
 async function openExternalUrl(url: string): Promise<void> {
   try {
@@ -166,16 +150,6 @@ export const workItemProvider: ContextProvider = (req, ctx) => {
         void import('@/components/layout/sidebarActions').then(({ selectSessionFromSidebar }) => {
           void selectSessionFromSidebar(links.sessionId!)
         })
-      },
-    })
-  }
-  if (links.knowledge?.spaceId && links.knowledge.docId) {
-    candidates.push({
-      id: 'workItem.openKnowledge',
-      label: ctx.t('contextMenu.workItem.openKnowledge'),
-      group: 'navigation',
-      run: () => {
-        void openWorkItemKnowledgeLink(links.knowledge!.spaceId, links.knowledge!.docId)
       },
     })
   }

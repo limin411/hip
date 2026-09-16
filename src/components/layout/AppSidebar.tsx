@@ -13,9 +13,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ClipboardCheck,
   Code2,
-  Folder,
   MessageSquare,
   Monitor,
   PanelLeftClose,
@@ -31,7 +29,7 @@ import { groupSessionsByDate } from '@/lib/sessionDateGroups'
 import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useCaptionTitleDoubleClick } from './WindowCaptionButtons'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+
 import { useProjectPathStore } from '@/store/projectPathStore'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import {
@@ -43,19 +41,16 @@ import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { terminalSessionsFor, useTerminalAgentStore } from '@/store/terminalAgentStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
-import { DirNavList } from '@/components/knowledge/DirNavList'
+
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
-import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
-import { WorkItemSidebarLists } from '@/components/work-items/WorkItemSidebarLists'
+
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { AutomationSidebarList } from '@/components/automation/AutomationSidebarList'
 import {
-  enterKnowledge,
   enterPlaceholderSection,
   enterSection,
   enterTerminalsSection,
-  enterWorkItemsSection,
   enterAutomationsSection,
   newConversationFromSidebar,
   openSettingsFromChrome,
@@ -98,8 +93,7 @@ export function AppSidebar() {
   const overlay = useUiStore((s) => s.overlay)
   const sessions = useSessions()
   const activeSessionId = useActiveSessionId()
-  const spaces = useKnowledgeStore((s) => s.spaces)
-  const kbNodes = useKnowledgeStore((s) => s.nodes)
+
   const managedTerminals = useManagedTerminalStore((s) => s.terminals)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
   const sidebarExpanded = useTerminalAgentStore((s) => s.sidebarExpanded)
@@ -213,14 +207,7 @@ export function AppSidebar() {
     useProjectPathStore.getState().ensureChecked(projectSessionGroups.map((g) => g.cwd ?? g.pathKey))
   }, [sidebarSection, projectSessionGroups])
 
-  const filteredSpaces = useMemo(() => {
-    if (sidebarSection !== 'knowledge') return []
-    const list = [...spaces]
-    // Ascending by name (locale-aware, case-insensitive).
-    list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-    return list
-  }, [spaces, sidebarSection])
-  void filteredSpaces // v2: 侧边栏已改为单层级目录（DirNavList），空间列表不再展示
+
 
   const projectCount = useMemo(
     () =>
@@ -234,36 +221,23 @@ export function AppSidebar() {
   )
 
   const onNav = (section: SidebarSection) => {
-    if (section === 'knowledge') void enterKnowledge()
-    else if (section === 'terminals' && TERMINAL_MANAGEMENT)
+    if (section === 'terminals' && TERMINAL_MANAGEMENT)
       void enterTerminalsSection({ library: true })
-    else if (section === 'tasks' && WORK_ITEM_TRACKING) void enterWorkItemsSection()
     else if (section === 'automation' && AUTOMATION_PAGE) void enterAutomationsSection()
     else if (isPlaceholderSidebarSection(section)) void enterPlaceholderSection(section)
     else if (section === 'projects' || section === 'chats') void enterSection(section)
   }
 
-  /** 文档管理：标题栏后退/前进作用于目录历史（与视觉稿一致）；其他视图走 shell 历史。 */
-  /** 导航徽标：顶层条目数（文件夹 + 文档）。 */
-  const topLevelCount = useMemo(
-    () => kbNodes.filter((n) => n.parentId === null).length,
-    [kbNodes],
-  )
-
   const listLabel =
-    sidebarSection === 'knowledge'
-      ? t('sidebar.list.spaces')
-      : sidebarSection === 'projects'
-        ? t('sidebar.list.projects')
-        : sidebarSection === 'chats'
-          ? t('sidebar.list.chats')
-          : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT
-            ? t('sidebar.list.terminals')
-            : sidebarSection === 'tasks' && WORK_ITEM_TRACKING
-              ? t('sidebar.list.workItems')
-              : sidebarSection === 'automation' && AUTOMATION_PAGE
-                ? t('sidebar.list.automations')
-                : t(`sidebar.nav.${sidebarSection}`)
+    sidebarSection === 'projects'
+      ? t('sidebar.list.projects')
+      : sidebarSection === 'chats'
+        ? t('sidebar.list.chats')
+        : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT
+          ? t('sidebar.list.terminals')
+          : sidebarSection === 'automation' && AUTOMATION_PAGE
+            ? t('sidebar.list.automations')
+            : t(`sidebar.nav.${sidebarSection}`)
 
   const toggleProjectGroup = (groupId: string) => {
     setProjectGroupCollapsed((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
@@ -390,28 +364,11 @@ export function AppSidebar() {
           onClick={() => onNav('projects')}
         />
         <NavItem
-          section="knowledge"
-          active={sidebarSection === 'knowledge'}
-          label={t('sidebar.nav.knowledge')}
-          icon={<Folder size={16} strokeWidth={1.75} />}
-          count={topLevelCount > 0 ? topLevelCount : undefined}
-          onClick={() => onNav('knowledge')}
-        />
-        <NavItem
           section="terminals"
           active={sidebarSection === 'terminals' && activeView === 'terminals'}
           label={t('sidebar.nav.terminals')}
           icon={<Monitor size={16} strokeWidth={1.75} />}
           onClick={() => onNav('terminals')}
-        />
-        <NavItem
-          section="tasks"
-          // Section-only (like chats/knowledge): Settings keeps `tasks` so the
-          // rail stays on Tasks; trash/history still reassign section away.
-          active={sidebarSection === 'tasks'}
-          label={t('sidebar.nav.tasks')}
-          icon={<ClipboardCheck size={16} strokeWidth={1.75} />}
-          onClick={() => onNav('tasks')}
         />
         <NavItem
           section="automation"
@@ -435,7 +392,7 @@ export function AppSidebar() {
           >
             {listLabel}
           </span>
-          {sidebarSection === 'knowledge' ? null : sidebarSection === 'projects' ? (
+          {sidebarSection === 'projects' ? (
             <button
               type="button"
               data-testid="sidebar-new-task"
@@ -459,24 +416,6 @@ export function AppSidebar() {
             </button>
           ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
             <QuickConnectPopover />
-          ) : sidebarSection === 'tasks' && WORK_ITEM_TRACKING ? (
-            <button
-              type="button"
-              data-testid="sidebar-new-work-item"
-              data-no-drag
-              onClick={() => {
-                void (async () => {
-                  await enterWorkItemsSection()
-                  const { useWorkItemViewStore } = await import(
-                    '@/store/workItemViewStore'
-                  )
-                  useWorkItemViewStore.getState().requestCreate()
-                })()
-              }}
-              className="rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
-            >
-              {t('sidebar.newWorkItem')}
-            </button>
           ) : sidebarSection === 'automation' && AUTOMATION_PAGE ? (
             <button
               type="button"
@@ -498,9 +437,7 @@ export function AppSidebar() {
           ) : null}
         </div>
 
-        {sidebarSection === 'tasks' && WORK_ITEM_TRACKING ? (
-          <WorkItemSidebarLists />
-        ) : sidebarSection === 'automation' && AUTOMATION_PAGE ? (
+        {sidebarSection === 'automation' && AUTOMATION_PAGE ? (
           <AutomationSidebarList />
         ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
           managedTerminals.length === 0 ? (
@@ -703,10 +640,6 @@ export function AppSidebar() {
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {t('placeholder.comingSoon')}
           </p>
-        ) : sidebarSection === 'knowledge' ? (
-          <div className="flex min-h-0 flex-col">
-            <DirNavList />
-          </div>
         ) : filteredSessions.length === 0 ? (
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {t('sidebar.emptySessions')}

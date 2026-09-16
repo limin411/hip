@@ -23,7 +23,6 @@ export type CommandSource =
   | 'action'
   | 'skill'
   | 'session'
-  | 'knowledge'
   | 'nav'
   | 'settings'
 

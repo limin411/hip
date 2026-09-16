@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   MessageSquare,
   Code2,
-  BookOpen,
-  ListTodo,
   Zap,
   RotateCcw,
   Trash2,
@@ -26,29 +24,12 @@ import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 import { useTrashBadgeStore } from '@/store/trashBadgeStore'
 import {
-  knowledgeEmptyTrash,
-  knowledgeHardDeleteTrashEntry,
-  knowledgeListTrash,
-  knowledgePurgeExpiredTrash,
-  knowledgeRestoreTrashEntry,
-  type KnowledgeTrashItem,
-} from '@/ipc/knowledge'
-import {
-  emptyWorkItemsTrash,
-  hardDeleteWorkItemTrashEntry,
-  listWorkItemsTrash,
-  purgeExpiredWorkItemsTrash,
-  type WorkItemTrashItem,
-} from '@/ipc/workItems'
-import {
   emptyAutomationsTrash,
   hardDeleteAutomationTrashEntry,
   listAutomationsTrash,
   purgeExpiredAutomationsTrash,
   type AutomationTrashItem,
 } from '@/ipc/automations'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
-import { useWorkItemStore } from '@/store/workItemStore'
 import { useAutomationStore } from '@/store/automationStore'
 import { useUiStore } from '@/store/uiStore'
 import { toast } from 'sonner'
@@ -57,7 +38,7 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 /** Show pagination when total items exceed one page. */
 const PAGE_SIZE = 10
 
-type KindFilter = 'all' | 'chat' | 'code' | 'knowledge' | 'workItems' | 'automations'
+type KindFilter = 'all' | 'chat' | 'code' | 'automations'
 
 type UnifiedRow =
   | {
@@ -69,23 +50,6 @@ type UnifiedRow =
       deletedAt: number
       preview?: string
       deleteDerivedMemories: boolean
-    }
-  | {
-      key: string
-      source: 'knowledge'
-      id: string
-      title: string
-      entityKind: KnowledgeTrashItem['kind']
-      deletedAt: number
-      spaceName?: string
-    }
-  | {
-      key: string
-      source: 'workItem'
-      id: string
-      title: string
-      deletedAt: number
-      status: string
     }
   | {
       key: string
@@ -113,10 +77,6 @@ export function RecycleBinPage({
   const retentionDays = resolveTrashRetentionDays(retentionRaw)
   const locale = i18n.language || 'en'
 
-  const [knowledge, setKnowledge] = useState<KnowledgeTrashItem[]>([])
-  const [knowledgeLoaded, setKnowledgeLoaded] = useState(false)
-  const [workItems, setWorkItems] = useState<WorkItemTrashItem[]>([])
-  const [workItemsLoaded, setWorkItemsLoaded] = useState(false)
   const [automations, setAutomations] = useState<AutomationTrashItem[]>([])
   const [automationsLoaded, setAutomationsLoaded] = useState(false)
   const [query, setQuery] = useState('')
@@ -124,38 +84,6 @@ export function RecycleBinPage({
   const [page, setPage] = useState(1)
   const [hardDeleteKey, setHardDeleteKey] = useState<string | null>(null)
   const [emptyOpen, setEmptyOpen] = useState(false)
-
-  const refreshKnowledge = useCallback(async () => {
-    try {
-      const days = resolveTrashRetentionDays(
-        useHipConfigStore.getState().config.trash?.retentionDays,
-      )
-      await knowledgePurgeExpiredTrash(days).catch(() => [])
-      const items = await knowledgeListTrash()
-      setKnowledge(items)
-      useTrashBadgeStore.getState().setKnowledgeCount(items.length)
-    } catch {
-      setKnowledge([])
-    } finally {
-      setKnowledgeLoaded(true)
-    }
-  }, [])
-
-  const refreshWorkItems = useCallback(async () => {
-    try {
-      const days = resolveTrashRetentionDays(
-        useHipConfigStore.getState().config.trash?.retentionDays,
-      )
-      await purgeExpiredWorkItemsTrash(days).catch(() => [])
-      const items = await listWorkItemsTrash()
-      setWorkItems(items)
-      useTrashBadgeStore.getState().setWorkItemCount(items.length)
-    } catch {
-      setWorkItems([])
-    } finally {
-      setWorkItemsLoaded(true)
-    }
-  }, [])
 
   const refreshAutomations = useCallback(async () => {
     try {
@@ -179,18 +107,14 @@ export function RecycleBinPage({
 
   useEffect(() => {
     sessionService.requestTrashList()
-    void refreshKnowledge()
-    void refreshWorkItems()
     void refreshAutomations()
     const onFocus = () => {
       sessionService.requestTrashList()
-      void refreshKnowledge()
-      void refreshWorkItems()
       void refreshAutomations()
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [refreshKnowledge, refreshWorkItems, refreshAutomations])
+  }, [refreshAutomations])
 
   const rows = useMemo<UnifiedRow[]>(() => {
     const sessionRows: UnifiedRow[] = sessions.map((s) => ({
@@ -203,23 +127,6 @@ export function RecycleBinPage({
       preview: s.preview,
       deleteDerivedMemories: s.deleteDerivedMemories,
     }))
-    const knowledgeRows: UnifiedRow[] = knowledge.map((k) => ({
-      key: `knowledge:${k.id}`,
-      source: 'knowledge' as const,
-      id: k.id,
-      title: k.title,
-      entityKind: k.kind,
-      deletedAt: k.deletedAt,
-      spaceName: k.spaceName,
-    }))
-    const workItemRows: UnifiedRow[] = workItems.map((w) => ({
-      key: `workItem:${w.id}`,
-      source: 'workItem' as const,
-      id: w.id,
-      title: w.title,
-      deletedAt: w.deletedAt,
-      status: w.status,
-    }))
     const automationRows: UnifiedRow[] = automations.map((a) => ({
       key: `automation:${a.id}`,
       source: 'automation' as const,
@@ -228,20 +135,16 @@ export function RecycleBinPage({
       deletedAt: a.deletedAt,
       triggerKind: a.triggerKind,
     }))
-    return [...sessionRows, ...knowledgeRows, ...workItemRows, ...automationRows].sort(
+    return [...sessionRows, ...automationRows].sort(
       (a, b) => b.deletedAt - a.deletedAt,
     )
-  }, [sessions, knowledge, workItems, automations])
+  }, [sessions, automations])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     let list = rows
     if (kindFilter === 'chat' || kindFilter === 'code') {
       list = list.filter((r) => r.source === 'session' && r.surface === kindFilter)
-    } else if (kindFilter === 'knowledge') {
-      list = list.filter((r) => r.source === 'knowledge')
-    } else if (kindFilter === 'workItems') {
-      list = list.filter((r) => r.source === 'workItem')
     } else if (kindFilter === 'automations') {
       list = list.filter((r) => r.source === 'automation')
     }
@@ -249,7 +152,6 @@ export function RecycleBinPage({
       list = list.filter((r) => {
         if (r.title.toLowerCase().includes(q)) return true
         if (r.source === 'session' && (r.preview ?? '').toLowerCase().includes(q)) return true
-        if (r.source === 'knowledge' && (r.spaceName ?? '').toLowerCase().includes(q)) return true
         return false
       })
     }
@@ -260,7 +162,7 @@ export function RecycleBinPage({
   const safePage = Math.min(page, totalPages)
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
   const loaded =
-    sessionsLoaded && knowledgeLoaded && workItemsLoaded && automationsLoaded
+    sessionsLoaded && automationsLoaded
   const hardTarget = hardDeleteKey
     ? filtered.find((r) => r.key === hardDeleteKey) ?? rows.find((r) => r.key === hardDeleteKey) ?? null
     : null
@@ -336,20 +238,6 @@ export function RecycleBinPage({
             </TabsTrigger>
             <TabsTrigger
               className="px-2.5"
-              value="knowledge"
-              data-testid="recycle-bin-filter-knowledge"
-            >
-              {t('trash.filterKnowledge')}
-            </TabsTrigger>
-            <TabsTrigger
-              className="px-2.5"
-              value="workItems"
-              data-testid="recycle-bin-filter-work-items"
-            >
-              {t('trash.filterWorkItems')}
-            </TabsTrigger>
-            <TabsTrigger
-              className="px-2.5"
               value="automations"
               data-testid="recycle-bin-filter-automations"
             >
@@ -421,37 +309,23 @@ export function RecycleBinPage({
           {paged.map((row) => {
             const left = daysLeftInTrash(row.deletedAt, retentionDays)
             const Icon =
-              row.source === 'knowledge'
-                ? BookOpen
-                : row.source === 'workItem'
-                  ? ListTodo
-                  : row.source === 'automation'
-                    ? Zap
-                    : row.surface === 'chat'
-                      ? MessageSquare
-                      : Code2
+              row.source === 'automation'
+                ? Zap
+                : row.surface === 'chat'
+                  ? MessageSquare
+                  : Code2
             const kindLabel =
-              row.source === 'knowledge'
-                ? t(`trash.kind.${row.entityKind}`, { defaultValue: row.entityKind })
-                : row.source === 'workItem'
-                  ? t('trash.kind.workItem')
-                  : row.source === 'automation'
-                    ? t('trash.kind.automation')
-                    : row.surface === 'chat'
-                      ? t('sidebar.nav.chats')
-                      : t('sidebar.nav.projects')
+              row.source === 'automation'
+                ? t('trash.kind.automation')
+                : row.surface === 'chat'
+                  ? t('sidebar.nav.chats')
+                  : t('sidebar.nav.projects')
             const secondary =
               row.source === 'session'
                 ? row.preview
-                : row.source === 'knowledge'
-                  ? row.spaceName
-                  : row.source === 'workItem'
-                    ? t(`workItems.status.${row.status as 'todo'}`, {
-                        defaultValue: row.status,
-                      })
-                    : t(`automation.trigger.${row.triggerKind as 'manual'}`, {
-                        defaultValue: row.triggerKind,
-                      })
+                : t(`automation.trigger.${row.triggerKind as 'manual'}`, {
+                    defaultValue: row.triggerKind,
+                  })
             const deletedWhen = formatRelativeTime(row.deletedAt, locale)
             const deletedAbs = formatAbsolute(row.deletedAt, locale)
             const restoreRow = () => {
@@ -459,33 +333,6 @@ export function RecycleBinPage({
                 sessionService.restoreSession(row.id)
                 useTrashListStore.getState().removeSession(row.id)
                 useTrashBadgeStore.getState().adjustSessions(-1)
-              } else if (row.source === 'knowledge') {
-                void knowledgeRestoreTrashEntry(row.id)
-                  .then(async () => {
-                    setKnowledge((k) => k.filter((x) => x.id !== row.id))
-                    useTrashBadgeStore.getState().adjustKnowledge(-1)
-                    toast.success(t('trash.restoredToast'))
-                    await useKnowledgeStore.getState().loadSpaces()
-                  })
-                  .catch((e) => {
-                    const msg = e instanceof Error ? e.message : String(e)
-                    if (msg.includes('parent_missing')) {
-                      toast.error(t('trash.parentMissing'))
-                    } else {
-                      toast.error(msg)
-                    }
-                  })
-              } else if (row.source === 'workItem') {
-                void useWorkItemStore
-                  .getState()
-                  .restoreTrashEntry(row.id)
-                  .then(() => {
-                    setWorkItems((w) => w.filter((x) => x.id !== row.id))
-                    toast.success(t('trash.restoredToast'))
-                  })
-                  .catch((e) => {
-                    toast.error(e instanceof Error ? e.message : String(e))
-                  })
               } else {
                 void useAutomationStore
                   .getState()
@@ -643,20 +490,6 @@ export function RecycleBinPage({
                       meta: { source: 'RecycleBinPage' },
                     })
                     useTrashListStore.getState().removeSession(hardTarget.id)
-                  } else if (hardTarget.source === 'knowledge') {
-                    void knowledgeHardDeleteTrashEntry(hardTarget.id)
-                      .then(() => {
-                        setKnowledge((k) => k.filter((x) => x.id !== hardTarget.id))
-                        useTrashBadgeStore.getState().adjustKnowledge(-1)
-                      })
-                      .catch((e) => toast.error(e instanceof Error ? e.message : String(e)))
-                  } else if (hardTarget.source === 'workItem') {
-                    void hardDeleteWorkItemTrashEntry(hardTarget.id)
-                      .then(() => {
-                        setWorkItems((w) => w.filter((x) => x.id !== hardTarget.id))
-                        useTrashBadgeStore.getState().adjustWorkItems(-1)
-                      })
-                      .catch((e) => toast.error(e instanceof Error ? e.message : String(e)))
                   } else {
                     void hardDeleteAutomationTrashEntry(hardTarget.id)
                       .then(() => {
@@ -700,18 +533,6 @@ export function RecycleBinPage({
                   sessionService.emptySessionTrash()
                   useTrashListStore.getState().clear()
                   useTrashBadgeStore.getState().setSessionCount(0)
-                  void knowledgeEmptyTrash()
-                    .then(() => {
-                      setKnowledge([])
-                      useTrashBadgeStore.getState().setKnowledgeCount(0)
-                    })
-                    .catch(() => {})
-                  void emptyWorkItemsTrash()
-                    .then(() => {
-                      setWorkItems([])
-                      useTrashBadgeStore.getState().setWorkItemCount(0)
-                    })
-                    .catch(() => {})
                   void emptyAutomationsTrash()
                     .then(() => {
                       setAutomations([])

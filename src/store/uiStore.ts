@@ -2,14 +2,12 @@ import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import type { AgentConfig, McpServerConfig } from '@hip/protocol'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
-import { WORK_ITEM_TRACKING } from '@/components/work-items/feature'
 import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import {
   clampSidebarWidth,
   SIDEBAR_WIDTH_DEFAULT,
 } from '@/components/layout/sidebarWidth'
-// Lazy helpers used only inside closeKnowledgeView to avoid circular init issues
-// are imported dynamically in that method.
+
 
 export type ArtifactTab =
   | 'files'
@@ -48,9 +46,7 @@ export const SETTINGS_SHELL_PAGE: SettingsShellRoute = { type: 'page' }
 export type ActiveView =
   | 'chat'
   | 'code'
-  | 'knowledge'
   | 'terminals'
-  | 'tasks'
   | 'automation'
 export type Surface = 'chat' | 'code'
 /** Managed-terminal right-rail tabs (spec §3.2). */
@@ -61,27 +57,22 @@ export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko'
 export type UiDensity = 'comfortable' | 'compact'
 /** Left sidebar primary section (memory-only; cold launch always 'chats'). */
 export type SidebarSection =
-  | 'knowledge'
   | 'projects'
   | 'chats'
   | 'terminals'
-  | 'tasks'
   | 'automation'
 
 /**
  * Primary nav sections that only show a "coming soon" placeholder page.
  * When TERMINAL_MANAGEMENT is on, `terminals` is a real section (not placeholder) — K14.
- * When WORK_ITEM_TRACKING is on, `tasks` is a real section (not placeholder).
  * When AUTOMATION_PAGE is on, `automation` is a real section (not placeholder).
  */
 export type PlaceholderSidebarSection =
   | (typeof AUTOMATION_PAGE extends true ? never : 'automation')
   | (typeof TERMINAL_MANAGEMENT extends true ? never : 'terminals')
-  | (typeof WORK_ITEM_TRACKING extends true ? never : 'tasks')
 
 export function isPlaceholderSidebarSection(s: SidebarSection): s is PlaceholderSidebarSection {
   if (s === 'terminals') return !TERMINAL_MANAGEMENT
-  if (s === 'tasks') return !WORK_ITEM_TRACKING
   if (s === 'automation') return !AUTOMATION_PAGE
   return false
 }
@@ -191,9 +182,7 @@ export type UiPersistedState = {
 /** Non-chat/code work surfaces are session-ephemeral; cold launch always lands on chats. */
 export function isEphemeralActiveView(v: ActiveView): boolean {
   return (
-    v === 'knowledge' ||
     v === 'terminals' ||
-    v === 'tasks' ||
     v === 'automation'
   )
 }
@@ -300,17 +289,6 @@ interface UiState {
   /** Left sidebar width in px (persisted; clamped). */
   sidebarWidth: number
   setSidebarWidth: (width: number) => void
-
-  openKnowledgeView: () => void
-  /** Flush knowledge draft then restore chat/code from domain active session. */
-  closeKnowledgeView: () => Promise<void>
-
-  /**
-   * Knowledge surface right-rail open (AppLayout drawer). Ephemeral — not persisted.
-   * Default true so the doc outline is visible when entering a space (discoverable).
-   */
-  knowledgePanelOpen: boolean
-  setKnowledgePanelOpen: (open: boolean) => void
 
   /**
    * Terminal-management right-rail (files tree) open (AppLayout drawer).
@@ -446,30 +424,9 @@ export const useUiStore = create<UiState>()(
           return s.sidebarWidth === next ? s : { sidebarWidth: next }
         }),
 
-      openKnowledgeView: () => set({ activeView: 'knowledge' }),
-      closeKnowledgeView: async () => {
-        // Tier A: await draft flush before leaving.
-        try {
-          const { useKnowledgeStore } = await import('@/store/knowledgeStore')
-          await useKnowledgeStore.getState().flushSave()
-        } catch {
-          // ignore — non-Tauri / not loaded
-        }
-        const { useDomainStore } = await import('@/domain')
-        const { surfaceOf } = await import('@/lib/sessions')
-        const active = useDomainStore.getState().sessions.find(
-          (s) => s.id === useDomainStore.getState().activeSessionId,
-        )
-        const surface = active ? surfaceOf(active.config) : 'chat'
-        set({
-          activeView: surface === 'code' ? 'code' : 'chat',
-          sidebarSection: surface === 'code' ? 'projects' : 'chats',
-        })
-      },
 
-      knowledgePanelOpen: true,
-      setKnowledgePanelOpen: (open) =>
-        set((s) => (s.knowledgePanelOpen === open ? s : { knowledgePanelOpen: open })),
+
+
 
       terminalPanelOpen: true,
       setTerminalPanelOpen: (open) =>

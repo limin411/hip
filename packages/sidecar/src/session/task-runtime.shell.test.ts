@@ -15,10 +15,13 @@ describe('TaskRuntime shell / wait / caps', () => {
     })
   })
 
-  afterEach(() => {
-    void mgr.destroyAll()
+  afterEach(async () => {
+    // Awaited on purpose: a shell child still exiting holds a handle on `dir`,
+    // and removing too early throws EBUSY on Windows. Retries absorb the
+    // remaining exit race.
+    await mgr.destroyAll()
     mgr.clear()
-    rmSync(dir, { recursive: true, force: true })
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
   })
 
   it('spawns background shell and captures output', async () => {

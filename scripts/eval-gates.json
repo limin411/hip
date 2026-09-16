@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "blockingPromotion": {
+    "minimumSoakRuns": 5,
+    "minimumSoakDays": 3,
+    "maximumUnexplainedFlakes": 0
+  },
+  "gates": [
+    {
+      "id": "tasks.wait-any-terminates",
+      "maturity": "blocking",
+      "title": "wait_tasks(wait_any) always terminates",
+      "invariant": "No single tool call may wedge a turn: wait_any must return even for a meta-only task with no timeout supplied.",
+      "oracle": "waitMany(['<meta-only>'], 'wait_any') resolves in < 5s and reports the task as still running.",
+      "commands": ["npx vitest run packages/sidecar/src/session/task-runtime.shell.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "packages/sidecar/src/session/task-runtime.shell.test.ts",
+          "assertions": ["wait_any returns promptly for a meta-only task even with no timeout"]
+        }
+      ]
+    },
+    {
+      "id": "types.no-emit-errors",
+      "maturity": "blocking",
+      "title": "TypeScript compiles without errors",
+      "invariant": "The whole workspace type-checks; no new type error reaches main.",
+      "oracle": "`tsc --noEmit` exits 0 and prints zero error lines.",
+      "commands": ["npx tsc --noEmit"],
+      "assertionRefs": []
+    },
+    {
+      "id": "sandbox.wrapper-preserves-command",
+      "maturity": "blocking",
+      "title": "Sandboxed spawns still execute the caller's command",
+      "invariant": "A background shell/monitor run under an active sandbox must execute the caller's own command, never a placeholder probe.",
+      "oracle": "sandboxWrapperArgv(command, decision) tail === command; 'true' appears nowhere in argv.",
+      "commands": ["npx vitest run packages/sidecar/src/session/sandbox/sandbox.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "packages/sidecar/src/session/sandbox/sandbox.test.ts",
+          "assertions": ["sandboxWrapperArgv > bakes the CALLER command into argv, not a probe command"]
+        }
+      ]
+    },
+    {
+      "id": "skills.routing-regression",
+      "maturity": "blocking",
+      "title": "Builtin skill routing keeps its positive/negative triggers",
+      "invariant": "Positive triggers rank their target skill top-1; negative triggers stay below 0.15; no description collisions.",
+      "oracle": "router.eval.test.ts passes against the real product-content catalog (no LLM, deterministic).",
+      "commands": ["npx vitest run e2e/eval/skills/router.eval.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "e2e/eval/skills/router.eval.test.ts",
+          "assertions": [
+            "positive triggers rank the target skill top-1",
+            "negative triggers stay well below positive-match strength",
+            "builtin skill descriptions do not collide"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unit.full-suite-clean",
+      "maturity": "experimental",
+      "title": "Full unit suite is green",
+      "invariant": "`yarn test` must be a usable regression gate, not a wall of permanent red.",
+      "oracle": "`vitest run` exits 0 with zero failing tests.",
+      "commands": ["npx vitest run --reporter=basic"],
+      "knownGaps": [
+        {
+          "platform": "win32",
+          "reason": "Environment-dependent expectations: macOS-only sandbox-exec assertions and ffmpeg-absent media tools. Being converted to self-skipping; until then this gate stays red on Windows.",
+          "tracking": "sandbox.test.ts already self-skips (see SANDBOX_SUPPORTED)"
+        }
+      ],
+      "assertionRefs": []
+    },
+    {
+      "id": "rust.lib-tests-clean",
+      "maturity": "soak",
+      "title": "Rust lib tests pass",
+      "invariant": "The Tauri host's pure logic stays green.",
+      "oracle": "`cargo test --lib -- --skip pty` exits 0.",
+      "commands": ["cd src-tauri && cargo test --lib -- --skip pty"],
+      "knownGaps": [
+        {
+          "platform": "win32",
+          "reason": "pty::tests::pty_echo_smoke hangs on Windows PTY; excluded via --skip pty.",
+          "tracking": "pre-existing, environment-intrinsic"
+        }
+      ],
+      "assertionRefs": []
+    }
+  ]
+}

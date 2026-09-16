@@ -44,7 +44,6 @@ export type GlobalCommandLabels = {
   settings: {
     general: string
     updates: string
-    voice: string
     window: string
     model: string
     agents: string
@@ -144,7 +143,6 @@ export const SESSION_DISPLAY_CAP = 15
 /** Order matches SettingsPanel NAV_GROUPS (basics → agents). */
 const ALL_SETTINGS_PAGES: SettingsPageId[] = [
   'general',
-  'voice',
   'window',
   'model',
   'keyManagement',
@@ -162,7 +160,6 @@ const CURATED_SETTINGS: SettingsPageId[] = ['model', 'memory', 'skill', 'mcp']
 const SETTINGS_ICON: Record<SettingsPageId, GlobalCommand['icon']> = {
   general: 'settings',
   updates: 'settings',
-  voice: 'settings',
   window: 'settings',
   model: 'cpu',
   agents: 'bot',

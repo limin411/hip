@@ -39,7 +39,6 @@ const labels: GlobalCommandLabels = {
   settings: {
     general: 'Settings: General',
     updates: 'Settings: Update check',
-    voice: 'Settings: Voice',
     window: 'Settings: Window',
     model: 'Settings: Model',
     agents: 'Settings: Agents',

@@ -81,7 +81,6 @@ export function isPlaceholderSidebarSection(s: SidebarSection): s is Placeholder
 export type SettingsPageId =
   | 'general'
   | 'updates'
-  | 'voice'
   | 'window'
   | 'model'
   | 'keyManagement'
@@ -96,7 +95,6 @@ export type SettingsPageId =
 const SETTINGS_PAGE_IDS: readonly SettingsPageId[] = [
   'general',
   'updates',
-  'voice',
   'window',
   'model',
   'keyManagement',

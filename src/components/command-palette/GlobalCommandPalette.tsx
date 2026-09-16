@@ -144,7 +144,6 @@ export function GlobalCommandPalette() {
       settings: {
         general: t('commandPalette.settings.general'),
         updates: t('commandPalette.settings.updates'),
-        voice: t('commandPalette.settings.voice'),
         window: t('commandPalette.settings.window'),
         model: t('commandPalette.settings.model'),
         agents: t('commandPalette.settings.agents'),

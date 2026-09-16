@@ -9,7 +9,6 @@ import {
   Cpu,
   KeyRound,
   Link2,
-  Mic,
   Package,
   Plug,
   RefreshCw,
@@ -18,11 +17,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { SettingsPageId } from '@/store/uiStore'
-import { VOICE_INPUT } from '@/components/chat/voiceFeature'
 
 import { GeneralSettings } from './GeneralSettings'
 import { UpdatesSettings } from './UpdatesSettings'
-import { VoiceSettings } from './VoiceSettings'
 import { WindowSettings } from './WindowSettings'
 import { ModelConfig } from './ModelConfig'
 import { AgentManagement } from './AgentManagement'
@@ -38,7 +35,6 @@ export type SettingsPageDef = {
   labelKey:
     | 'settings.general'
     | 'settings.updatesPage'
-    | 'settings.voicePage'
     | 'settings.window'
     | 'settings.model'
     | 'settings.agentsLabel'
@@ -65,16 +61,6 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     pages: [
       { id: 'general', icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
       { id: 'updates', icon: RefreshCw, labelKey: 'settings.updatesPage', Component: UpdatesSettings },
-      ...(VOICE_INPUT
-        ? ([
-            {
-              id: 'voice',
-              icon: Mic,
-              labelKey: 'settings.voicePage',
-              Component: VoiceSettings,
-            },
-          ] as SettingsPageDef[])
-        : []),
       { id: 'window', icon: AppWindow, labelKey: 'settings.window', Component: WindowSettings },
       { id: 'model', icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
       { id: 'keyManagement', icon: KeyRound, labelKey: 'settings.keyManagementLabel', Component: KeyManagementSettings },

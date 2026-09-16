@@ -1,7 +1,6 @@
 export type KeybindHelpLabelKey =
   | 'commandPalette.shortcuts.openPalette'
   | 'commandPalette.shortcuts.slash'
-  | 'commandPalette.shortcuts.voiceToggle'
   | 'commandPalette.shortcuts.hotkeys'
   | 'commandPalette.shortcuts.prefixCmd'
   | 'commandPalette.shortcuts.prefixSess'
@@ -32,12 +31,6 @@ export function getKeybindHelp(isMac: boolean): KeybindHelpEntry[] {
       id: 'slash',
       combo: '/',
       labelKey: 'commandPalette.shortcuts.slash',
-      section: 'composer',
-    },
-    {
-      id: 'voice-toggle',
-      combo: isMac ? '⌘⇧M' : 'Ctrl+Shift+M',
-      labelKey: 'commandPalette.shortcuts.voiceToggle',
       section: 'composer',
     },
     {

@@ -28,8 +28,7 @@ mod sftp_path;
 mod knowledge;
 mod knowledge_trash;
 mod knowledge_link_index;
-mod voice_models;
-mod voice;
+
 mod provider_logo;
 mod updates;
 // Production SSH (default feature `ssh`); stubs keep IPC registered when stripped.
@@ -1033,12 +1032,7 @@ pub fn run() {
             knowledge_link_index::knowledge_link_index_broken,
             knowledge_link_index::knowledge_link_index_doc_count,
             knowledge_link_index::knowledge_link_index_graph,
-            voice::voice_runtime_status,
-            voice::voice_model_status,
-            voice::voice_download_model,
-            voice::voice_cancel_download,
-            voice::voice_transcribe,
-            voice::voice_open_models_dir,
+
             provider_logo::provider_logo,
         ])
         .build(tauri::generate_context!())

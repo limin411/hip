@@ -16,7 +16,6 @@ function settingsPageTitleKey(
   page: SettingsPageId,
 ):
   | 'settings.general'
-  | 'settings.voicePage'
   | 'settings.window'
   | 'settings.model'
   | 'settings.agentsLabel'
@@ -30,8 +29,6 @@ function settingsPageTitleKey(
   switch (page) {
     case 'general':
       return 'settings.general'
-    case 'voice':
-      return 'settings.voicePage'
     case 'window':
       return 'settings.window'
     case 'model':

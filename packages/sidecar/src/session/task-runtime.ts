@@ -74,6 +74,8 @@ const DEFAULT_TASK_OUTPUT_DIR = join(homedir(), '.hip', 'task-output')
 const LOG_TAIL_CHARS = 2048
 /** Anti-hang ceiling for wait_any's schedule-only poll when no timeout is given. */
 const SCHEDULE_SPIN_MAX_MS = 2_000
+/** Retained in-memory output ceiling per task (see evictOldestOutput). */
+const TASK_OUTPUT_CAP_BYTES = 4 * 1024 * 1024
 
 // ── Persistence ────────────────────────────────────────────────────────────
 
@@ -962,7 +964,28 @@ export class BackgroundManager {
     m.outputSizeBytes = (m.outputSizeBytes ?? 0) + Buffer.byteLength(chunk, 'utf8')
     m.updatedAt = Date.now()
     m.metrics = { ...m.metrics, bytes: m.outputSizeBytes }
+    this.evictOldestOutput(m)
     this.persistence?.saveOutput(this.sessionId, taskId, chunk)
+  }
+
+  /**
+   * Bound retained in-memory output. Background shell / monitor tasks can stream
+   * for hours, and `outputChunks` had no ceiling (the foreground shell path caps
+   * at `outputCap`, this one did not) — a chatty task grew the sidecar heap
+   * without limit. Oldest chunks are shed first so monitoring keeps the most
+   * recent lines. Note this bounds memory only; `saveOutput` still appends the
+   * full stream to disk.
+   */
+  private evictOldestOutput(m: BackgroundTaskMeta): void {
+    const chunks = m.outputChunks
+    if (!chunks) return
+    let retained = chunks.reduce((n, c) => n + Buffer.byteLength(c, 'utf8'), 0)
+    // Keep at least the newest chunk so a single oversized write still surfaces.
+    while (retained > TASK_OUTPUT_CAP_BYTES && chunks.length > 1) {
+      const head = chunks.shift()
+      if (head === undefined) break
+      retained -= Buffer.byteLength(head, 'utf8')
+    }
   }
 
   getOutput(taskId: string): string {

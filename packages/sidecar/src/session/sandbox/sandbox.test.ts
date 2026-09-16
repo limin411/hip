@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { deriveSandboxPolicy } from './policy.js'
 import { renderSeatbeltProfile, renderBwrapArgv, buildSandboxArgv } from './launcher.js'
 import { classifySandboxViolation } from './violation.js'
-import { decideSandbox, sandboxCommand } from './index.js'
+import { decideSandbox, sandboxCommand, sandboxWrapperArgv } from './index.js'
 
 describe('deriveSandboxPolicy', () => {
   it('edit mode: cwd writable, everything else read-only', () => {
@@ -114,23 +114,34 @@ describe('classifySandboxViolation', () => {
   })
 })
 
+// A real OS sandbox only exists for macOS (seatbelt) and Linux (bwrap). On
+// other platforms every decision degrades to inactive by design, so the
+// "activates" assertions below self-skip instead of reporting false red.
+const SANDBOX_SUPPORTED = process.platform === 'darwin' || process.platform === 'linux'
+
 describe('decideSandbox', () => {
   it('off mode never sandboxes', () => {
     const d = decideSandbox({ cwd: '/x', unattended: true, mode: 'off' })
     expect(d.active).toBe(false)
   })
 
-  it('auto mode sandboxes only unattended runs', () => {
+  it.skipIf(!SANDBOX_SUPPORTED)('auto mode sandboxes only unattended runs', () => {
     expect(decideSandbox({ cwd: '/x', unattended: false, mode: 'auto' }).active).toBe(false)
     expect(decideSandbox({ cwd: '/x', unattended: true, mode: 'auto' }).active).toBe(true)
   })
 
-  it('require mode sandboxes interactive runs too', () => {
+  it.skipIf(!SANDBOX_SUPPORTED)('require mode sandboxes interactive runs too', () => {
     expect(decideSandbox({ cwd: '/x', unattended: false, mode: 'require' }).active).toBe(true)
   })
 
-  it('defaults to auto', () => {
+  it.skipIf(!SANDBOX_SUPPORTED)('defaults to auto', () => {
     expect(decideSandbox({ cwd: '/x', unattended: true }).active).toBe(true)
+  })
+
+  it.skipIf(SANDBOX_SUPPORTED)('degrades to inactive where no launcher exists', () => {
+    const d = decideSandbox({ cwd: '/x', unattended: true, mode: 'require' })
+    expect(d.active).toBe(false)
+    if (!d.active) expect(d.reason).toBe('unsupported')
   })
 })
 
@@ -142,7 +153,33 @@ describe('sandboxCommand', () => {
   it('wraps the command when active', () => {
     const d = decideSandbox({ cwd: '/x', unattended: true, mode: 'auto' })
     const wrapped = sandboxCommand('echo hi', d)
-    expect(wrapped).toContain('sandbox-exec')
-    expect(wrapped).toContain('echo hi')
+    if (process.platform === 'darwin') {
+      expect(wrapped).toContain('sandbox-exec')
+      expect(wrapped).toContain('echo hi')
+    } else {
+      // Windows has no supported launcher; the command must still survive intact.
+      expect(wrapped).toBe('echo hi')
+    }
+  })
+})
+
+describe('sandboxWrapperArgv', () => {
+  it('bakes the CALLER command into argv, not a probe command', () => {
+    const d = decideSandbox({ cwd: '/x', unattended: true, mode: 'auto' })
+    if (!d.active) return // unsupported platform (e.g. Windows)
+    const argv = sandboxWrapperArgv('echo real-command', d)
+    expect(argv).toBeDefined()
+    // Regression: decideSandbox used to return argv built from the literal
+    // `'true'` probe. Any caller using that argv as a spawn wrapper silently
+    // ran `true` and dropped the real command.
+    expect(argv).toContain('echo real-command')
+    expect(argv).not.toContain('true')
+    expect(argv![argv!.length - 1]).toBe('echo real-command')
+  })
+
+  it('returns undefined when inactive or the command is empty', () => {
+    expect(sandboxWrapperArgv('echo hi', { active: false, reason: 'off' })).toBeUndefined()
+    const d = decideSandbox({ cwd: '/x', unattended: true, mode: 'auto' })
+    if (d.active) expect(sandboxWrapperArgv('', d)).toBeUndefined()
   })
 })

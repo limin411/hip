@@ -10,9 +10,11 @@ const setSecretRaw = vi.fn().mockResolvedValue(undefined)
 const deleteSecretRaw = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/store/terminalHostStore', () => ({
+  // Mirrors the real store's initial state: `hosts` is always an array.
   useTerminalHostStore: (sel: (s: Record<string, unknown>) => unknown) =>
     sel({
       upsertHost,
+      hosts: [],
     }),
 }))
 

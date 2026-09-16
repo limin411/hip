@@ -26,7 +26,7 @@ export interface SandboxRequest {
 
 export type SandboxDecision =
   | { active: false; reason: 'off' | 'not-required' | 'unsupported' }
-  | { active: true; kind: 'seatbelt' | 'bwrap'; argv: string[]; policy: SandboxPolicy }
+  | { active: true; kind: 'seatbelt' | 'bwrap'; policy: SandboxPolicy }
 
 /**
  * Decide whether a command must run inside the OS sandbox and build its argv.
@@ -50,7 +50,22 @@ export function decideSandbox(req: SandboxRequest): SandboxDecision {
   if (!kind) return { active: false, reason: 'unsupported' }
   const probe = buildSandboxArgv('true', policy)
   if (!probe.ok) return { active: false, reason: 'unsupported' }
-  return { active: true, kind, argv: probe.argv, policy }
+  return { active: true, kind, policy }
+}
+
+/**
+ * Build the *wrapper argv* that runs `command` inside the decided sandbox, or
+ * undefined when the sandbox is inactive / cannot render.
+ *
+ * Always call this per-command. `buildSandboxArgv` bakes the command into the
+ * tail of argv, so any argv captured at decide-time carries that decision's
+ * probe command instead of the caller's real command.
+ */
+export function sandboxWrapperArgv(command: string, decision: SandboxDecision): string[] | undefined {
+  if (!decision.active) return undefined
+  if (!command) return undefined
+  const built = buildSandboxArgv(command, decision.policy)
+  return built.ok ? built.argv : undefined
 }
 
 /** Wrap a concrete command with the decided sandbox (or pass through). */

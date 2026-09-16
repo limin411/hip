@@ -18,6 +18,7 @@ import type {
 import { emptyTaskRunningCounts } from '@hip/protocol'
 import { safeErrorMessage } from './error.js'
 import { spawnShell, type SpawnedShell } from './shell-backend.js'
+import { sandboxWrapperArgv, type SandboxDecision } from './sandbox/index.js'
 
 // ── Caps ───────────────────────────────────────────────────────────────────
 
@@ -266,10 +267,14 @@ export class BackgroundManager {
     this.sandbox = opts?.sandbox
   }
 
-  /** G4: resolve wrapper argv for a spawn kind, or undefined when inactive. */
-  private sandboxArgv(kind: 'shell' | 'monitor'): string[] | undefined {
+  /**
+   * G4: wrapper argv that runs `command` inside the sandbox for a spawn kind,
+   * or undefined when the sandbox is inactive. Built per-command — see
+   * `sandboxWrapperArgv`.
+   */
+  private sandboxArgv(command: string, kind: 'shell' | 'monitor'): string[] | undefined {
     const decision = this.sandbox?.(kind)
-    return decision?.active ? decision.argv : undefined
+    return decision ? sandboxWrapperArgv(command, decision) : undefined
   }
 
   setBroadcast(fn: (msg: ServerMessage) => void): void {
@@ -513,13 +518,15 @@ export class BackgroundManager {
     const now = Date.now()
     const ac = new AbortController()
 
+    const wrapperArgv = this.sandboxArgv(opts.command, 'shell')
+
     const shell = spawnShell({
       command: opts.command,
       cwd: opts.cwd,
       signal: ac.signal,
       onStdout: (c) => this.appendOutput(taskId, c),
       onStderr: (c) => this.appendOutput(taskId, c),
-      ...(this.sandboxArgv('shell') ? { wrapperArgv: this.sandboxArgv('shell') } : {}),
+      ...(wrapperArgv ? { wrapperArgv } : {}),
     })
 
     const meta: BackgroundTaskMeta = {
@@ -663,13 +670,14 @@ export class BackgroundManager {
       }
     }
 
+    const monitorWrapper = this.sandboxArgv(opts.command, 'monitor')
     const shell = spawnShell({
       command: opts.command,
       cwd: opts.cwd,
       signal: ac.signal,
       onStdout: onData,
       onStderr: onData,
-      ...(this.sandboxArgv('monitor') ? { wrapperArgv: this.sandboxArgv('monitor') } : {}),
+      ...(monitorWrapper ? { wrapperArgv: monitorWrapper } : {}),
     })
 
     const meta: BackgroundTaskMeta = {

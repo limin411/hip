@@ -62,3 +62,4 @@ tmp/
 # Staged whisper engine tree (built by scripts/make-whisper-bin.*; not committed)
 src-tauri/resources/whisper/**
 !src-tauri/resources/whisper/README.md
+.workbuddy/

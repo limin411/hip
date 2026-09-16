@@ -45,13 +45,10 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { QuickConnectPopover } from '@/components/terminals/QuickConnectPopover'
 
-import { AUTOMATION_PAGE } from '@/components/automation/feature'
-import { AutomationSidebarList } from '@/components/automation/AutomationSidebarList'
 import {
   enterPlaceholderSection,
   enterSection,
   enterTerminalsSection,
-  enterAutomationsSection,
   newConversationFromSidebar,
   openSettingsFromChrome,
   selectSessionFromSidebar,
@@ -223,7 +220,6 @@ export function AppSidebar() {
   const onNav = (section: SidebarSection) => {
     if (section === 'terminals' && TERMINAL_MANAGEMENT)
       void enterTerminalsSection({ library: true })
-    else if (section === 'automation' && AUTOMATION_PAGE) void enterAutomationsSection()
     else if (isPlaceholderSidebarSection(section)) void enterPlaceholderSection(section)
     else if (section === 'projects' || section === 'chats') void enterSection(section)
   }
@@ -235,9 +231,7 @@ export function AppSidebar() {
         ? t('sidebar.list.chats')
         : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT
           ? t('sidebar.list.terminals')
-          : sidebarSection === 'automation' && AUTOMATION_PAGE
-            ? t('sidebar.list.automations')
-            : t(`sidebar.nav.${sidebarSection}`)
+          : t(`sidebar.nav.${sidebarSection}`)
 
   const toggleProjectGroup = (groupId: string) => {
     setProjectGroupCollapsed((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
@@ -370,13 +364,6 @@ export function AppSidebar() {
           icon={<Monitor size={16} strokeWidth={1.75} />}
           onClick={() => onNav('terminals')}
         />
-        <NavItem
-          section="automation"
-          active={sidebarSection === 'automation' && activeView === 'automation'}
-          label={t('sidebar.nav.automation')}
-          icon={<Timer size={16} strokeWidth={1.75} />}
-          onClick={() => onNav('automation')}
-        />
       </nav>
 
       <div
@@ -416,30 +403,10 @@ export function AppSidebar() {
             </button>
           ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
             <QuickConnectPopover />
-          ) : sidebarSection === 'automation' && AUTOMATION_PAGE ? (
-            <button
-              type="button"
-              data-testid="sidebar-new-automation"
-              data-no-drag
-              onClick={() => {
-                void (async () => {
-                  await enterAutomationsSection()
-                  const { useAutomationStore } = await import(
-                    '@/store/automationStore'
-                  )
-                  useAutomationStore.getState().requestCreate()
-                })()
-              }}
-              className="rounded-sm px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
-            >
-              {t('sidebar.newAutomation')}
-            </button>
           ) : null}
         </div>
 
-        {sidebarSection === 'automation' && AUTOMATION_PAGE ? (
-          <AutomationSidebarList />
-        ) : sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
+        {sidebarSection === 'terminals' && TERMINAL_MANAGEMENT ? (
           managedTerminals.length === 0 ? (
             <div
               className="flex flex-col items-center gap-1 px-3 py-6 text-center"

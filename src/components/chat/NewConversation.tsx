@@ -30,6 +30,7 @@ import { activeModelKey, parseModelKey } from '@/lib/modelKey'
 import { cn } from '@/lib/utils'
 import type { LocalAttachment } from './attachmentTypes'
 import { MascotActor } from '@/components/login/MascotActor'
+import { ScheduledTaskButton } from './scheduled-task'
 import {
   selectEmptyGreeting,
   resolveSystemTimeZone,
@@ -383,6 +384,7 @@ export function NewConversation() {
                 }
               />
             }
+            rightSlot={<ScheduledTaskButton />}
             attachments={attachments}
             onAttachmentsChange={setAttachments}
             footer={

@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定时任务集成到对话输入框 - 原型</title>
+    <style>
+        /* 项目实际的 CSS 变量 */
+        :root {
+            --bg-app: #ffffff;
+            --bg-subtle: #F6F5F3;
+            --bg-muted: #f1f1f1;
+            --bg-surface: #ffffff;
+            --bg-surface-subtle: #F6F5F3;
+            --bg-surface-muted: #f1f1f1;
+            --bg-surface-content: #ffffff;
+            --border: #e0e0e0;
+            --border-strong: #c9c9c9;
+            --text-primary: #111111;
+            --text-secondary: #5e5e5e;
+            --text-tertiary: #757575;
+            --accent: #c2410c;
+            --accent-hover: #9a3412;
+            --accent-subtle: #f0f0f0;
+            --accent-active: #e6e6e6;
+            --btn-primary: #3a3a3a;
+            --btn-primary-hover: #2e2e2e;
+            --on-btn-primary: #fafafa;
+            --success: #2f7d40;
+            --danger: #c63b3b;
+            --warning: #9a5d10;
+            --state-hover: var(--accent-subtle);
+            --state-active: var(--accent-active);
+            --ink: var(--text-primary);
+            --ink-secondary: var(--text-secondary);
+            --ink-tertiary: var(--text-tertiary);
+            --surface: var(--bg-app);
+            --surface-subtle: var(--bg-subtle);
+            --surface-muted: var(--bg-muted);
+            --surface-content: var(--bg-surface-content);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-app);
+            color: var(--text-primary);
+            line-height: 1.5;
+            font-size: 13px;
+        }
+
+        /* 页面布局 */
+        .page-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 240px;
+            background: var(--bg-subtle);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .sidebar-logo-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 8px;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 16px;
+        }
+
+        .nav-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            padding: 0 8px;
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 100ms;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            line-height: 1.5;
+        }
+
+        .nav-item:hover {
+            background: var(--state-hover);
+        }
+
+        .nav-item.active {
+            background: var(--state-active);
+            color: var(--text-primary);
+        }
+
+        .nav-item-icon {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-tertiary);
+        }
+
+        .nav-item.active .nav-item-icon {
+            color: var(--accent);
+        }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            background: var(--surface-content);
+        }
+
+        /* 工具栏 */
+        .toolbar {
+            height: 40px;
+            background: var(--surface-content);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            justify-content: space-between;
+        }
+
+        .toolbar-title {
+            font-weight: 600;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .toolbar-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            background: var(--bg-muted);
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* 聊天区域 */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            max-width: 768px; /* max-w-4xl */
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            animation: message-enter 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes message-enter {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .message-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .message-avatar.user {
+            background: var(--bg-muted);
+            color: var(--text-secondary);
+        }
+
+        .message-avatar.assistant {
+            background: var(--accent);
+            color: white;
+        }
+
+        .message-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .message-bubble {
+            background: var(--bg-subtle);
+            border-radius: 10px;
+            padding: 10px 14px;
+            line-height: 1.6;
+            font-size: 13px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        /* 输入区域 */
+        .input-container {
+            padding: 8px 16px 12px;
+            background: var(--surface-content);
+        }
+
+        .composer-wrapper {
+            max-width: 768px; /* max-w-4xl */
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* 定时任务状态栏 - 与 diff annotations 风格一致 */
+        .schedule-banner {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface-muted);
+            padding: 10px 12px;
+            animation: message-enter 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .schedule-banner-icon {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-tertiary);
+            flex-shrink: 0;
+        }
+
+        .schedule-banner-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .schedule-banner-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .schedule-banner-subtitle {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-top: 2px;
+            line-height: 1.4;
+        }
+
+        .schedule-banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .schedule-banner-btn {
+            padding: 0;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 100ms;
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            line-height: 1.4;
+        }
+
+        .schedule-banner-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .schedule-banner-btn.close {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            padding: 0;
+        }
+
+        .schedule-banner-btn.close:hover {
+            background: var(--state-hover);
+        }
+
+        /* Composer - 项目实际样式 */
+        .composer {
+            position: relative;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface-subtle);
+            padding: 10px;
+            transition: border-color 100ms;
+        }
+
+        .composer:focus-within {
+            border-color: var(--border-strong);
+        }
+
+        .composer-input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            resize: none;
+            padding: 4px 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            outline: none;
+            min-height: 42px;
+            font-family: inherit;
+        }
+
+        .composer-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .composer-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 6px;
+            padding-left: 2px;
+            padding-right: 2px;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        /* ComposerChip - 项目实际样式 */
+        .composer-chip {
+            display: inline-flex;
+            height: 28px;
+            align-items: center;
+            gap: 6px;
+            border-radius: 6px;
+            padding: 0 8px;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background-color 100ms;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            line-height: 1.45;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .composer-chip:hover {
+            background: var(--state-hover);
+            color: var(--text-secondary);
+        }
+
+        .composer-chip:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.2);
+        }
+
+        .composer-chip.active {
+            background: var(--state-active);
+            color: var(--text-primary);
+        }
+
+        .composer-chip.active:hover {
+            background: var(--accent-subtle);
+        }
+
+        /* Button - 项目实际样式 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: 1px solid transparent;
+            font-weight: 500;
+            transition: all 100ms;
+            cursor: pointer;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.2);
+        }
+
+        .btn-primary {
+            background: var(--btn-primary);
+            color: var(--on-btn-primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--btn-primary-hover);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-primary);
+        }
+
+        .btn-ghost:hover {
+            background: var(--state-hover);
+        }
+
+        .btn-icon {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border-radius: 6px;
+        }
+
+        /* 发送按钮 - 项目实际样式 */
+        .send-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: var(--btn-primary);
+            color: var(--on-btn-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 100ms;
+            outline: none;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            background: var(--btn-primary-hover);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .send-btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.2);
+        }
+
+        /* TokenUsageChip - 项目实际样式 */
+        .token-usage {
+            display: none;
+            border-radius: 9999px;
+            background: var(--bg-muted);
+            padding: 2px 6px;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-tertiary);
+            cursor: default;
+            user-select: none;
+            line-height: 1.4;
+        }
+
+        @media (min-width: 640px) {
+            .token-usage {
+                display: inline-block;
+            }
+        }
+
+        /* 弹窗 - 项目实际样式 */
+        .popover-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 17, 17, 0.28);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .popover-content {
+            background: var(--bg-app);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            width: 320px;
+            animation: modal-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes modal-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .popover-header {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .popover-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .popover-close {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 100ms;
+        }
+
+        .popover-close:hover {
+            background: var(--state-hover);
+            color: var(--text-primary);
+        }
+
+        .popover-body {
+            padding: 14px;
+        }
+
+        .popover-footer {
+            padding: 10px 14px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* 表单 - 项目实际样式 */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            line-height: 1.5;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-primary);
+            background: var(--bg-app);
+            transition: border-color 100ms;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--border-strong);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-primary);
+            background: var(--bg-app);
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23757575' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+            transition: border-color 100ms;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--border-strong);
+        }
+
+        .form-hint {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+
+        /* 按钮 - 项目实际样式 */
+        .modal-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 100ms;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid transparent;
+            font-family: inherit;
+            line-height: 1.5;
+            outline: none;
+        }
+
+        .modal-btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.2);
+        }
+
+        .modal-btn-primary {
+            background: var(--btn-primary);
+            color: var(--on-btn-primary);
+        }
+
+        .modal-btn-primary:hover {
+            background: var(--btn-primary-hover);
+        }
+
+        .modal-btn-secondary {
+            background: var(--bg-subtle);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .modal-btn-secondary:hover {
+            background: var(--state-hover);
+        }
+
+        /* 说明区域 */
+        .demo-section {
+            background: var(--bg-app);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .demo-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            line-height: 1.4;
+        }
+
+        .demo-title-icon {
+            color: var(--accent);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .feature-card {
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: border-color 100ms;
+        }
+
+        .feature-card:hover {
+            border-color: var(--border-strong);
+        }
+
+        .feature-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            background: var(--bg-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .feature-name {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+            line-height: 1.5;
+        }
+
+        .feature-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* 分隔线 */
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div style="max-width: 1200px; margin: 0 auto; padding: 24px;">
+        <!-- 页面标题 -->
+        <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; line-height: 1.25;">
+                定时任务集成到对话输入框
+            </h1>
+            <p style="font-size: 14px; color: var(--text-secondary); max-width: 480px; margin: 0 auto; line-height: 1.7;">
+                在对话输入框底部工具栏添加定时任务按钮，无需离开对话即可设置定时执行任务
+            </p>
+        </div>
+
+        <!-- 核心功能 -->
+        <div class="demo-section">
+            <div class="demo-title">
+                <span class="demo-title-icon">★</span>
+                核心功能
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⏰</div>
+                    <div class="feature-name">工具栏按钮</div>
+                    <div class="feature-desc">
+                        在输入框底部工具栏右侧添加定时任务按钮，一键设置定时执行
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📋</div>
+                    <div class="feature-name">简洁弹窗</div>
+                    <div class="feature-desc">
+                        点击按钮弹出简洁的时间设置窗口，快速配置执行频率和时间
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📌</div>
+                    <div class="feature-name">状态提示栏</div>
+                    <div class="feature-desc">
+                        输入框上方显示定时任务信息，类似异步shell窗口，可手动关闭
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🗑️</div>
+                    <div class="feature-name">简化导航</div>
+                    <div class="feature-desc">
+                        删除独立的自动化页面，所有功能集成到对话输入框
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 原型1: 无定时任务状态 -->
+        <div class="demo-section">
+            <div class="demo-title">
+                <span class="demo-title-icon">▶</span>
+                原型 1: 无定时任务状态
+            </div>
+            <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;">
+                <div class="page-container" style="height: 480px;">
+                    <!-- 侧边栏 -->
+                    <div class="sidebar">
+                        <div class="sidebar-header">
+                            <div class="sidebar-logo">
+                                <div class="sidebar-logo-icon">H</div>
+                                <span>hip</span>
+                            </div>
+                        </div>
+                        <div class="sidebar-nav">
+                            <div class="nav-section">
+                                <div class="nav-section-title">导航</div>
+                                <a class="nav-item active" href="#">
+                                    <span class="nav-item-icon">💬</span>
+                                    <span>Chat</span>
+                                </a>
+                                <a class="nav-item" href="#">
+                                    <span class="nav-item-icon">💻</span>
+                                    <span>Code</span>
+                                </a>
+                                <a class="nav-item" href="#">
+                                    <span class="nav-item-icon">⌨️</span>
+                                    <span>终端</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主内容区 -->
+                    <div class="main-content">
+                        <div class="toolbar">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="toolbar-title">新对话</div>
+                                <span class="toolbar-tag">Chat</span>
+                            </div>
+                        </div>
+
+                        <div class="chat-area">
+                            <div class="messages-container">
+                                <div class="message">
+                                    <div class="message-avatar assistant">H</div>
+                                    <div class="message-content">
+                                        <div class="message-bubble">
+                                            <p>你好！我可以帮助你完成各种任务。你可以设置定时任务让我定期执行某些操作。</p>
+                                        </div>
+                                        <div class="message-time">10:30</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="input-container">
+                                <div class="composer-wrapper">
+                                    <!-- Composer - 项目实际样式 -->
+                                    <div class="composer">
+                                        <textarea class="composer-input" rows="2" placeholder="输入消息..."></textarea>
+                                        <div class="composer-toolbar">
+                                            <div class="toolbar-group">
+                                                <!-- Agent 按钮 - ComposerChip 样式 -->
+                                                <button class="composer-chip">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M12 8V4H8"></path>
+                                                        <rect width="16" height="12" x="4" y="8" rx="2"></rect>
+                                                        <path d="M2 14h2"></path>
+                                                        <path d="M20 14h2"></path>
+                                                        <path d="M15 13v2"></path>
+                                                        <path d="M9 13v2"></path>
+                                                    </svg>
+                                                    <span>Built-in</span>
+                                                </button>
+                                                <!-- 附件按钮 - ComposerChip 样式 -->
+                                                <button class="composer-chip" title="附件">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div class="toolbar-group">
+                                                <span class="token-usage">42%</span>
+                                                <!-- 定时任务按钮 - ComposerChip 样式 -->
+                                                <button class="composer-chip" title="定时任务">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                                    </svg>
+                                                </button>
+                                                <!-- 发送按钮 -->
+                                                <button class="send-btn" disabled title="发送">
+                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                                                        <polyline points="5 12 12 5 19 12"></polyline>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 12px; padding: 12px; background: var(--bg-subtle); border-radius: 6px; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                <strong>说明：</strong>Composer 使用 card variant，外层容器样式为 <code>relative rounded-lg border bg-surface-subtle p-2.5</code>。
+                底部工具栏使用 <code>flex items-center justify-between pt-1.5 px-0.5</code>。
+                左侧显示 Agent 选择器和附件按钮（ComposerChip 样式），右侧显示 TokenUsage、定时任务按钮和发送按钮。
+            </div>
+        </div>
+
+        <!-- 原型2: 定时任务设置弹窗 -->
+        <div class="demo-section">
+            <div class="demo-title">
+                <span class="demo-title-icon">🪟</span>
+                原型 2: 定时任务设置弹窗
+            </div>
+            <div style="background: var(--bg-subtle); border-radius: 10px; padding: 40px; position: relative; min-height: 320px;">
+                <div class="popover-content" style="margin: 0 auto;">
+                    <div class="popover-header">
+                        <div class="popover-title">定时任务设置</div>
+                        <button class="popover-close">×</button>
+                    </div>
+                    <div class="popover-body">
+                        <div class="form-group">
+                            <label class="form-label">执行频率</label>
+                            <select class="form-select">
+                                <option value="manual">手动触发</option>
+                                <option value="daily" selected>每天</option>
+                                <option value="weekly">每周</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">执行时间</label>
+                            <input type="time" class="form-input" value="09:00">
+                        </div>
+                        <div class="form-hint">
+                            当前对话内容将作为任务执行的上下文
+                        </div>
+                    </div>
+                    <div class="popover-footer">
+                        <button class="modal-btn modal-btn-secondary">取消</button>
+                        <button class="modal-btn modal-btn-primary">设置定时任务</button>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 12px; padding: 12px; background: var(--bg-subtle); border-radius: 6px; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                <strong>说明：</strong>点击定时任务按钮后弹出 Popover 设置窗口。
+                按钮样式：primary 使用 <code>bg-btn-primary text-on-btn-primary</code>，secondary 使用 <code>bg-surface-subtle border border-border text-ink</code>。
+            </div>
+        </div>
+
+        <!-- 原型3: 已设置定时任务状态 -->
+        <div class="demo-section">
+            <div class="demo-title">
+                <span class="demo-title-icon">✓</span>
+                原型 3: 已设置定时任务状态
+            </div>
+            <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;">
+                <div class="page-container" style="height: 520px;">
+                    <!-- 侧边栏 -->
+                    <div class="sidebar">
+                        <div class="sidebar-header">
+                            <div class="sidebar-logo">
+                                <div class="sidebar-logo-icon">H</div>
+                                <span>hip</span>
+                            </div>
+                        </div>
+                        <div class="sidebar-nav">
+                            <div class="nav-section">
+                                <div class="nav-section-title">导航</div>
+                                <a class="nav-item active" href="#">
+                                    <span class="nav-item-icon">💬</span>
+                                    <span>Chat</span>
+                                </a>
+                                <a class="nav-item" href="#">
+                                    <span class="nav-item-icon">💻</span>
+                                    <span>Code</span>
+                                </a>
+                                <a class="nav-item" href="#">
+                                    <span class="nav-item-icon">⌨️</span>
+                                    <span>终端</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主内容区 -->
+                    <div class="main-content">
+                        <div class="toolbar">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="toolbar-title">每日站会总结</div>
+                                <span class="toolbar-tag">Chat</span>
+                            </div>
+                        </div>
+
+                        <div class="chat-area">
+                            <div class="messages-container">
+                                <div class="message">
+                                    <div class="message-avatar assistant">H</div>
+                                    <div class="message-content">
+                                        <div class="message-bubble">
+                                            <p>已为你设置定时任务：每天早上9点执行此对话。</p>
+                                        </div>
+                                        <div class="message-time">10:30</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="input-container">
+                                <div class="composer-wrapper">
+                                    <!-- 定时任务状态栏 - 与 diff annotations 风格一致 -->
+                                    <div class="schedule-banner">
+                                        <div class="schedule-banner-icon">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <polyline points="12 6 12 12 16 14"></polyline>
+                                            </svg>
+                                        </div>
+                                        <div class="schedule-banner-content">
+                                            <div class="schedule-banner-title">
+                                                定时任务：每天 09:00 执行
+                                            </div>
+                                            <div class="schedule-banner-subtitle">
+                                                下次执行：明天 09:00
+                                            </div>
+                                        </div>
+                                        <div class="schedule-banner-actions">
+                                            <button class="schedule-banner-btn">编辑</button>
+                                            <button class="schedule-banner-btn close" title="关闭提示（不删除任务）">×</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Composer - 项目实际样式 -->
+                                    <div class="composer">
+                                        <textarea class="composer-input" rows="2" placeholder="输入消息..."></textarea>
+                                        <div class="composer-toolbar">
+                                            <div class="toolbar-group">
+                                                <!-- Agent 按钮 -->
+                                                <button class="composer-chip">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M12 8V4H8"></path>
+                                                        <rect width="16" height="12" x="4" y="8" rx="2"></rect>
+                                                        <path d="M2 14h2"></path>
+                                                        <path d="M20 14h2"></path>
+                                                        <path d="M15 13v2"></path>
+                                                        <path d="M9 13v2"></path>
+                                                    </svg>
+                                                    <span>Built-in</span>
+                                                </button>
+                                                <!-- 附件按钮 -->
+                                                <button class="composer-chip" title="附件">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div class="toolbar-group">
+                                                <span class="token-usage">42%</span>
+                                                <!-- 定时任务按钮 - 已激活状态 -->
+                                                <button class="composer-chip active" title="定时任务：每天 09:00">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                                    </svg>
+                                                    <span>09:00</span>
+                                                </button>
+                                                <!-- 发送按钮 -->
+                                                <button class="send-btn" disabled title="发送">
+                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                                                        <polyline points="5 12 12 5 19 12"></polyline>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 12px; padding: 12px; background: var(--bg-subtle); border-radius: 6px; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                <strong>说明：</strong>状态栏样式与 diff annotations 一致：<code>rounded-md border border-border bg-surface-muted px-2.5 py-1.5</code>。
+                定时任务按钮使用 active 状态：<code>bg-state-active text-ink</code>，显示时间标签。
+                关闭按钮仅隐藏显示，不删除任务。
+            </div>
+        </div>
+
+        <!-- 技术要点 -->
+        <div class="demo-section">
+            <div class="demo-title">
+                <span class="demo-title-icon">⚙</span>
+                技术实现要点
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                <div>
+                    <h4 style="font-weight: 600; margin-bottom: 10px; font-size: 13px; line-height: 1.5;">新增组件</h4>
+                    <ul style="list-style: none; padding: 0; font-size: 12px; color: var(--text-secondary);">
+                        <li style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+                            <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">ScheduledTaskButton</code>
+                            <span style="margin-left: 8px;">- ComposerChip 样式按钮</span>
+                        </li>
+                        <li style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+                            <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">ScheduledTaskPopover</code>
+                            <span style="margin-left: 8px;">- Popover 时间设置弹窗</span>
+                        </li>
+                        <li style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+                            <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">ScheduledTaskBanner</code>
+                            <span style="margin-left: 8px;">- 状态提示栏</span>
+                        </li>
+                        <li style="padding: 6px 0;">
+                            <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">useScheduledTask</code>
+                            <span style="margin-left: 8px;">- 定时任务 Hook</span>
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="font-weight: 600; margin-bottom: 10px; font-size: 13px; line-height: 1.5;">修改文件</h4>
+                    <ul style="list-style: none; padding: 0; font-size: 12px; color: var(--text-secondary);">
+                        <li style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+                            <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">Composer.tsx</code>
+                            <span style="margin-left: 8px;">- 添加按钮位置</span>
+                        </li>
+                        <li style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+                            <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">InputBar.tsx</code>
+                            <span style="margin-left: 8px;">- 集成状态栏</span>
+                        </li>
+                        <li style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+                            <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">AppSidebar.tsx</code>
+                            <span style="margin-left: 8px;">- 移除自动化导航</span>
+                        </li>
+                        <li style="padding: 6px 0;">
+                            <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">automationStore.ts</code>
+                            <span style="margin-left: 8px;">- 简化为定时任务存储</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 删除的组件 -->
+        <div class="demo-section">
+            <div class="demo-title">
+                <span class="demo-title-icon">🗑</span>
+                删除的组件
+            </div>
+            <div style="background: rgba(198, 59, 59, 0.05); border: 1px solid rgba(198, 59, 59, 0.2); border-radius: 10px; padding: 16px;">
+                <h4 style="font-weight: 600; color: var(--danger); margin-bottom: 10px; font-size: 13px; line-height: 1.5;">移除自动化页面相关组件</h4>
+                <ul style="list-style: none; padding: 0; font-size: 12px; color: var(--text-secondary);">
+                    <li style="padding: 6px 0;">
+                        <span style="color: var(--danger); margin-right: 8px;">✕</span>
+                        <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">src/components/automation/</code>
+                        <span style="margin-left: 8px;">- 整个目录</span>
+                    </li>
+                    <li style="padding: 6px 0;">
+                        <span style="color: var(--danger); margin-right: 8px;">✕</span>
+                        侧边栏"自动化"导航项
+                    </li>
+                    <li style="padding: 6px 0;">
+                        <span style="color: var(--danger); margin-right: 8px;">✕</span>
+                        <code style="background: var(--bg-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">AUTOMATION_PAGE</code>
+                        <span style="margin-left: 8px;">- 功能标志</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

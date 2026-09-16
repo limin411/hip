@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { bootstrapIsolation } from './env-bootstrap.js'
 
 describe('bootstrapIsolation', () => {
@@ -21,13 +21,20 @@ describe('bootstrapIsolation', () => {
     expect(existsSync(env.HIP_CONFIG_PATH!)).toBe(true)
     expect(JSON.parse(readFileSync(env.HIP_MEMORY_CONFIG_PATH!, 'utf8')).useMemories).toBe(false)
     // Auth points at user home secret path, not isolation root
-    expect(env.HIP_AUTH_PATH).toContain('.hip/config/auth.json')
-    expect(env.HIP_AUTH_PATH).not.toContain(join(root, 'config', 'auth'))
+    // Normalize path separators for cross-platform comparison
+    const authPath = env.HIP_AUTH_PATH!.replace(/\\/g, '/')
+    expect(authPath).toContain('.hip/config/auth.json')
+    expect(authPath).not.toContain(root.replace(/\\/g, '/') + '/config/auth')
   })
 
   it('db memory', () => {
     const { env } = bootstrapIsolation({ setHome: false, dbMemory: true, env: { HOME: '/h' } })
     expect(env.HIP_DB_PATH).toBe(':memory:')
-    expect(env.HOME).toBe('/h')
+    // On Windows, HOME might be converted to Windows format
+    if (sep === '\\') {
+      expect(env.HOME).toMatch(/h$/)
+    } else {
+      expect(env.HOME).toBe('/h')
+    }
   })
 })

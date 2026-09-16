@@ -22,6 +22,7 @@ export function Composer({
   onStop,
   reconnecting,
   leftSlot,
+  rightSlot,
   submitDisabled,
   inputDisabled,
   placeholder,
@@ -45,6 +46,8 @@ export function Composer({
   onStop?: () => void
   reconnecting?: boolean
   leftSlot?: React.ReactNode
+  /** Slot for right-side toolbar items before send button (e.g. scheduled task button). */
+  rightSlot?: React.ReactNode
   submitDisabled?: boolean
   /** When true, textarea is not editable (e.g. project folder required). */
   inputDisabled?: boolean
@@ -209,6 +212,7 @@ export function Composer({
         </div>
         <div className="flex items-center gap-1.5">
           <TokenUsageChip />
+          {rightSlot}
           {running && onStop ? (
             <>
               {reconnecting && (

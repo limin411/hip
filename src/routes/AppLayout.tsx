@@ -31,9 +31,7 @@ import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
 import { TerminalManagementPage } from '@/components/terminals/TerminalManagementPage'
 
-import { AUTOMATION_PAGE } from '@/components/automation/feature'
-import { AutomationsPage } from '@/components/automation/AutomationsPage'
-import { AutomationRunHost } from '@/components/automation/AutomationRunHost'
+
 
 import { TerminalRightPanel } from '@/components/terminals/TerminalRightPanel'
 import { startTerminalBridge } from '@/ipc/pty'
@@ -313,16 +311,6 @@ export function AppLayout() {
         />
       )
     }
-    if (activeView === 'automation') {
-      if (AUTOMATION_PAGE) return <AutomationsPage />
-      return (
-        <PlaceholderPage
-          titleKey="sidebar.nav.automation"
-          descriptionKey="placeholder.automation"
-          testId="placeholder-automation"
-        />
-      )
-    }
     return activeSessionId == null ? (
       <NewConversation />
     ) : (
@@ -348,7 +336,6 @@ export function AppLayout() {
     // AppSidebar is solid bg-surface-subtle (light gray chrome); main column stays opaque.
     <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
       <WindowLifecycleHost />
-      {AUTOMATION_PAGE ? <AutomationRunHost /> : null}
       {sidebarOpen ? <AppSidebar /> : null}
       {/* Measure the group width via a plain div — PanelGroup's own ref is an
           ImperativePanelGroupHandle, not the DOM node. */}

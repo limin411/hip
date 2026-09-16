@@ -19,7 +19,6 @@ import {
   openTrashFromChrome,
 } from '@/components/layout/sidebarActions'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
-import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import { useHostLibraryUi } from '@/components/terminals/hostLibraryUi'
 import { useManagedTerminalStore } from '@/store/managedTerminalStore'
 
@@ -132,11 +131,6 @@ export function GlobalCommandPalette() {
             quickConnect: t('commandPalette.quickConnect'),
           }
         : {}),
-      ...(AUTOMATION_PAGE
-        ? {
-            openAutomations: t('commandPalette.openAutomations'),
-          }
-        : {}),
       themeLight: t('settings.themes.light'),
       themeDark: t('settings.themes.dark'),
       themeSystem: t('settings.themes.system'),
@@ -239,11 +233,6 @@ export function GlobalCommandPalette() {
                 useHostLibraryUi.getState().requestOpenQuickConnect()
               })
             },
-          }
-        : {}),
-      ...(AUTOMATION_PAGE
-        ? {
-            enterAutomations: () => void enterAutomationsSection(),
           }
         : {}),
     }),

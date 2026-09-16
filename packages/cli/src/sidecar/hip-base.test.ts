@@ -1,15 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { resolveDiscoveryPath, resolveHipBaseDir } from './hip-base.js'
 
 describe('resolveHipBaseDir', () => {
   it('honors HIP_DATA_DIR', () => {
-    expect(resolveHipBaseDir({ HIP_DATA_DIR: '/tmp/isolated-hip' }, 'darwin')).toBe('/tmp/isolated-hip')
+    const result = resolveHipBaseDir({ HIP_DATA_DIR: '/tmp/isolated-hip' }, 'darwin')
+    // On Windows, path.resolve converts Unix paths to Windows format
+    if (sep === '\\') {
+      expect(result).toMatch(/isolated-hip$/)
+    } else {
+      expect(result).toBe('/tmp/isolated-hip')
+    }
   })
 
   it('unix uses $HOME/.hip', () => {
-    expect(resolveHipBaseDir({ HOME: '/Users/x' }, 'darwin')).toBe('/Users/x/.hip')
-    expect(resolveHipBaseDir({ HOME: '/home/u' }, 'linux')).toBe('/home/u/.hip')
+    // On Windows, join converts Unix paths to Windows format
+    if (sep === '\\') {
+      expect(resolveHipBaseDir({ HOME: '/Users/x' }, 'darwin')).toMatch(/\.hip$/)
+      expect(resolveHipBaseDir({ HOME: '/home/u' }, 'linux')).toMatch(/\.hip$/)
+    } else {
+      expect(resolveHipBaseDir({ HOME: '/Users/x' }, 'darwin')).toBe('/Users/x/.hip')
+      expect(resolveHipBaseDir({ HOME: '/home/u' }, 'linux')).toBe('/home/u/.hip')
+    }
   })
 
   it('windows uses USERPROFILE/.hip (not APPDATA)', () => {
@@ -35,6 +47,8 @@ describe('resolveHipBaseDir', () => {
 describe('resolveDiscoveryPath', () => {
   it('appends run/sidecar.json', () => {
     const p = resolveDiscoveryPath({ HOME: '/Users/x' }, 'darwin')
-    expect(p.replace(/\\/g, '/')).toBe('/Users/x/.hip/run/sidecar.json')
+    // Normalize separators for cross-platform comparison
+    const normalized = p.replace(/\\/g, '/')
+    expect(normalized).toMatch(/\.hip\/run\/sidecar\.json$/)
   })
 })

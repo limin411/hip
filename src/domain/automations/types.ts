@@ -1,13 +1,15 @@
 /** Product automation — NOT session CronManager / Workflow DAG. */
 
-export type AutomationTriggerKind = 'manual' | 'daily' | 'weekly'
+export type AutomationTriggerKind = 'interval' | 'daily' | 'weekly'
 
 /**
- * Trigger config. `weekday`: 0=Sunday … 6=Saturday (`Date.getDay()`).
- * UI uses i18n weekday names; does not assume week-start day.
+ * Trigger config.
+ * - `interval`: every N minutes (minimum 1)
+ * - `daily`: at specific hour:minute
+ * - `weekly`: on specific weekday at hour:minute
  */
 export type AutomationTrigger =
-  | { kind: 'manual' }
+  | { kind: 'interval'; intervalMinutes: number }
   | { kind: 'daily'; hour: number; minute: number }
   | { kind: 'weekly'; weekday: number; hour: number; minute: number }
 

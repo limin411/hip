@@ -28,6 +28,7 @@ import { hasPlanApproval } from './planApproval'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
+import { ScheduledTaskButton, ScheduledTaskBanner } from './scheduled-task'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useSkillsStore } from '@/store/skillsStore'
@@ -323,6 +324,7 @@ export function InputBar() {
                 onDismiss={handleFileMentionDismiss}
               />
             )}
+            <ScheduledTaskBanner />
             <Composer
               variant="card"
               textareaHeight={textareaHeight}
@@ -351,6 +353,7 @@ export function InputBar() {
                   }
                 />
               }
+              rightSlot={<ScheduledTaskButton />}
               attachments={attachments}
               onAttachmentsChange={setAttachments}
               quoteText={quoteText}

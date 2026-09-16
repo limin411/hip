@@ -96,17 +96,17 @@ export function AutomationDetailPanel({
       data-testid="automation-detail-panel"
       aria-label={name}
     >
-      <div className="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-2.5">
+      <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <h2
-              className="truncate text-body font-semibold text-ink"
+              className="truncate text-title font-semibold text-ink"
               data-testid="automation-detail-name"
               title={name}
             >
               {name}
             </h2>
-            <p className="mt-0.5 text-meta text-ink-tertiary">
+            <p className="mt-1 text-meta text-ink-tertiary">
               {triggerLabel(
                 automation,
                 t as (key: string, opts?: Record<string, unknown>) => string,
@@ -128,7 +128,7 @@ export function AutomationDetailPanel({
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 text-meta text-ink-tertiary">
+        <div className="flex flex-wrap items-center gap-2 text-meta text-ink-tertiary">
           {status ? (
             <Badge
               size="sm"
@@ -200,11 +200,10 @@ export function AutomationDetailPanel({
           </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button
             type="button"
             size="sm"
-            variant="secondary"
             disabled={running}
             data-testid="automation-detail-run"
             onClick={() => onRun({ focus: false })}
@@ -215,7 +214,7 @@ export function AutomationDetailPanel({
           <Button
             type="button"
             size="sm"
-            variant="ghost"
+            variant="secondary"
             disabled={running}
             data-testid="automation-detail-run-open"
             onClick={() => onRun({ focus: true })}

@@ -157,6 +157,18 @@ export function AutomationRow({
 
   const promptPreview = automation.prompt.trim()
 
+  const statusColor = running
+    ? 'bg-accent'
+    : status === 'succeeded'
+      ? 'bg-success'
+      : status === 'failed' || status === 'cancelled'
+        ? 'bg-danger'
+        : status === 'waiting_user'
+          ? 'bg-warning'
+          : automation.enabled
+            ? 'bg-ink-tertiary'
+            : 'bg-ink-tertiary/50'
+
   return (
     <div
       data-testid={`automation-row-${automation.id}`}
@@ -175,8 +187,8 @@ export function AutomationRow({
           : undefined
       }
       className={cn(
-        'group relative flex min-h-[168px] flex-col gap-3 rounded-lg border bg-surface p-4',
-        'transition-[border-color,background-color,box-shadow] duration-chrome',
+        'group relative flex min-h-[172px] flex-col gap-3 overflow-hidden rounded-lg border bg-surface',
+        'transition-[border-color,background-color] duration-chrome',
         selected
           ? 'border-ink bg-state-active'
           : 'border-border hover:border-border-strong hover:bg-surface-subtle',
@@ -185,16 +197,24 @@ export function AutomationRow({
         !automation.enabled && 'opacity-80',
       )}
     >
+      {/* Status color bar - top edge */}
+      <div
+        className={cn(
+          'absolute inset-x-0 top-0 h-0.5 transition-colors duration-chrome',
+          statusColor,
+        )}
+        aria-hidden
+      />
       {/* Top: icon + name + status */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 px-4 pt-4">
         <div
           className={cn(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-chrome',
             running
               ? 'bg-accent/10 text-accent'
               : automation.enabled
-                ? 'bg-surface-subtle text-ink-secondary'
-                : 'bg-surface-muted text-ink-tertiary',
+                ? 'bg-surface-muted text-ink-secondary'
+                : 'bg-surface-muted/60 text-ink-tertiary',
           )}
         >
           {running ? (
@@ -239,7 +259,7 @@ export function AutomationRow({
             ) : null}
           </div>
 
-          <p className="mt-1 truncate text-meta text-ink-tertiary" title={scheduleLine}>
+          <p className="mt-1.5 text-meta text-ink-tertiary" title={scheduleLine}>
             {scheduleLine}
             {nextLine ? ` · ${nextLine}` : null}
           </p>
@@ -247,7 +267,7 @@ export function AutomationRow({
       </div>
 
       {/* Body: prompt + meta */}
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 px-4">
         {promptPreview ? (
           <p className="line-clamp-2 text-meta leading-relaxed text-ink-secondary">
             {promptPreview}
@@ -260,7 +280,7 @@ export function AutomationRow({
 
         {automation.projectPath ? (
           <p
-            className="flex items-center gap-1 truncate text-caption text-ink-tertiary"
+            className="flex items-center gap-1.5 truncate text-caption text-ink-tertiary"
             title={automation.projectPath}
           >
             <FolderGit2 className="h-3 w-3 shrink-0" strokeWidth={1.75} aria-hidden />
@@ -294,7 +314,7 @@ export function AutomationRow({
 
       {/* Footer: enable + actions */}
       <div
-        className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-3"
+        className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 px-4 py-3"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >

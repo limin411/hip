@@ -133,19 +133,19 @@ export function AutomationRunHistory({
       aria-label={t('automation.run.history')}
     >
       {hideHeader ? (
-        <div className="shrink-0 border-b border-border px-3 py-2">
+        <div className="shrink-0 border-b border-border px-4 py-2.5">
           <h3 className="text-meta font-medium text-ink-secondary">
             {t('automation.run.history')}
           </h3>
         </div>
       ) : (
-        <div className="flex shrink-0 items-start gap-2 border-b border-border px-3 py-2.5">
+        <div className="flex shrink-0 items-start gap-2 border-b border-border px-4 py-3">
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-body font-semibold text-ink">
+            <h2 className="truncate text-title font-semibold text-ink">
               {t('automation.run.history')}
             </h2>
             <p
-              className="truncate text-meta text-ink-tertiary"
+              className="mt-0.5 truncate text-meta text-ink-tertiary"
               data-testid="automation-run-history-name"
               title={name}
             >
@@ -176,7 +176,7 @@ export function AutomationRunHistory({
         />
       ) : (
         <ul
-          className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-2"
+          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3"
           data-testid="automation-run-history-list"
         >
           {recent.map((run) => {
@@ -201,7 +201,7 @@ export function AutomationRunHistory({
                       : reason ?? undefined
                   }
                   className={cn(
-                    'flex w-full flex-col gap-1 rounded-md border border-border bg-surface-subtle px-2.5 py-2 text-left',
+                    'flex w-full flex-col gap-1.5 rounded-md border border-border bg-surface px-3 py-2.5 text-left',
                     'transition-colors duration-chrome',
                     interactive
                       ? 'cursor-pointer hover:bg-state-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40'

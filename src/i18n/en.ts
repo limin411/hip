@@ -2148,6 +2148,12 @@ export const en = {
       startCta: 'Start automating',
       loading: 'Loading…',
       untitled: 'Untitled automation',
+      feature: {
+        schedule: 'Scheduled runs',
+        scheduleDesc: 'Run daily or weekly without lifting a finger.',
+        triggers: 'Manual triggers',
+        triggersDesc: 'Run on demand with one click.',
+      },
       localOnlyHint: 'Runs on this computer. hip must be open or hidden to the tray for scheduled runs.',
       projectRequired: 'This template requires a project folder.',
       templatesHeading: 'Templates',

@@ -2093,6 +2093,12 @@ export const zhCN = {
       startCta: '开始自动化',
       loading: '加载中…',
       untitled: '未命名自动化',
+      feature: {
+        schedule: '定时运行',
+        scheduleDesc: '每天或每周自动执行，无需操心。',
+        triggers: '手动触发',
+        triggersDesc: '一键即可立即运行。',
+      },
       localOnlyHint: '在本机运行。定时任务需 hip 保持打开或隐藏到托盘。',
       projectRequired: '此模板需要选择项目目录。',
       templatesHeading: '模板',

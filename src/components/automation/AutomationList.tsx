@@ -107,9 +107,9 @@ export function AutomationList({
       className="flex min-h-0 flex-1 flex-col overflow-hidden bg-surface-subtle/40"
       data-testid="automation-list"
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-5 py-3">
         <span
-          className="shrink-0 text-meta text-ink-tertiary"
+          className="shrink-0 text-meta font-medium text-ink-secondary"
           data-testid="automation-list-count"
         >
           {t('automation.list.count', {
@@ -118,9 +118,9 @@ export function AutomationList({
           })}
         </span>
 
-        <div className="relative min-w-[10rem] flex-1">
+        <div className="relative min-w-[12rem] flex-1">
           <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-tertiary"
+            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-tertiary"
             strokeWidth={1.75}
             aria-hidden
           />
@@ -128,7 +128,7 @@ export function AutomationList({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('automation.list.searchPlaceholder')}
-            className="h-8 pl-8"
+            className="h-8 pl-9"
             data-testid="automation-list-search"
             aria-label={t('automation.list.searchPlaceholder')}
           />
@@ -153,7 +153,7 @@ export function AutomationList({
             onChange={(e) => setSort(e.target.value as AutomationSort)}
             data-testid="automation-list-sort"
             aria-label={t('automation.list.sortAria')}
-            className="h-8 rounded-sm border border-border bg-surface px-2 text-meta text-ink"
+            className="h-8 rounded-sm border border-border bg-surface px-2.5 text-meta text-ink"
           >
             <option value="nextRun">{t('automation.list.sortNextRun')}</option>
             <option value="recent">{t('automation.list.sortRecent')}</option>
@@ -230,7 +230,7 @@ export function AutomationList({
       ) : (
         <ul
           className={cn(
-            'm-0 grid min-h-0 flex-1 list-none content-start gap-3 overflow-y-auto p-4',
+            'm-0 grid min-h-0 flex-1 list-none content-start gap-4 overflow-y-auto p-5',
             'grid-cols-1 sm:grid-cols-2',
             /* Detail panel open: keep two max so cards stay readable. */
             selectedId ? 'xl:grid-cols-2' : 'xl:grid-cols-3',

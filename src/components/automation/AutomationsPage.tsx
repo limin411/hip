@@ -82,9 +82,20 @@ export function AutomationsPage() {
   if (!loaded && loading) {
     return (
       <div
-        className="flex h-full min-h-0 flex-1 flex-col"
+        className="flex h-full min-h-0 flex-1 flex-col bg-surface-content"
         data-testid="automations-page"
       >
+        {/* Page header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
+          <div>
+            <h1 className="text-title font-semibold text-ink">
+              {t('automation.title')}
+            </h1>
+            <p className="mt-0.5 text-meta text-ink-tertiary">
+              {t('automation.subtitle')}
+            </p>
+          </div>
+        </div>
         <EmptyState
           icon={Zap}
           tier="professional"
@@ -99,12 +110,24 @@ export function AutomationsPage() {
 
   return (
     <div
-      className="flex h-full min-h-0 flex-1 flex-col"
+      className="flex h-full min-h-0 flex-1 flex-col bg-surface-content"
       data-testid="automations-page"
     >
+      {/* Page header */}
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
+        <div>
+          <h1 className="text-title font-semibold text-ink">
+            {t('automation.title')}
+          </h1>
+          <p className="mt-0.5 text-meta text-ink-tertiary">
+            {t('automation.subtitle')}
+          </p>
+        </div>
+      </div>
+
       {error ? (
         <div
-          className="shrink-0 border-b border-danger/30 bg-danger/10 px-4 py-2 text-meta text-danger"
+          className="shrink-0 border-b border-danger/30 bg-danger/10 px-5 py-2 text-meta text-danger"
           data-testid="automation-error"
           role="alert"
         >

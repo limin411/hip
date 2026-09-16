@@ -5,10 +5,9 @@ import { useSkillsStore } from '@/store/skillsStore'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import type { SkillSeedDraft } from './AutomationEmptyState'
 
 export type AutomationSkillsSectionProps = {
-  onSelectSkill: (seed: SkillSeedDraft) => void
+  onSelectSkill: (seed: { name: string; prompt: string; skillIds: string[] }) => void
   className?: string
   /** Cap list length for empty-state density. */
   maxVisible?: number
@@ -49,7 +48,7 @@ export function AutomationSkillsSection({
       .slice(0, maxVisible)
   }, [skills, query, maxVisible])
 
-  const seedFromSkill = (id: string, name: string, description: string): SkillSeedDraft => ({
+  const seedFromSkill = (id: string, name: string, description: string) => ({
     name: t('automation.skillSeedName', { name }),
     prompt: t('automation.skillSeedPrompt', { name, description }),
     skillIds: [id],

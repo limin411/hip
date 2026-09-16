@@ -4,17 +4,13 @@ import { Zap } from 'lucide-react'
 import { useAutomationStore } from '@/store/automationStore'
 import { sessionService } from '@/domain'
 import { EmptyState } from '@/components/ui/EmptyState'
-import {
-  AutomationEmptyState,
-  type SkillSeedDraft,
-} from './AutomationEmptyState'
+import { AutomationEmptyState } from './AutomationEmptyState'
 import { AutomationList } from './AutomationList'
 import { AutomationEditorModal, type EditorMode } from './AutomationEditorModal'
 import { AutomationScheduleBanner } from './AutomationScheduleBanner'
 import { AutomationDetailPanel } from './AutomationDetailPanel'
 import { AutomationDeleteDialog } from './AutomationDeleteDialog'
 import { useInFlightIds } from './useAutomationInFlight'
-import type { AutomationTemplate } from './templates'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import {
   resolveCloseAction,
@@ -80,10 +76,6 @@ export function AutomationsPage() {
   }, [selectedId, selected, select])
 
   const openCreate = () => setEditor({ mode: 'create' })
-  const openTemplate = (template: AutomationTemplate) =>
-    setEditor({ mode: 'create', template })
-  const openSkill = (skillSeed: SkillSeedDraft) =>
-    setEditor({ mode: 'create', skillSeed })
   const openEdit = (id: string) => setEditor({ mode: 'edit', automationId: id })
   const closeEditor = () => setEditor({ mode: 'closed' })
 
@@ -132,7 +124,6 @@ export function AutomationsPage() {
               selectedId={selected?.id ?? null}
               onSelect={(id) => select(selectedId === id ? null : id)}
               onCreate={openCreate}
-              onCreateFromTemplate={openTemplate}
               onToggle={(id, enabled) => void setEnabled(id, enabled)}
               onRun={(id, opts) =>
                 void runNow(id, {
@@ -176,8 +167,6 @@ export function AutomationsPage() {
       ) : (
         <AutomationEmptyState
           onStartBlank={openCreate}
-          onSelectTemplate={openTemplate}
-          onSelectSkill={openSkill}
         />
       )}
 

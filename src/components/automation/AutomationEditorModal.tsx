@@ -30,14 +30,12 @@ import {
   type AutomationTemplate,
   type AutomationTemplateSoftWarning,
 } from './templates'
-import type { SkillSeedDraft } from './AutomationEmptyState'
 
 export type EditorMode =
   | { mode: 'closed' }
   | {
       mode: 'create'
       template?: AutomationTemplate | null
-      skillSeed?: SkillSeedDraft | null
     }
   | { mode: 'edit'; automationId: string }
 
@@ -226,7 +224,7 @@ export function AutomationEditorModal({
     state.mode === 'closed'
       ? 'closed'
       : state.mode === 'create'
-        ? `c:${state.template?.id ?? 'blank'}:${state.skillSeed?.skillIds?.join(',') ?? ''}`
+        ? `c:${state.template?.id ?? 'blank'}`
         : `e:${state.automationId}`
 
   useEffect(() => {
@@ -238,7 +236,6 @@ export function AutomationEditorModal({
     if (state.mode === 'create') {
       const d = emptyDraft()
       const tpl = state.template
-      const seed = state.skillSeed
       if (tpl && tpl.id !== 'blank') {
         d.name = t(tpl.nameKey as 'automation.templates.dailyStandup.name')
         d.prompt = t(tpl.promptKey as 'automation.templates.dailyStandup.prompt')
@@ -254,12 +251,6 @@ export function AutomationEditorModal({
         d.templateId = tpl.id
         d.requiresProject = tpl.requiresProject
         d.softWarnings = tpl.softWarnings ? [...tpl.softWarnings] : []
-      }
-      if (seed) {
-        d.name = seed.name
-        d.prompt = seed.prompt
-        d.skillIds = [...seed.skillIds]
-        d.templateId = 'skill-bootstrap'
       }
       setDraft(d)
     } else if (state.mode === 'edit') {
@@ -499,15 +490,6 @@ export function AutomationEditorModal({
         className="flex flex-col gap-5 px-5 py-5"
         data-testid="automation-editor-modal"
       >
-        {draft.skillIds.length > 0 ? (
-          <p
-            className="rounded-lg border border-border bg-surface-subtle/70 px-3.5 py-2.5 text-meta leading-relaxed text-ink-secondary"
-            data-testid="automation-skill-seed-hint"
-          >
-            {t('automation.seedOnlyHint')}
-          </p>
-        ) : null}
-
         {draft.softWarnings.length > 0 ? (
           <ul
             className="flex flex-col gap-2"

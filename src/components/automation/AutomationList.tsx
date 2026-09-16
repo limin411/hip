@@ -1,21 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, LayoutTemplate, Plus, Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import type { Automation } from '@/domain/automations'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { EmptyState } from '@/components/ui/EmptyState'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/DropdownMenu'
-import { Modal } from '@/components/ui/Modal'
 import { AutomationRow } from './AutomationRow'
-import { AutomationTemplateGrid } from './AutomationTemplateGrid'
-import type { AutomationTemplate } from './templates'
 import { isInFlight } from '@/store/automationStore'
 import { cn } from '@/lib/utils'
 
@@ -30,7 +21,6 @@ export type AutomationListProps = {
   onDelete: (id: string) => void
   onOpenLastSession?: (id: string) => void
   onCreate?: () => void
-  onCreateFromTemplate?: (template: AutomationTemplate) => void
   onSelect?: (id: string) => void
   selectedId?: string | null
   runningIds?: Set<string>
@@ -84,7 +74,6 @@ export function AutomationList({
   onDelete,
   onOpenLastSession,
   onCreate,
-  onCreateFromTemplate,
   onSelect,
   selectedId,
   runningIds,
@@ -94,7 +83,6 @@ export function AutomationList({
   const [filter, setFilter] = useState<AutomationFilter>('all')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<AutomationSort>('nextRun')
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -175,48 +163,15 @@ export function AutomationList({
         </label>
 
         {onCreate ? (
-          onCreateFromTemplate ? (
-            /* modal={false}: menu item opens Modal; two body pointer-events locks
-               stack and leave the app unclickable after the dialog closes. */
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  size="sm"
-                  data-testid="automation-new"
-                >
-                  <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  {t('automation.startCta')}
-                  <ChevronDown className="h-3 w-3" strokeWidth={2} aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" data-testid="automation-new-menu">
-                <DropdownMenuItem
-                  data-testid="automation-new-blank"
-                  onSelect={() => onCreate()}
-                >
-                  <Plus className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                  {t('automation.list.newBlank')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  data-testid="automation-new-template"
-                  onSelect={() => setTemplatePickerOpen(true)}
-                >
-                  <LayoutTemplate className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-                  {t('automation.list.newFromTemplate')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              data-testid="automation-new"
-              onClick={onCreate}
-            >
-              {t('automation.startCta')}
-            </Button>
-          )
+          <Button
+            type="button"
+            size="sm"
+            data-testid="automation-new"
+            onClick={onCreate}
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+            {t('automation.startCta')}
+          </Button>
         ) : null}
       </div>
 
@@ -304,25 +259,6 @@ export function AutomationList({
         </ul>
       )}
 
-      {onCreateFromTemplate ? (
-        <Modal
-          open={templatePickerOpen}
-          onOpenChange={setTemplatePickerOpen}
-          title={t('automation.list.newFromTemplate')}
-        >
-          <div className="max-h-[min(28rem,60vh)] overflow-y-auto px-4 py-3">
-            <p className="mb-3 text-meta text-ink-tertiary">
-              {t('automation.templatesHint')}
-            </p>
-            <AutomationTemplateGrid
-              onSelect={(template) => {
-                setTemplatePickerOpen(false)
-                onCreateFromTemplate(template)
-              }}
-            />
-          </div>
-        </Modal>
-      ) : null}
     </div>
   )
 }

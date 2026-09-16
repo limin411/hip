@@ -51,6 +51,28 @@ describe('TaskRuntime shell / wait / caps', () => {
     expect('taskId' in s).toBe(true)
   })
 
+  // Regression: wait_any polls tasks that have a meta entry but no live promise
+  // (schedule-only). Its exit condition used to depend solely on an exhausted
+  // timeout budget, which is `undefined` when the caller omits timeout_ms — so
+  // the poll spun at 50ms forever and a single agent tool call wedged the turn.
+  it('wait_any returns promptly for a meta-only task even with no timeout', async () => {
+    mgr.meta.set('sch-stuck', {
+      description: 'never settling',
+      status: 'running',
+      kind: 'schedule',
+      abortController: new AbortController(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+    const started = Date.now()
+    const result = await mgr.waitMany(['sch-stuck'], 'wait_any')
+    const elapsed = Date.now() - started
+    expect(result.tasks).toHaveLength(1)
+    expect(result.tasks[0].status).toBe('running')
+    // Must terminate well before any plausible "waited forever" threshold.
+    expect(elapsed).toBeLessThan(5_000)
+  })
+
   it('waitMany wait_all returns structured payloads', async () => {
     const a = mgr.spawnShell({
       command: process.platform === 'win32' ? 'echo a' : 'echo a',

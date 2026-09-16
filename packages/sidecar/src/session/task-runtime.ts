@@ -72,6 +72,8 @@ export type TaskInternal = BackgroundTaskMeta
 
 const DEFAULT_TASK_OUTPUT_DIR = join(homedir(), '.hip', 'task-output')
 const LOG_TAIL_CHARS = 2048
+/** Anti-hang ceiling for wait_any's schedule-only poll when no timeout is given. */
+const SCHEDULE_SPIN_MAX_MS = 2_000
 
 // ── Persistence ────────────────────────────────────────────────────────────
 
@@ -910,11 +912,13 @@ export class BackgroundManager {
         const p = this.tasks.get(id)
         if (p) await p
         else if (!isTerminal(id)) {
-          // spin short for schedule-only
-          while (!isTerminal(id)) {
+          // Spin short for schedule-only tasks (no live promise — only a meta
+          // entry whose status may flip). Must stay bounded: `remaining()` is
+          // undefined when the caller passed no timeout, so a budget-only exit
+          // would spin forever and wedge the turn on a single LLM tool call.
+          const deadline = Date.now() + (timeoutMs ?? SCHEDULE_SPIN_MAX_MS)
+          while (!isTerminal(id) && Date.now() < deadline) {
             await new Promise((r) => setTimeout(r, 50))
-            const rem = remaining()
-            if (rem === 0) break
           }
         }
       })

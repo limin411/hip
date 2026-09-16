@@ -162,8 +162,12 @@ describe('run_script tool', () => {
 
   it('truncates very large output to ~64KB', async () => {
     const tools = buildTools(root, undefined, root, undefined, { requestApproval: allowApproval })
-    // emit ~200KB of x's instantly (portable, no slow shell loop)
-    const out = String(await byName(tools, 'run_script').invoke({ command: 'head -c 200000 /dev/zero | tr "\\0" x' }))
+    // emit ~200KB of x's instantly. Written with node rather than
+    // `head -c … /dev/zero | tr …` because /dev/zero and tr are POSIX-only and
+    // the whole point of the fixture is "lots of output", not "unix plumbing".
+    const out = String(await byName(tools, 'run_script').invoke({
+      command: `${process.execPath} -e "process.stdout.write('x'.repeat(200000))"`,
+    }))
     expect(out.length).toBeLessThan(70 * 1024)
     expect(out).toMatch(/truncat/i)
   }, 30_000)

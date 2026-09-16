@@ -29,3 +29,15 @@ process.env.HIP_AUTH_PATH = path.join(os.tmpdir(), '__hip_no_auth__', 'auth.json
 if (typeof document !== 'undefined') {
   Object.defineProperty(document, 'compatMode', { value: 'CSS1Compat', configurable: true })
 }
+
+// Git on Windows ships core.autocrlf=true, so `git checkout` rewrites LF → CRLF and
+// every byte-exact assertion on a checked-out file fails for a reason that has nothing
+// to do with the code under test. Force LF for every git subprocess this test process
+// spawns (GIT_CONFIG_* is git's env form of `-c`, and it is inherited by child
+// processes). Product behaviour is unchanged: CRLF remains git's normal working-tree
+// behaviour for a user's own repo; here we only want a deterministic fixture.
+if (!process.env.GIT_CONFIG_COUNT) {
+  process.env.GIT_CONFIG_COUNT = '1'
+  process.env.GIT_CONFIG_KEY_0 = 'core.autocrlf'
+  process.env.GIT_CONFIG_VALUE_0 = 'false'
+}

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { EventEmitter } from 'node:events'
 import type { SpawnOptions } from 'node:child_process'
 
@@ -124,7 +124,10 @@ describe('read_media', () => {
         (_cmd: string, args: string[], _opts: SpawnOptions) => {
           // args[args.length - 1] is the output pattern like /tmp/.../frame_%04d.png
           const pattern = args[args.length - 1]
-          const dir = pattern.substring(0, pattern.lastIndexOf('/'))
+          // dirname, not lastIndexOf('/'): on Windows the frame pattern is
+          // backslash-separated and a '/'-split yields '' (frames land in CWD
+          // and the tool reports "ffmpeg produced no frames").
+          const dir = dirname(pattern)
 
           process.nextTick(() => {
             for (let i = 0; i < frames.length; i++) {

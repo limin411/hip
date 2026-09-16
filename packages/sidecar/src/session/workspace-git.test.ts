@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { CAN_SYMLINK, rmRetry } from '../test/env.js'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
@@ -21,8 +22,8 @@ beforeEach(async () => {
   trashRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-trash-'))
 })
 afterEach(async () => {
-  await fs.rm(root, { recursive: true, force: true })
-  await fs.rm(trashRoot, { recursive: true, force: true })
+  await rmRetry(root)
+  await rmRetry(trashRoot)
 })
 
 const MODIFY = `diff --git a/src/app.ts b/src/app.ts
@@ -198,7 +199,7 @@ describe('collectWorkspaceDiff', () => {
   })
   it('reports a deleted file', async () => {
     await fs.writeFile(path.join(root, 'a.txt'), 'one\ntwo\n'); await makeRepo(root)
-    await fs.rm(path.join(root, 'a.txt'))
+    await rmRetry(path.join(root, 'a.txt'))
     expect((await collectWorkspaceDiff(root)).files![0]).toMatchObject({ path: 'a.txt', status: 'deleted', deletions: 2 })
   })
   it('shows an untracked file as added via the now-tree', async () => {
@@ -251,7 +252,7 @@ describe('collectWorkspaceDiff', () => {
     expect(r.files).toHaveLength(MAX_DIFF_FILES)
     expect(r.summary!.totalFiles).toBe(MAX_DIFF_FILES + 1)
   })
-  it('does not render a symlink target content', async () => {
+  it.skipIf(!CAN_SYMLINK)('does not render a symlink target content', async () => {
     await makeRepo(root)
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-out-'))
     try {
@@ -259,7 +260,7 @@ describe('collectWorkspaceDiff', () => {
       await fs.symlink(path.join(outside, 'secret.txt'), path.join(root, 'link.txt'))
       const r = await collectWorkspaceDiff(root)
       expect(r.state).toBe('ok'); expect(JSON.stringify(r.files)).not.toContain('TOP SECRET')
-    } finally { await fs.rm(outside, { recursive: true, force: true }) }
+    } finally { await rmRetry(outside) }
   })
   it('diffs base tree → an explicit headSha tree (tree↔tree), ignoring the live working tree', async () => {
     await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
@@ -364,7 +365,7 @@ describe('discardFile', () => {
 
   it('restores a deleted file from HEAD and trashes the HEAD revision', async () => {
     await fs.writeFile(path.join(root, 'gone.txt'), 'bye\n'); await makeRepo(root)
-    await fs.rm(path.join(root, 'gone.txt'))
+    await rmRetry(path.join(root, 'gone.txt'))
     const r = await discardFile(root, 'gone.txt', 'deleted', { trashRoot })
     expect(r.ok).toBe(true)
     expect(await fs.readFile(path.join(root, 'gone.txt'), 'utf8')).toBe('bye\n')
@@ -395,7 +396,7 @@ describe('discardFile', () => {
     try {
       const r = await discardFile(root, outside, 'modified', { trashRoot })
       expect(r.ok).toBe(false)
-    } finally { await fs.rm(outside, { recursive: true, force: true }) }
+    } finally { await rmRetry(outside) }
   })
 })
 
@@ -447,7 +448,9 @@ describe('captureSessionSnapshot + session-start base', () => {
     expect(r.files!.map((f) => f.path)).toEqual(['agent.txt'])        // pre.txt 不计入
     const head = await collectWorkspaceDiff(root, { base: 'head' })
     expect(head.files!.map((f) => f.path).sort()).toEqual(['agent.txt', 'pre.txt']) // HEAD 仍显示两者
-  })
+    // Windows git spawns are ~10x slower than on CI's Linux runners; the
+    // assertion is about scoping, not latency.
+  }, { timeout: 60_000 })
   it('returns null for a non-repo folder', async () => {
     expect(await captureSessionSnapshot(root)).toBeNull()
   })
@@ -514,7 +517,7 @@ describe('deleteCheckpointRefs', () => {
     expect((await listCheckpointRefs(root, 's1')).length).toBe(2)
     await deleteCheckpointRefs(root, 's1')
     expect(await listCheckpointRefs(root, 's1')).toEqual([])
-  })
+  }, { timeout: 60_000 })
   it('only deletes the targeted session\'s refs', async () => {
     await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
     const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
@@ -615,17 +618,24 @@ describe('collectCommitLog', () => {
     await makeRepo(root)
     await git(root, 'config', 'user.name', 'test')
     await git(root, 'config', 'user.email', 'test@test')
+    // `commit -am` once a.txt is tracked: one git subprocess per commit instead
+    // of two. 105 commits is the oracle (the cap is 100), but on Windows every
+    // spawn costs ~150ms, so the fixture has to be as cheap as it can be.
+    await fs.writeFile(path.join(root, 'a.txt'), 'seed\n')
+    await git(root, 'add', '-A')
+    await git(root, 'commit', '-m', 'seed')
     for (let i = 0; i < 105; i++) {
       await fs.writeFile(path.join(root, 'a.txt'), `commit-${i}\n`)
-      await git(root, 'add', '-A')
-      await git(root, 'commit', '-m', `commit-${i}`)
+      await git(root, 'commit', '-am', `commit-${i}`)
     }
     const r = await collectCommitLog(root, null)
     expect(r.state).toBe('ok')
     expect(r.commits!.length).toBe(100)
     expect(r.commits![0].message).toBe('commit-104')
     expect(r.commits![99].message).toBe('commit-5')
-  }, { timeout: 30000 })
+    // ~105 git spawns; the default 30s is not enough when the rest of the suite
+    // is hammering the same machine.
+  }, { timeout: 180_000 })
 })
 
 describe('listBranches + switchBranch', () => {

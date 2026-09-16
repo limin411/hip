@@ -258,8 +258,8 @@ describe('use_skill progressive disclosure', () => {
     const result = String(await useSkill.invoke({ name: 'With Files' }))
     expect(result).toContain('Main instructions')
     expect(result).toContain('Bundled resources')
-    expect(result).toContain('references/api-docs.md')
-    expect(result).toContain('assets/logo.svg')
+    expect(result).toContain(join('references', 'api-docs.md'))
+    expect(result).toContain(join('assets', 'logo.svg'))
   })
 })
 

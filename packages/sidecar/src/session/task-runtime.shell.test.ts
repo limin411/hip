@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -91,6 +91,32 @@ describe('TaskRuntime shell / wait / caps', () => {
     expect(result.timed_out).toBe(false)
     expect(result.tasks).toHaveLength(2)
     expect(result.tasks.every((t) => t.kind === 'shell')).toBe(true)
+  })
+
+  // GUARDRAIL: waitMany armed a setTimeout for the caller's timeout and never
+  // cleared it on the winning path. Every wait left a live timer behind for up
+  // to timeoutMs — busy event loop, delayed sidecar shutdown, and a growing
+  // pile of handles for a long session that waits on tasks a lot.
+  it.each(['wait_any', 'wait_all'] as const)('waitMany clears its timeout timer (%s)', async (mode) => {
+    const setSpy = vi.spyOn(globalThis, 'setTimeout')
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout')
+    try {
+      const started = mgr.spawnShell({ command: 'echo done', cwd: dir })
+      expect('taskId' in started).toBe(true)
+      if (!('taskId' in started)) return
+      const result = await mgr.waitMany([started.taskId], mode, 60_000)
+      expect(result.timed_out).toBe(false)
+
+      // Scope the assertion to the handle this wait armed for its own timeout:
+      // the manager (and vitest) legitimately own other timers.
+      const armedIndex = setSpy.mock.calls.findIndex((c) => c[1] === 60_000)
+      expect(armedIndex).toBeGreaterThanOrEqual(0)
+      const handle = setSpy.mock.results[armedIndex]!.value as NodeJS.Timeout
+      expect(clearSpy.mock.calls.some((c) => c[0] === handle)).toBe(true)
+    } finally {
+      setSpy.mockRestore()
+      clearSpy.mockRestore()
+    }
   })
 
   it('destroyAll kills running shells', async () => {

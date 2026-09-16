@@ -98,6 +98,9 @@ describe('memory process e2e (file-backed hip.db)', () => {
   let configPath: string
   let dbPath: string
   let store: MemoryStore
+  /** Held so afterEach can close it: an open better-sqlite3 handle keeps
+   *  hip.db locked on Windows and the cleanup rmSync fails with EBUSY. */
+  let db: ReturnType<typeof openFileMemDb>['db']
   let svc: MemoryService
   let sent: ServerMessage[]
   let sessions: Map<string, Session>
@@ -115,6 +118,7 @@ describe('memory process e2e (file-backed hip.db)', () => {
     process.env.HIP_MEMORY_CONFIG_PATH = configPath
     const opened = openFileMemDb(dir)
     dbPath = opened.dbPath
+    db = opened.db
     store = opened.store
     svc = new MemoryService(store, { configPath })
     svc.setConfig({ useMemories: true, generateMemories: true })
@@ -149,6 +153,8 @@ describe('memory process e2e (file-backed hip.db)', () => {
   afterEach(() => {
     resetPhase1Queue()
     delete process.env.HIP_MEMORY_CONFIG_PATH
+    // Close before unlink: Windows refuses to delete an open sqlite file (EBUSY).
+    db?.close()
     rmSync(dir, { recursive: true, force: true })
     vi.useRealTimers()
     vi.restoreAllMocks()

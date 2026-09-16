@@ -4,14 +4,14 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=451755b81ed37030 skillVersion=3 productVersion=1.0.1
+ * contentHash=252ca33713564480 skillVersion=3 productVersion=2.0.2
  */
 
 /** Schema / materialization version for builtin skill files (from packages/product-content/meta.json). */
 export const PRODUCT_SKILL_VERSION = '3'
 
 /** App version from root package.json (also used in L0/L2 placeholders). */
-export const HIP_PRODUCT_VERSION = '1.0.1'
+export const HIP_PRODUCT_VERSION = '2.0.2'
 
 export const HIP_SKILL_ID = 'hip'
 export const HIP_SKILL_NAME = 'hip'
@@ -26,7 +26,7 @@ description: "Product help for the hip desktop agent: Chat/Code/Knowledge surfac
 
 # hip
 
-hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **1.0.1**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
+hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **2.0.2**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
 
 This skill is the authoritative product guide for *hip itself*. For ordinary coding work in the user's project, do **not** load this skill.
 
@@ -511,7 +511,7 @@ To install a plugin:
 
 /** L0 always-on product facts (main agent system prompt). */
 export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
-- Version: 1.0.1.
+- Version: 2.0.2.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
 - Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Knowledge (notes spaces).
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".

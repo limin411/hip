@@ -16,6 +16,7 @@ describe('SessionManager soft-delete / trash', () => {
   let scratchRoot: string
   let fakeHome: string
   let prevHome: string | undefined
+  let prevUserProfile: string | undefined
   let store: SessionStore
   let mgr: SessionManager
   let sent: ServerMessage[]
@@ -24,7 +25,10 @@ describe('SessionManager soft-delete / trash', () => {
     scratchRoot = mkdtempSync(path.join(os.tmpdir(), 'hip-trash-'))
     fakeHome = mkdtempSync(path.join(os.tmpdir(), 'hip-home-'))
     prevHome = process.env.HOME
+    // os.homedir() reads HOME on POSIX but USERPROFILE on Windows; stub both or the
+    // product hunts for artifacts under the real home and the fixture home never empties.
     process.env.HOME = fakeHome
+    if (process.platform === 'win32') process.env.USERPROFILE = fakeHome
     const { db, ftsEnabled } = openDatabase(':memory:')
     store = new SessionStore(db, ftsEnabled)
     mgr = new SessionManager(store, () => new FakeListChatModel({ responses: ['ok'] }), scratchRoot)

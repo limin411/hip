@@ -154,9 +154,20 @@ export async function real(root: string, p: string): Promise<string> {
       isUnderRoot(abs, realRoot) || isUnderRoot(abs, resolvedRoot)
     if (underExisting || underLexical) {
       candidate = underExisting ? normalizedP : abs
-    } else if (normalizedP.startsWith('/') || normalizedP.startsWith('\\')) {
-      // Documented project-root form ("/index.html") or absolute outside root → jail under root.
-      candidate = path.join(root, normalizedP.replace(/^[\/\\]+/, ''))
+    } else if (
+      normalizedP.startsWith('/') ||
+      normalizedP.startsWith('\\') ||
+      /^[a-zA-Z]:[\\/]/.test(normalizedP)
+    ) {
+      // Documented project-root form ("/index.html") or absolute outside root → jail
+      // under root. A Windows drive letter must come off first: joining "C:\tmp\x"
+      // under root produced the invalid "root\C:\tmp\x", so every out-of-root write
+      // died with ENOENT instead of being jailed. The jail looked like it worked
+      // (nothing escaped) while the tool was in fact broken on Windows.
+      candidate = path.join(
+        root,
+        normalizedP.replace(/^[a-zA-Z]:/, '').replace(/^[\\/]+/, ''),
+      )
     } else {
       candidate = path.join(root, normalizedP)
     }

@@ -221,7 +221,10 @@ describe('runSubagent permissionMode cascade (FIX 1 — task worker honors the c
       try {
         const runner = new CapturingChildRunner([
           { name: 'write_file', args: { path: target, content: 'OUT' } },
-          { name: 'run_script', args: { command: `: > '${flag}'`, reason: 'touch a flag' } },
+          // Double quotes: cmd.exe does not treat ' as a quoting character,
+          // so a single-quoted path arrives with the quotes as part of argv[1]
+          // and the write goes nowhere.
+          { name: 'run_script', args: { command: `${process.execPath} -e "require('fs').writeFileSync(process.argv[1],'ran')" "${flag}"`, reason: 'touch a flag' } },
         ])
         await runSubagent({
           runner, root, summarizer: noopSummarizer, emit: noopEmit,

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { IS_POSIX, POSIX_MODES } from '../test/env.js'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -26,11 +27,12 @@ describe('memoryConfigPath', () => {
     expect(memoryConfigPath()).toBe('/tmp/custom-memory.json')
   })
 
-  it('honors HIP_DATA_DIR when HIP_MEMORY_CONFIG_PATH unset', () => {
+  it.skipIf(!IS_POSIX)('honors HIP_DATA_DIR when HIP_MEMORY_CONFIG_PATH unset', () => {
     delete process.env.HIP_MEMORY_CONFIG_PATH
     const prevData = process.env.HIP_DATA_DIR
     process.env.HIP_DATA_DIR = '/tmp/hip-e2e-data'
-    expect(memoryConfigPath()).toBe('/tmp/hip-e2e-data/config/memory.json')
+    // path.join, not a POSIX literal: '/tmp/x' + 'config' is '\tmp\x\config' on win32.
+    expect(memoryConfigPath()).toBe(path.join('/tmp/hip-e2e-data', 'config', 'memory.json'))
     if (prevData === undefined) delete process.env.HIP_DATA_DIR
     else process.env.HIP_DATA_DIR = prevData
   })
@@ -82,7 +84,7 @@ describe('loadMemoryConfig / saveMemoryConfig', () => {
     expect(cfg.defaultScope).toBe('project')
   })
 
-  it('saveMemoryConfig partial-merges and writes 0o600', () => {
+  it.skipIf(!IS_POSIX)('saveMemoryConfig partial-merges and writes 0o600', () => {
     const saved = saveMemoryConfig({ useMemories: true, generateMemories: true })
     expect(saved.useMemories).toBe(true)
     expect(saved.generateMemories).toBe(true)

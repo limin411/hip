@@ -62,6 +62,97 @@
       ]
     },
     {
+      "id": "shell.quoted-command-survives-spawn",
+      "maturity": "blocking",
+      "title": "A shell command containing quotes reaches the shell intact",
+      "invariant": "On Windows the whole command is one argv element; Node must hand it to cmd.exe verbatim or quotes are re-escaped and the command is silently mis-parsed.",
+      "oracle": "spawnShell with `node -e \"console.log('QUOTED-OK')\"` yields output containing QUOTED-OK instead of exiting 0 with no output.",
+      "commands": ["npx vitest run packages/sidecar/src/session/shell-backend.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "packages/sidecar/src/session/shell-backend.test.ts",
+          "assertions": ["passes a command containing quotes through to the shell intact"]
+        }
+      ]
+    },
+    {
+      "id": "persistence.task-output-bounded",
+      "maturity": "blocking",
+      "title": "Background task output on disk stays bounded",
+      "invariant": "A task that streams for hours must not grow output.log without limit under ~/.hip/task-output.",
+      "oracle": "saveOutput keeps the tail and caps the file at TASK_OUTPUT_FILE_CAP_BYTES, with a truncation notice.",
+      "commands": ["npx vitest run packages/sidecar/src/session/background-manager.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "packages/sidecar/src/session/background-manager.test.ts",
+          "assertions": ["saveOutput caps output.log on disk and keeps the tail"]
+        }
+      ]
+    },
+    {
+      "id": "tasks.wait-does-not-leak-timers",
+      "maturity": "blocking",
+      "title": "wait_tasks clears the timeout it arms",
+      "invariant": "A completed wait must not leave a live timer for the rest of its timeout window — that is a handle leak per tool call.",
+      "oracle": "waitMany(timeoutMs=60_000) clears the handle it armed, in both wait_any and wait_all.",
+      "commands": ["npx vitest run packages/sidecar/src/session/task-runtime.shell.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "packages/sidecar/src/session/task-runtime.shell.test.ts",
+          "assertions": ["waitMany clears its timeout timer (wait_any)", "waitMany clears its timeout timer (wait_all)"]
+        }
+      ]
+    },
+    {
+      "id": "session.resume-refusal-is-reported",
+      "maturity": "blocking",
+      "title": "A refused agent resume answers the user",
+      "invariant": "resumeSubagent must never `return` in silence: busy, background, and unknown-task refusals all emit an error the UI can show.",
+      "oracle": "Each refusal path emits exactly one error with code AGENT_BUSY / AGENT_NOT_RESUMABLE.",
+      "commands": ["npx vitest run packages/sidecar/src/session/session-turn-ops.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "packages/sidecar/src/session/session-turn-ops.test.ts",
+          "assertions": [
+            "unknown task id → AGENT_NOT_RESUMABLE error",
+            "still-running background task → AGENT_NOT_RESUMABLE error",
+            "another turn in flight → AGENT_BUSY error"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "attachments.path-containment",
+      "maturity": "blocking",
+      "title": "Attachment paths cannot escape the allowed roots",
+      "invariant": "Both separators are path separators on Windows: `dir/sub/../x` must be rejected, and an out-of-root path must read as invalid rather than merely missing.",
+      "oracle": "attachments.test.ts traversal + out-of-root cases pass.",
+      "commands": ["npx vitest run packages/sidecar/src/session/attachments.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "packages/sidecar/src/session/attachments.test.ts",
+          "assertions": [
+            "rejects \"..\" segments written with every separator the platform honours",
+            "reports INVALID_PATH for an out-of-root path even when it does not exist"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "automation.skip-history-not-flooded",
+      "maturity": "blocking",
+      "title": "A stuck automation records one skip per reason per due slot",
+      "invariant": "Global concurrency cap must not write a skip row every 30s and evict the real run history.",
+      "oracle": "recordSkip dedupes identical (error, nextRunAt) signatures and records again once the slot or claim state changes.",
+      "commands": ["npx vitest run src/store/automationStore.test.ts"],
+      "assertionRefs": [
+        {
+          "file": "src/store/automationStore.test.ts",
+          "assertions": ["recordSkip logs one row per reason per due slot"]
+        }
+      ]
+    },
+    {
       "id": "unit.full-suite-clean",
       "maturity": "experimental",
       "title": "Full unit suite is green",

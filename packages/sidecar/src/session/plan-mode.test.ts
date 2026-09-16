@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { rmSync, existsSync, readFileSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, basename } from 'node:path'
 
 const { mockHomedir } = vi.hoisted(() => ({
   mockHomedir: vi.fn(),
@@ -86,7 +86,8 @@ describe('PlanMode', () => {
     it('sanitizes sessionId — replaces special characters with underscores', async () => {
       await planMode.enter('session!@#$%')
       // Path should contain the safe prefix and suffix, no special chars
-      const filename = planMode.planFilePath!.split('/').pop()!
+      // basename, not split('/').pop(): on Windows the separator is '\'.
+      const filename = basename(planMode.planFilePath!)
       // All non-alphanumeric except '.' in extension should be '_'
       // 'session!@#$%' → 'session_____'
       expect(filename).toMatch(/^[a-zA-Z0-9_]+\.md$/)

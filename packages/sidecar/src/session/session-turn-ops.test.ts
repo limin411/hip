@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { ServerMessage } from '@hip/protocol'
-import { resume } from './session-turn-ops.js'
+import { resume, resumeSubagent } from './session-turn-ops.js'
 import type { SessionTurnHost } from './session-turn-runner.js'
 
 vi.mock('./session-turn-runner.js', async (importOriginal) => {
@@ -119,5 +119,46 @@ describe('resume while planStatus ready (KD-PA-1)', () => {
     expect(sent.some((m) => m.type === 'error' && (m as { code?: string }).code === 'PLAN_AWAITING_RESPONSE')).toBe(
       false,
     )
+  })
+})
+
+// GUARDRAIL: resumeSubagent used to `return` in silence on all three refusal
+// paths. The UI sent "resume this agent" and got nothing back — no error, no
+// token, not even an agent:finished — so the message box looked broken. A
+// refusal is an answer the user can act on; it has to be sent.
+describe('resumeSubagent refusals are reported, never silent', () => {
+  function stubHost(overrides: Record<string, unknown> = {}): SessionTurnHost {
+    return {
+      id: 's-ops',
+      running: false,
+      awaitingResume: false,
+      backgroundTasks: new Set<string>(),
+      spawnedSubagentIds: new Set<string>(),
+      ...overrides,
+    } as unknown as SessionTurnHost
+  }
+
+  it('unknown task id → AGENT_NOT_RESUMABLE error', async () => {
+    const sent: ServerMessage[] = []
+    await resumeSubagent(stubHost(), 'nope', 'continue', (m) => sent.push(m))
+    expect(sent).toEqual([
+      expect.objectContaining({ type: 'error', sessionId: 's-ops', code: 'AGENT_NOT_RESUMABLE' }),
+    ])
+  })
+
+  it('still-running background task → AGENT_NOT_RESUMABLE error', async () => {
+    const sent: ServerMessage[] = []
+    await resumeSubagent(stubHost({ backgroundTasks: new Set(['t1']) }), 't1', 'continue', (m) => sent.push(m))
+    expect(sent).toEqual([
+      expect.objectContaining({ type: 'error', sessionId: 's-ops', code: 'AGENT_NOT_RESUMABLE' }),
+    ])
+  })
+
+  it('another turn in flight → AGENT_BUSY error', async () => {
+    const sent: ServerMessage[] = []
+    await resumeSubagent(stubHost({ running: true, spawnedSubagentIds: new Set(['t1']) }), 't1', 'continue', (m) => sent.push(m))
+    expect(sent).toEqual([
+      expect.objectContaining({ type: 'error', sessionId: 's-ops', code: 'AGENT_BUSY' }),
+    ])
   })
 })

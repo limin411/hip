@@ -24,10 +24,19 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
+
+/**
+ * Dynamic-import a source file by absolute path.
+ *
+ * A bare Windows path (`D:\repo\src\x.ts`) is rejected by the ESM loader with
+ * ERR_UNSUPPORTED_ESM_URL_SCHEME ("Received protocol 'd:'"), so the harness
+ * never got past module load on Windows. Always hand the loader a file URL.
+ */
+const importAbs = (p) => import(pathToFileURL(p).href)
 const wantJson = process.argv.includes('--json')
 
 const results = []
@@ -64,16 +73,16 @@ const dataDir = mkdtempSync(join(tmpdir(), 'hip-prompt-dogfood-'))
 process.env.HIP_DATA_DIR = dataDir
 
 try {
-  const { buildSystemPrompt, skillsBlock } = await import(
+  const { buildSystemPrompt, skillsBlock } = await importAbs(
     join(ROOT, 'packages/sidecar/src/session/system-prompt.ts')
   )
-  const { getBuiltinSkills } = await import(
+  const { getBuiltinSkills } = await importAbs(
     join(ROOT, 'packages/sidecar/src/session/product/builtin-skills.ts')
   )
-  const { PRODUCT_HELP_GUIDANCE } = await import(
+  const { PRODUCT_HELP_GUIDANCE } = await importAbs(
     join(ROOT, 'packages/sidecar/src/session/product/content.ts')
   )
-  const { CODING_SKILL_MD } = await import(
+  const { CODING_SKILL_MD } = await importAbs(
     join(ROOT, 'packages/sidecar/src/session/ops/content.ts')
   )
 

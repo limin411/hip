@@ -573,6 +573,42 @@ describe('automationStore', () => {
     expect(st.automations[0].lastSessionId).toBe('s-live')
   })
 
+  // GUARDRAIL: a slot rejected by the global concurrency cap stays due on purpose
+  // (nextRunAt must not roll — the run is retried, not dropped), so the 30s host
+  // tick re-fired it and appended a skip row every single tick. 120 rows/hour into
+  // a 120-row log erased the real run history. One row per (reason, due slot).
+  it('recordSkip logs one row per reason per due slot', async () => {
+    useAutomationStore.setState({
+      automations: [auto({ id: 'auto_cap', nextRunAt: 5_000 })],
+      loaded: true,
+    })
+    const skip = { trigger: 'schedule' as const, error: 'skip_global_cap', now: 10_000 }
+
+    for (let i = 0; i < 5; i++) {
+      await useAutomationStore.getState().recordSkip('auto_cap', skip)
+    }
+    const rows = () => useAutomationStore.getState().runs.filter((r) => r.automationId === 'auto_cap')
+    expect(rows()).toHaveLength(1)
+
+    // Same reason on a NEW due slot is a new occurrence and must still log.
+    useAutomationStore.setState((s) => ({
+      automations: s.automations.map((a) =>
+        a.id === 'auto_cap' ? { ...a, nextRunAt: 90_000 } : a,
+      ),
+    }))
+    await useAutomationStore.getState().recordSkip('auto_cap', skip)
+    expect(rows()).toHaveLength(2)
+
+    // And a successful claim clears the signature so the next skip logs again.
+    useAutomationStore.setState((s) => ({
+      automations: s.automations.map((a) => (a.id === 'auto_cap' ? { ...a, nextRunAt: 90_000 } : a)),
+    }))
+    tryClaimInFlight('auto_cap', { trigger: 'schedule' })
+    await useAutomationStore.getState().recordSkip('auto_cap', skip)
+    expect(rows()).toHaveLength(3)
+    releaseInFlight('auto_cap')
+  })
+
   // ─── failBeforeSession releases claim ──────────────────────
 
   it('failBeforeSession releases claim so second runNow can claim', async () => {

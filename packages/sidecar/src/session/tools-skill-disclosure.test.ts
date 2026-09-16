@@ -61,7 +61,7 @@ describe('use_skill progressive disclosure', () => {
     expect(out).toContain('Skill dir:')
     expect(out).toContain('Instructions')
     expect(out).toContain('guide.md')
-    expect(out).toContain('api/reference.json')
+    expect(out).toContain(join('api', 'reference.json'))
   })
 
   it('discloses Level 3 resources: assets/ paths in the file manifest', async () => {
@@ -72,7 +72,7 @@ describe('use_skill progressive disclosure', () => {
     const out = String(await byName(tools, 'use_skill').invoke({ name: 'AssetSkill' }))
     expect(out).toContain('Skill dir:')
     expect(out).toContain('logo.png')
-    expect(out).toContain('templates/layout.html')
+    expect(out).toContain(join('templates', 'layout.html'))
   })
 
   it('discloses both references/ and assets/ paths together', async () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { rmRetry } from '../test/env.js'
 import { loadProjection } from '../persistence/message-projector.js'
 import * as catalogModule from '../config/catalog.js'
 import type { AgentInvoker } from './agents/invoker.js'
@@ -49,7 +50,7 @@ describe('Session image attachments', () => {
   let scratch: string
   beforeEach(async () => { scratch = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-attach-')) })
   afterEach(async () => {
-    await fs.rm(scratch, { recursive: true, force: true })
+    await rmRetry(scratch)
     vi.restoreAllMocks()
   })
 
@@ -60,6 +61,14 @@ describe('Session image attachments', () => {
     const { store } = makeStore()
     store.insertSession({ id: 's-attach', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
     const captured: BaseMessage[][] = []
+    // Force a multimodal main model. Without this the image is routed to an
+    // internal vision agent chosen from the *ambient* agent config, so the test
+    // only passed on machines that happened to have one configured — everywhere
+    // else the turn short-circuited with NO_IMAGE_AGENT and no model ran at all.
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue({
+      deepseek: { id: 'deepseek', name: 'DeepSeek', models: { 'deepseek-chat': { id: 'deepseek-chat', name: 'DeepSeek Chat', attachment: true } } },
+    })
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(true)
     const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], disablePlan: true }
     const session = new Session('s-attach', cfg, undefined, store, undefined, 10_000, capturingRunner(captured), undefined, undefined, scratch)
 
@@ -201,8 +210,8 @@ describe('Session multimodal attachment splitting', () => {
     await fs.mkdir(path.join(cwd, '.hip'), { recursive: true })
   })
   afterEach(async () => {
-    await fs.rm(scratch, { recursive: true, force: true })
-    await fs.rm(cwd, { recursive: true, force: true })
+    await rmRetry(scratch)
+    await rmRetry(cwd)
     vi.restoreAllMocks()
   })
 

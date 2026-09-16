@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { rmRetry } from '../test/env.js'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
@@ -13,7 +14,7 @@ beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-sess-'))
   await fs.writeFile(path.join(root, 'README.md'), '# Hi')
 })
-afterEach(async () => { await fs.rm(root, { recursive: true, force: true }) })
+afterEach(async () => { await rmRetry(root) })
 
 describe('Session workspace', () => {
   it('lsDir returns no_workspace before a cwd is bound', async () => {

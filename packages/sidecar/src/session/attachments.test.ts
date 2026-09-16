@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { isAllowedAttachment, validateAttachments, stageAttachments, buildAttachmentContentParts, AttachmentError } from './attachments.js'
+import { CAN_SYMLINK, IS_WIN32 } from '../test/env.js'
 
 async function tempFile(name: string, content: Buffer | string): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-attach-'))
@@ -88,6 +89,37 @@ describe('attachments', () => {
     await fs.rm(path.dirname(tmpFile), { recursive: true, force: true })
   })
 
+  // GUARDRAIL: the traversal guard split on `path.sep` alone. Windows accepts '/'
+  // as a separator too, so `dir/sub/../x.txt` had no '\'-delimited '..' segment —
+  // the guard never fired, realpath resolved it, and the attachment was accepted.
+  it('rejects ".." segments written with every separator the platform honours', async () => {
+    const tmpFile = await tempFile('x.txt', 'hi')
+    const dir = path.dirname(tmpFile)
+    const separators = path.sep === '/' ? ['/'] : ['/', '\\']
+    for (const sep of separators) {
+      const traversal = `${dir}${sep}sub${sep}..${sep}${path.basename(tmpFile)}`
+      await expectAttachmentError(
+        validateAttachments([{ id: '1', name: 'x.txt', mimeType: 'text/plain', path: traversal }]),
+        'ATTACHMENT_INVALID_PATH',
+        /cannot contain '\.\.'/,
+      )
+    }
+    await fs.rm(path.dirname(tmpFile), { recursive: true, force: true })
+  })
+
+  // GUARDRAIL: realpath fails for a path that does not exist, and the ENOENT branch
+  // used to answer NOT_FOUND before ever asking whether the path was allowed. The
+  // verdict then depended on the host filesystem: '/etc/passwd' is outside every
+  // allowed root on every platform, and must say so whether or not it exists.
+  it('reports INVALID_PATH for an out-of-root path even when it does not exist', async () => {
+    const outside = IS_WIN32 ? 'C:\\Windows\\definitely-not-a-real-attachment.txt' : '/etc/definitely-not-a-real-attachment.txt'
+    await expectAttachmentError(
+      validateAttachments([{ id: '1', name: 'x.txt', mimeType: 'text/plain', path: outside }]),
+      'ATTACHMENT_INVALID_PATH',
+      /outside allowed directories/,
+    )
+  })
+
   it('rejects paths outside allowed directories with ATTACHMENT_INVALID_PATH', async () => {
     await expectAttachmentError(
       validateAttachments([{ id: '1', name: 'x.txt', mimeType: 'text/plain', path: '/etc/passwd' }]),
@@ -120,7 +152,7 @@ describe('attachments', () => {
     await fs.rm(path.dirname(src), { recursive: true, force: true })
   })
 
-  it('allows symlinks that resolve inside allowed directories', async () => {
+  it.skipIf(!CAN_SYMLINK)('allows symlinks that resolve inside allowed directories', async () => {
     const dir = await tempDir()
     const realFile = path.join(dir, 'real.txt')
     const linkFile = path.join(dir, 'link.txt')
@@ -130,7 +162,7 @@ describe('attachments', () => {
     await fs.rm(dir, { recursive: true, force: true })
   })
 
-  it('rejects symlinks that resolve outside allowed directories', async () => {
+  it.skipIf(!CAN_SYMLINK)('rejects symlinks that resolve outside allowed directories', async () => {
     const dir = await tempDir()
     const linkFile = path.join(dir, 'link.txt')
     await fs.symlink('/etc/passwd', linkFile)
@@ -272,7 +304,10 @@ describe('attachments', () => {
 
   it('rejects sensitive and hidden home paths', async () => {
     const fakeHome = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-fake-home-'))
+    // os.homedir() reads HOME on POSIX and USERPROFILE on Windows; stub whichever
+    // this platform actually consults, or the fixture home is never in play.
     vi.stubEnv('HOME', fakeHome)
+    if (process.platform === 'win32') vi.stubEnv('USERPROFILE', fakeHome)
     try {
       const targets = [
         { dir: '.ssh', file: 'authorized_keys', label: '.ssh' },

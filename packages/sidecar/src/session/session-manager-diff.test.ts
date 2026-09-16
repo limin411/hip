@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { rmRetry } from '../test/env.js'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -16,7 +17,7 @@ beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-mgr-diff-'))
   await fs.writeFile(path.join(root, 'README.md'), '# Hi\n')
 })
-afterEach(async () => { await fs.rm(root, { recursive: true, force: true }) })
+afterEach(async () => { await rmRetry(root) })
 
 function setup() {
   const sent: ServerMessage[] = []
@@ -97,7 +98,9 @@ describe('session-manager diff', () => {
     expect(msg).toMatchObject({ base: 'session-start', hasSessionStart: true, state: 'ok' })
     // Only the post-create file should appear
     expect(msg.files!.map((f: { path: string }) => f.path)).toEqual(['agent.txt'])
-  })
+    // Real git subprocesses + a real snapshot: ~1s alone, more than the default
+    // 5s budget when the whole suite runs in parallel on Windows.
+  }, { timeout: 60_000 })
 
   it('git:commitDiff returns the diff of one commit with cwd-relative paths', async () => {
     const { mgr, sent, send } = setup()

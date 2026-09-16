@@ -111,7 +111,10 @@ describe('runWorkflowTurn safety-dependency wiring', () => {
     expect(args.sessionId).toBe('wf-sess-1')
     // Inherits session permissionMode (default edit), never forced full.
     expect(args.permissionMode).toBe('edit')
-  })
+    // Real hook registry + real temp workspace: ~1.4s alone, well over the
+    // default 5s budget when the whole suite runs in parallel. Slow is fine
+    // here; the assertion is about wiring, not latency.
+  }, 30_000)
 })
 
 describe('runWorkflowTurn lifecycle hooks', () => {

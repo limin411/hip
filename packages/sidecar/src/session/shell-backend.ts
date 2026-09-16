@@ -81,6 +81,15 @@ export function spawnShell(opts: SpawnShellOptions): SpawnedShell {
     env: opts.env ?? process.env,
     detached: !win,
     windowsHide: true,
+    // Windows: hand the `cmd /c <command>` string through verbatim.
+    //
+    // Without this, Node re-quotes the whole command (it always contains
+    // spaces) and escapes the inner quotes with backslashes. cmd.exe does not
+    // understand backslash escapes: `node -e "console.log(1)"` is cut at the
+    // space *inside* the quotes, so the command silently runs something else
+    // (or nothing) and reports exit code 0. Verbatim args are what cmd.exe
+    // expects — this is how the string would be typed at a prompt.
+    ...(win && !wrapper ? { windowsVerbatimArguments: true } : {}),
   })
 
   let timedOut = false

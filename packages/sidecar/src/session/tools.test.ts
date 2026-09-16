@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { CAN_SYMLINK } from '../test/env.js'
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -67,7 +68,7 @@ describe('file tools', () => {
       .resolves.toMatch(/escape|outside|root/i)
   })
 
-  it('rejects reading through a symlink that escapes the root', async () => {
+  it.skipIf(!CAN_SYMLINK)('rejects reading through a symlink that escapes the root', async () => {
     const outside = mkdtempSync(join(tmpdir(), 'hip-outside-'))
     writeFileSync(join(outside, 'secret.txt'), 'TOP SECRET')
     try {
@@ -78,7 +79,7 @@ describe('file tools', () => {
     } finally { rmSync(outside, { recursive: true, force: true }) }
   })
 
-  it('rejects writing through a symlinked parent that escapes the root', async () => {
+  it.skipIf(!CAN_SYMLINK)('rejects writing through a symlinked parent that escapes the root', async () => {
     const outside = mkdtempSync(join(tmpdir(), 'hip-outside-'))
     try {
       symlinkSync(outside, join(root, 'link'))

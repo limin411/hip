@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { rmRetry } from '../test/env.js'
 import { AIMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -56,8 +57,8 @@ describe('Session image agent dispatch', () => {
     await fs.mkdir(path.join(cwd, '.hip'), { recursive: true })
   })
   afterEach(async () => {
-    await fs.rm(scratch, { recursive: true, force: true })
-    await fs.rm(cwd, { recursive: true, force: true })
+    await rmRetry(scratch)
+    await rmRetry(cwd)
     vi.restoreAllMocks()
   })
 

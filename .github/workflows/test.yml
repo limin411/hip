@@ -71,6 +71,31 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
+  # Agent evaluation gates: assertion-backed invariants with a maturity ladder.
+  # Only `blocking` gates fail the build; experimental/soak failures are recorded
+  # as data. A gate whose command cannot run is `unverifiable` and also blocks.
+  eval-gates:
+    runs-on: ubuntu-latest
+    needs: [type-check]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+      - name: Enable Yarn (classic)
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+      - run: yarn install --frozen-lockfile
+      - run: yarn eval:gates
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-gates-report
+          path: ~/.hip/eval-runs/gates/
+          if-no-files-found: warn
+          retention-days: 7
+
   rust-unit:
     runs-on: ubuntu-latest
     timeout-minutes: 45

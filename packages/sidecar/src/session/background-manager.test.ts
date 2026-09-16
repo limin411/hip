@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BackgroundManager, BackgroundTaskPersistence } from './background-manager.js'
+import { TASK_OUTPUT_FILE_CAP_BYTES } from './task-runtime.js'
 
 let tmpDir: string
 
@@ -391,6 +392,27 @@ describe('BackgroundTaskPersistence', () => {
     const ids = persistence.listTaskIds('nonexistent-session')
     expect(ids).toEqual([])
   })
+
+  // GUARDRAIL: saveOutput used to append with no ceiling at all, so a monitor task
+  // streaming for hours left an unbounded output.log under ~/.hip/task-output even
+  // though the in-memory chunks were already capped. Memory bounds the live view;
+  // the on-disk artefact has to be bounded too.
+  it('saveOutput caps output.log on disk and keeps the tail', () => {
+    const persistence = new BackgroundTaskPersistence(tmpDir)
+    const chunk = 'x'.repeat(512 * 1024)
+    const marker = 'TAIL-MARKER'
+    for (let i = 0; i < Math.ceil((TASK_OUTPUT_FILE_CAP_BYTES * 1.2) / chunk.length); i++) {
+      persistence.saveOutput('s1', 'task-cap', chunk)
+    }
+    persistence.saveOutput('s1', 'task-cap', marker)
+
+    const { size } = statSync(join(tmpDir, 's1', 'task-cap', 'output.log'))
+    expect(size).toBeLessThanOrEqual(TASK_OUTPUT_FILE_CAP_BYTES)
+
+    const output = persistence.readOutput('s1', 'task-cap')
+    expect(output).toContain('[output truncated')
+    expect(output.endsWith(marker)).toBe(true)
+  }, 30_000)
 })
 
 // ── Persistence integration with manager ──────────────────────────────────

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { CAN_SYMLINK } from '../test/env.js'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -112,7 +113,7 @@ describe('readForPreview', () => {
   it('throws when the path escapes root', async () => {
     await expect(readForPreview(root, '/etc/passwd')).rejects.toThrow()
   })
-  it('throws when an in-cwd symlink points outside root (no content leak)', async () => {
+  it.skipIf(!CAN_SYMLINK)('throws when an in-cwd symlink points outside root (no content leak)', async () => {
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-outside-'))
     await fs.writeFile(path.join(outside, 'secret.txt'), 'TOP-SECRET')
     await fs.symlink(path.join(outside, 'secret.txt'), path.join(root, 'link.txt'))

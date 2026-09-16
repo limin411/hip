@@ -3,7 +3,20 @@
  * Evolves BackgroundManager API; exported both as TaskRuntime and BackgroundManager.
  * Spec: docs/design/2026-07-22-async-task-runtime-right-panel.md
  */
-import { mkdirSync, appendFileSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs'
+import {
+  closeSync,
+  ftruncateSync,
+  mkdirSync,
+  appendFileSync,
+  openSync,
+  readFileSync,
+  readSync,
+  existsSync,
+  statSync,
+  writeFileSync,
+  writeSync,
+  readdirSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import type {
@@ -76,8 +89,54 @@ const LOG_TAIL_CHARS = 2048
 const SCHEDULE_SPIN_MAX_MS = 2_000
 /** Retained in-memory output ceiling per task (see evictOldestOutput). */
 const TASK_OUTPUT_CAP_BYTES = 4 * 1024 * 1024
+/**
+ * Retained ON-DISK output ceiling per task (see trimOutputFile). The in-memory cap
+ * bounds the live view only; the persisted log had no ceiling at all, so a monitor
+ * streaming for hours left an unbounded file under ~/.hip/task-output forever.
+ * Kept larger than the memory cap so the artefact stays a superset of what the UI
+ * can show after a restart.
+ */
+export const TASK_OUTPUT_FILE_CAP_BYTES = 8 * 1024 * 1024
+const OUTPUT_TRUNCATION_NOTICE = '[output truncated — showing the most recent bytes]\n'
+const OUTPUT_TRUNCATION_NOTICE_BYTES = Buffer.byteLength(OUTPUT_TRUNCATION_NOTICE, 'utf8')
 
 // ── Persistence ────────────────────────────────────────────────────────────
+
+/**
+ * Bound a persisted output log to its most recent bytes, in place.
+ *
+ * `saveOutput` appended forever, so a monitor task that streams for hours left an
+ * unbounded file on disk even though the in-memory chunks were already capped.
+ * Tail-preserving (oldest bytes are dropped) so the log still answers "what is it
+ * doing right now", which is what the task panel is for.
+ *
+ * Best effort: a filesystem we cannot stat or truncate must never lose the write
+ * that just succeeded.
+ */
+function trimOutputFile(path: string): void {
+  let fd: number | undefined
+  try {
+    const { size } = statSync(path)
+    if (size <= TASK_OUTPUT_FILE_CAP_BYTES) return
+    const keep = TASK_OUTPUT_FILE_CAP_BYTES - OUTPUT_TRUNCATION_NOTICE_BYTES
+    fd = openSync(path, 'r+')
+    const tail = Buffer.alloc(keep)
+    readSync(fd, tail, 0, keep, size - keep)
+    writeSync(fd, OUTPUT_TRUNCATION_NOTICE, 0, 'utf8')
+    writeSync(fd, tail, 0, keep, OUTPUT_TRUNCATION_NOTICE_BYTES)
+    ftruncateSync(fd, OUTPUT_TRUNCATION_NOTICE_BYTES + keep)
+  } catch {
+    /* best effort */
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd)
+      } catch {
+        /* best effort */
+      }
+    }
+  }
+}
 
 export class BackgroundTaskPersistence {
   constructor(private readonly baseDir: string = DEFAULT_TASK_OUTPUT_DIR) {}
@@ -101,7 +160,9 @@ export class BackgroundTaskPersistence {
   saveOutput(sessionId: string, taskId: string, chunk: string): void {
     const dir = this.taskDir(sessionId, taskId)
     mkdirSync(dir, { recursive: true })
-    appendFileSync(this.outputPath(sessionId, taskId), chunk, 'utf8')
+    const file = this.outputPath(sessionId, taskId)
+    appendFileSync(file, chunk, 'utf8')
+    trimOutputFile(file)
   }
 
   appendEvent(sessionId: string, taskId: string, line: string, seq: number): void {
@@ -924,13 +985,24 @@ export class BackgroundManager {
           }
         }
       })
+      // The timeout timer must be cleared on the winning path too: every wait
+      // with a timeout used to leave a live timer behind for up to timeoutMs,
+      // which keeps the event loop busy long after the turn has moved on.
+      let timer: ReturnType<typeof setTimeout> | undefined
       const timeout =
         timeoutMs !== undefined
-          ? new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), timeoutMs))
+          ? new Promise<'timeout'>((r) => {
+              timer = setTimeout(() => r('timeout'), timeoutMs)
+            })
           : null
-      const raced = timeout
-        ? await Promise.race([Promise.any(polls).then(() => 'done' as const), timeout])
-        : await Promise.any(polls).then(() => 'done' as const)
+      let raced: 'done' | 'timeout'
+      try {
+        raced = timeout
+          ? await Promise.race([Promise.any(polls).then(() => 'done' as const), timeout])
+          : await Promise.any(polls).then(() => 'done' as const)
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
       return {
         mode,
         timed_out: raced === 'timeout',
@@ -939,20 +1011,27 @@ export class BackgroundManager {
     }
 
     // wait_all
+    let timer: ReturnType<typeof setTimeout> | undefined
     const timeout =
       timeoutMs !== undefined
-        ? new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), timeoutMs))
+        ? new Promise<'timeout'>((r) => {
+            timer = setTimeout(() => r('timeout'), timeoutMs)
+          })
         : null
     const all = Promise.all(taskIds.map((id) => this.wait(id, remaining())))
-    if (timeout) {
-      const raced = await Promise.race([all.then(() => 'done' as const), timeout])
-      return {
-        mode,
-        timed_out: raced === 'timeout',
-        tasks: taskIds.map((id) => this.getOutputStructured(id)),
+    try {
+      if (timeout) {
+        const raced = await Promise.race([all.then(() => 'done' as const), timeout])
+        return {
+          mode,
+          timed_out: raced === 'timeout',
+          tasks: taskIds.map((id) => this.getOutputStructured(id)),
+        }
       }
+      await all
+    } finally {
+      if (timer) clearTimeout(timer)
     }
-    await all
     return { mode, timed_out: false, tasks: taskIds.map((id) => this.getOutputStructured(id)) }
   }
 

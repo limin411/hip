@@ -90,7 +90,7 @@ describe('fixture plugin skills load through use_skill', () => {
     const useSkill = tools.find((t) => t.name === 'use_skill')!
 
     const result = String(await useSkill.invoke({ name: 'sample-format' }))
-    expect(result).toContain('references/style-guide.md')
+    expect(result).toContain(join('references', 'style-guide.md'))
   })
 
   it('use_skill returns error for missing skill', async () => {

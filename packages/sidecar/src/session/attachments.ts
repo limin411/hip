@@ -73,11 +73,27 @@ export function isAllowedAttachment(name: string, mimeType: string): boolean {
   return TEXT_EXTENSIONS.has(ext)
 }
 
+/**
+ * Lexical containment check against the allowed roots, used when realpath is
+ * unavailable (path does not exist). Deliberately conservative and never a
+ * substitute for the realpath check: a `true` here only means "not obviously
+ * outside", and the caller that has a realpath still uses that instead.
+ */
+function isUnderAllowedRootsLexical(filePath: string): boolean {
+  const target = path.normalize(filePath)
+  return [os.homedir(), os.tmpdir()].some((root) => {
+    const rel = path.relative(path.normalize(root), target)
+    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+  })
+}
+
 async function resolveAndValidateAttachmentPath(filePath: string): Promise<{ realPath: string; size: number }> {
   if (!path.isAbsolute(filePath)) {
     throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment path must be absolute: ${filePath}`)
   }
-  if (filePath.split(path.sep).some((segment) => segment === '..')) {
+  // Split on BOTH separators: Windows accepts '/' as well as '\', so a
+  // path.sep-only split let `dir/sub/../x.txt` slip past the traversal guard.
+  if (filePath.split(/[/\\]/).some((segment) => segment === '..')) {
     throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment path cannot contain '..' segments: ${filePath}`)
   }
   let realPath: string
@@ -86,6 +102,12 @@ async function resolveAndValidateAttachmentPath(filePath: string): Promise<{ rea
   } catch (err) {
     const errno = err as NodeJS.ErrnoException
     if (errno.code === 'ENOENT' || errno.code === 'ENOTDIR') {
+      // Existence is not a policy question: a path outside the allowed roots is
+      // INVALID_PATH whether or not it happens to exist. Classify lexically so the
+      // answer does not depend on the host filesystem.
+      if (!isUnderAllowedRootsLexical(filePath)) {
+        throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment path is outside allowed directories (${os.homedir()} or ${os.tmpdir()}): ${filePath}`)
+      }
       throw new AttachmentError('ATTACHMENT_NOT_FOUND', `Attachment not found or inaccessible: ${filePath}`)
     }
     throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Cannot resolve attachment path ${filePath}: ${errno.message}`)

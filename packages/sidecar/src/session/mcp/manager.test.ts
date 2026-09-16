@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { CAN_SYMLINK, IS_POSIX } from '../../test/env.js'
 import { symlinkSync, unlinkSync, existsSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -181,7 +182,7 @@ describe('McpManager.tools', () => {
 })
 
 describe('McpManager.validateStdioCommand', () => {
-  it('accepts /usr/bin/env (allowed directory)', async () => {
+  it.skipIf(!IS_POSIX)('accepts /usr/bin/env (allowed directory)', async () => {
     const result = await mgr.testValidate('/usr/bin/env')
     expect(result).toBeUndefined()
   })
@@ -196,12 +197,12 @@ describe('McpManager.validateStdioCommand', () => {
     expect(result).toMatch(/must be an absolute path/)
   })
 
-  it('rejects path traversal like /usr/bin/../tmp/malicious', async () => {
+  it.skipIf(!IS_POSIX)('rejects path traversal like /usr/bin/../tmp/malicious', async () => {
     const result = await mgr.testValidate('/usr/bin/../tmp/malicious')
     expect(result).toMatch(/does not exist or cannot be resolved/)
   })
 
-  it('accepts a symlink whose realpath falls inside an allowed directory', async () => {
+  it.skipIf(!CAN_SYMLINK)('accepts a symlink whose realpath falls inside an allowed directory', async () => {
     const target = '/usr/bin/env'
     const link = path.join(os.tmpdir(), 'hip-test-allowed-link')
     try { symlinkSync(target, link) } catch { /* may already exist */ }
@@ -213,7 +214,7 @@ describe('McpManager.validateStdioCommand', () => {
     }
   })
 
-  it('rejects a symlink whose realpath falls outside allowed directories', async () => {
+  it.skipIf(!CAN_SYMLINK)('rejects a symlink whose realpath falls outside allowed directories', async () => {
     const target = path.join(os.tmpdir(), 'hip-test-evil-target')
     // Create a real file outside allowed dirs so realpath succeeds but the check fails
     try {

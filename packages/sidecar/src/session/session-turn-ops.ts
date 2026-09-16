@@ -430,9 +430,24 @@ export async function retrySubagent(host: SessionTurnHost, agentId: string, send
 }
 
 export async function resumeSubagent(host: SessionTurnHost, taskId: string, content: string, send: SendFn): Promise<void> {
-  if (host.running || host.awaitingResume) return
-  if (host.backgroundTasks.has(taskId)) return
-  if (!host.spawnedSubagentIds.has(taskId)) return
+  // Every rejection used to `return` in silence: the UI sent "resume agent",
+  // nothing came back, and the message box looked like it had been swallowed.
+  // Say *why* — the caller cannot distinguish "busy" from "unknown task".
+  const refuse = (code: string, message: string) => {
+    send({ type: 'error', sessionId: host.id, code, message })
+  }
+  if (host.running || host.awaitingResume) {
+    refuse('AGENT_BUSY', 'Another turn is still running; wait for it to finish before resuming this agent.')
+    return
+  }
+  if (host.backgroundTasks.has(taskId)) {
+    refuse('AGENT_NOT_RESUMABLE', 'That agent is still running as a background task — open it from the task panel instead.')
+    return
+  }
+  if (!host.spawnedSubagentIds.has(taskId)) {
+    refuse('AGENT_NOT_RESUMABLE', `No resumable agent with id ${taskId} in this session.`)
+    return
+  }
   host.running = true
 
   const existingMessages = loadSubagentMessages(host, taskId)

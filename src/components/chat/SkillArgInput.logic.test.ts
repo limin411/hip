@@ -6,7 +6,13 @@ import { extractPlaceholders, extractSkillInvocation } from './SkillArgInput'
 const sampleFormatDir = path.resolve(import.meta.dirname, '../../../e2e/fixtures/sample-plugin/skills/sample-format')
 
 function readSampleFormat() {
-  const raw = readFileSync(path.join(sampleFormatDir, 'SKILL.md'), 'utf8')
+  // Normalise CRLF: git checks this fixture out with CRLF on Windows and the LF-only
+  // fence regex below then matches nothing. The product parser normalises too
+  // (packages/sidecar/src/session/skills/frontmatter.ts).
+  // Normalise CRLF: git checks this fixture out with CRLF on Windows and the
+  // LF-only fence regex below then matches nothing. The product parser
+  // normalises the same way (packages/sidecar/src/session/skills/frontmatter.ts).
+  const raw = readFileSync(path.join(sampleFormatDir, 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n').replace(/\r\n/g, '\n')
   const frontmatterMatch = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
   const frontmatter = frontmatterMatch ? frontmatterMatch[1] : ''
   const body = frontmatterMatch ? frontmatterMatch[2].trim() : raw.trim()

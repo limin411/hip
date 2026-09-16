@@ -55,6 +55,21 @@ function notifyInFlight(): void {
 const watches = new Map<string, { sessionId: string; automationId: string }>()
 
 /**
+ * Last recorded skip signature per automation: `"<error>|<due slot>"`.
+ *
+ * A scheduled slot that stays due across host ticks must not append a skip row
+ * every tick. When the global concurrency cap is saturated, `runNow` rejects with
+ * `skip_global_cap` and `nextRunAt` deliberately does NOT advance — the run should
+ * be retried, not lost — so the next 30s tick sees the very same due slot and
+ * records the very same skip again. That is 120 rows an hour into a 120-row runs
+ * log: a saturated cap silently erased the real run history.
+ *
+ * Keyed by the due slot so a genuinely new occurrence (next day's slot, a different
+ * reason) still logs. Cleared when the automation actually claims a run.
+ */
+const lastSkipSignature = new Map<string, string>()
+
+/**
  * Serialize runNow bodies so disk/session side effects cannot interleave
  * for concurrent tick+manual paths (workItemStore saveChain pattern).
  */
@@ -94,6 +109,8 @@ export function tryClaimInFlight(
   }
   inFlight.add(automationId)
   globalInFlight++
+  // A real run is starting: the next skip is a new decision, not a repeat.
+  lastSkipSignature.delete(automationId)
   notifyInFlight()
   return { ok: true }
 }
@@ -886,6 +903,15 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
    * session and stays wrong after reconcile-by-startedAt.
    */
   recordSkip: async (automationId, input) => {
+    const auto = get().automations.find((a) => a.id === automationId)
+
+    // One row per (automation, reason, due slot). A slot that stays due across
+    // host ticks is retried on purpose, but it must not log the retry — see
+    // lastSkipSignature.
+    const signature = `${input.error}|${auto?.nextRunAt ?? null}`
+    if (lastSkipSignature.get(automationId) === signature) return
+    lastSkipSignature.set(automationId, signature)
+
     const runId = mintAutomationRunId()
     const run: AutomationRun = {
       id: runId,
@@ -909,7 +935,6 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
       return
     }
 
-    const auto = get().automations.find((a) => a.id === automationId)
     let nextRunAt = auto?.nextRunAt ?? null
     if (input.rollNextRunAt && auto && auto.trigger.kind !== 'manual') {
       nextRunAt = rollNextRunAt(auto.trigger, input.now)

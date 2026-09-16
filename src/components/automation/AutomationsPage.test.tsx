@@ -108,6 +108,13 @@ vi.mock('@/ipc/dialog', () => ({
   pickDirectory: vi.fn().mockResolvedValue(null),
 }))
 
+let mockSessions: Array<{ id: string }> = []
+vi.mock('@/domain/sessionStore', () => ({
+  useDomainStore: {
+    getState: () => ({ sessions: mockSessions }),
+  },
+}))
+
 /** Radix portal menus are flaky in happy-dom; render items inline for tests. */
 vi.mock('@/components/ui/DropdownMenu', () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => (
@@ -168,6 +175,7 @@ describe('AutomationsPage', () => {
     select.mockClear()
     clearPendingCreate.mockClear()
     selectSession.mockClear()
+    mockSessions = []
     storeState = {
       loaded: true,
       loading: false,
@@ -233,6 +241,7 @@ describe('AutomationsPage', () => {
   })
 
   it('selecting a row opens detail panel with run history; session deep-link works', () => {
+    mockSessions = [{ id: 'sess_deep' }]
     storeState.automations = [
       {
         ...sampleAutomation,

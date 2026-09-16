@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { MessageSquare, Pencil, Play, TriangleAlert, X } from 'lucide-react'
 import type { Automation } from '@/domain/automations'
 import { sessionService } from '@/domain'
+import { useDomainStore } from '@/domain/sessionStore'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
@@ -74,6 +76,13 @@ export function AutomationDetailPanel({
 
   const openLastSession = () => {
     if (automation.lastSessionId) {
+      const exists = useDomainStore.getState().sessions.some(
+        (s) => s.id === automation.lastSessionId,
+      )
+      if (!exists) {
+        toast.error(t('automation.run.sessionDeleted'))
+        return
+      }
       sessionService.selectSession(automation.lastSessionId)
     }
   }

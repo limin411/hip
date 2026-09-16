@@ -527,6 +527,23 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
         finishedAt: nowMs,
       })
     }
+
+    // Clean up stale lastSessionId references: if an automation's lastSessionId
+    // points to a session that no longer exists (user deleted the conversation),
+    // clear it so the UI does not offer a broken "Open session" button.
+    const liveSessionIds = new Set(sessions.map((s) => s.id))
+    let catalogDirty = false
+    const patched = get().automations.map((a) => {
+      if (a.lastSessionId && !liveSessionIds.has(a.lastSessionId)) {
+        catalogDirty = true
+        return { ...a, lastSessionId: null, updatedAt: nowMs }
+      }
+      return a
+    })
+    if (catalogDirty) {
+      set({ automations: patched })
+      await get().saveCatalog()
+    }
   },
 
   saveCatalog: () =>

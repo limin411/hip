@@ -2304,6 +2304,7 @@ export const zhCN = {
         triggerManual: '手动',
         triggerSchedule: '定时',
         triggerCatchup: '补跑',
+        sessionDeleted: '该会话已被删除',
       },
       sessionTitle: '⏱ {{name}}',
     },

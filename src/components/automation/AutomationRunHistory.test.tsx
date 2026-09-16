@@ -13,6 +13,13 @@ vi.mock('@/domain', () => ({
 }))
 
 let storeRuns: AutomationRun[] = []
+let mockSessions: Array<{ id: string }> = []
+
+vi.mock('@/domain/sessionStore', () => ({
+  useDomainStore: {
+    getState: () => ({ sessions: mockSessions }),
+  },
+}))
 
 vi.mock('@/store/automationStore', () => {
   const useAutomationStore = (sel: (s: { runs: AutomationRun[] }) => unknown) =>
@@ -45,6 +52,7 @@ describe('AutomationRunHistory', () => {
   beforeEach(() => {
     selectSession.mockClear()
     storeRuns = []
+    mockSessions = []
   })
 
   afterEach(() => {
@@ -122,6 +130,7 @@ describe('AutomationRunHistory', () => {
   })
 
   it('opens session via selectSession when run has sessionId', () => {
+    mockSessions = [{ id: 'sess_abc' }]
     storeRuns = [
       mkRun({
         id: 'arun_s',

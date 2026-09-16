@@ -2269,7 +2269,8 @@ export const ja = {
       "close": "実行履歴を閉じる",
       "triggerManual": "手動",
       "triggerSchedule": "スケジュール",
-      "triggerCatchup": "キャッチアップ"
+      "triggerCatchup": "キャッチアップ",
+      "sessionDeleted": "このセッションは削除されました"
     },
     "sessionTitle": "⏱ {{name}}"
   },

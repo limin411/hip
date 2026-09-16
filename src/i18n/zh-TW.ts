@@ -2273,7 +2273,8 @@ export const zhTW = {
       "close": "關閉執行歷史",
       "triggerManual": "手動",
       "triggerSchedule": "排程",
-      "triggerCatchup": "補跑"
+      "triggerCatchup": "補跑",
+      "sessionDeleted": "該會話已被刪除"
     },
     "sessionTitle": "⏱ {{name}}"
   },

@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { MessageSquare, X } from 'lucide-react'
 import type {
   Automation,
@@ -8,6 +9,7 @@ import type {
   AutomationRunTrigger,
 } from '@/domain/automations'
 import { sessionService } from '@/domain'
+import { useDomainStore } from '@/domain/sessionStore'
 import { useAutomationStore } from '@/store/automationStore'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -113,6 +115,11 @@ export function AutomationRunHistory({
   }, [runs, automation.id])
 
   const openSession = (sessionId: string) => {
+    const exists = useDomainStore.getState().sessions.some((s) => s.id === sessionId)
+    if (!exists) {
+      toast.error(t('automation.run.sessionDeleted'))
+      return
+    }
     sessionService.selectSession(sessionId)
   }
 

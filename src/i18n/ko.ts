@@ -2269,7 +2269,8 @@ export const ko = {
       "close": "실행 기록 닫기",
       "triggerManual": "수동",
       "triggerSchedule": "예약",
-      "triggerCatchup": "따라잡기"
+      "triggerCatchup": "따라잡기",
+      "sessionDeleted": "이 세션은 삭제되었습니다"
     },
     "sessionTitle": "⏱ {{name}}"
   },

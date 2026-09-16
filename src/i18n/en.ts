@@ -2365,6 +2365,7 @@ export const en = {
         triggerManual: 'Manual',
         triggerSchedule: 'Scheduled',
         triggerCatchup: 'Catch-up',
+        sessionDeleted: 'This session has been deleted',
       },
       sessionTitle: '⏱ {{name}}',
     },

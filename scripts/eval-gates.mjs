@@ -48,6 +48,9 @@ if (hasFlag('--list')) {
   process.exit(0)
 }
 
+const ANSI_RE = /[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d\/#&.:=?%@~_]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-ntqry=><~]))/g
+const stripAnsi = (s) => String(s).replace(ANSI_RE, '')
+
 /** Run one shell string. Returns an honest result — never throws. */
 function runCommand(cmd, timeoutMs) {
   const started = Date.now()
@@ -69,7 +72,9 @@ function runCommand(cmd, timeoutMs) {
     if (typeof res.status !== 'number') {
       return { ok: false, reason: 'no-exit-status', detail: 'unknown', durationMs }
     }
-    const tail = (res.stdout || '').trim().split('\n').slice(-12).join('\n')
+    // Strip ANSI: test runners emit colour codes and progress glyphs that render
+    // as mojibake once embedded in a markdown report.
+    const tail = stripAnsi((res.stdout || '').trim()).split('\n').slice(-12).join('\n')
     return { ok: res.status === 0, reason: res.status === 0 ? 'passed' : 'nonzero-exit', detail: tail, exitCode: res.status, durationMs }
   } catch (err) {
     return { ok: false, reason: 'runner-exception', detail: String(err?.message ?? err), durationMs: Date.now() - started }
@@ -230,7 +235,7 @@ for (const g of report.gates) {
   lines.push('')
   const s = g.soak
   if (s) {
-    lines.push(`Soak: ${s.consecutivePassing} consecutive passes over ${s.distinctDays} day(s) of ${s.totalRuns} run(s) — promotion eligible: **${s.promotionEligible ? 'yes' : 'no'}** (needs ${s.needed.minimumSoakRuns} runs / ${s.needed.minimumSoakDays} days).`)
+    lines.push(`Soak: ${s.consecutivePassing} consecutive passes over ${s.distinctDays} day(s) of ${s.totalRuns} run(s) - promotion eligible: **${s.promotionEligible ? 'yes' : 'no'}** (needs ${s.needed.minimumSoakRuns} runs / ${s.needed.minimumSoakDays} days).`)
     lines.push('')
   }
   if (g.assertionRefs.length) {
@@ -248,7 +253,7 @@ for (const g of report.gates) {
     lines.push('')
   }
   for (const c of g.commands) {
-    lines.push(`<details><summary><code>${c.command}</code> → ${c.reason} (exit ${c.exitCode ?? 'n/a'}, ${(c.durationMs / 1000).toFixed(2)}s)</summary>`)
+    lines.push(`<details><summary><code>${c.command}</code> -> ${c.reason} (exit ${c.exitCode ?? 'n/a'}, ${(c.durationMs / 1000).toFixed(2)}s)</summary>`)
     lines.push('')
     if (c.detail) lines.push('```', String(c.detail).slice(-4000), '```')
     lines.push('')

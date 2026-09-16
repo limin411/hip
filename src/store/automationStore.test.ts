@@ -238,6 +238,30 @@ describe('automationStore', () => {
     expect(saveAutomations).toHaveBeenCalled()
   })
 
+  it('create stores the owning conversation id', async () => {
+    const id = await useAutomationStore.getState().create({
+      name: 'Scoped',
+      prompt: 'P',
+      trigger: { kind: 'interval', intervalMinutes: 30 },
+      sessionId: 'sess_a',
+    })
+    expect(useAutomationStore.getState().automations[0].sessionId).toBe('sess_a')
+    // Regression: normalizeTrigger had no `interval` branch, so the composer's
+    // default scheduled task was persisted as `manual` and never ran.
+    expect(useAutomationStore.getState().automations[0].trigger).toEqual({
+      kind: 'interval',
+      intervalMinutes: 30,
+    })
+
+    // A task created from the automations page has no owning conversation.
+    await useAutomationStore.getState().create({ name: 'Unscoped', prompt: 'P' })
+    const unscoped = useAutomationStore
+      .getState()
+      .automations.find((a) => a.name === 'Unscoped')
+    expect(unscoped?.sessionId).toBeNull()
+    expect(id).not.toBe(unscoped?.id)
+  })
+
   it('create rejects duplicate names (case-insensitive)', async () => {
     useAutomationStore.setState({
       automations: [auto({ id: 'auto_exist', name: 'Daily Notes' })],

@@ -11,9 +11,14 @@ import {
   MessageSquare,
   ExternalLink,
   TriangleAlert,
+  Timer,
   Zap,
 } from 'lucide-react'
-import type { Automation, AutomationRunStatus } from '@/domain/automations'
+import {
+  automationTriggerLabel,
+  type Automation,
+  type AutomationRunStatus,
+} from '@/domain/automations'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
@@ -42,16 +47,6 @@ export type AutomationRowProps = {
   scheduleUnreliable?: boolean
 }
 
-const WEEKDAY_KEYS = [
-  'automation.weekday.0',
-  'automation.weekday.1',
-  'automation.weekday.2',
-  'automation.weekday.3',
-  'automation.weekday.4',
-  'automation.weekday.5',
-  'automation.weekday.6',
-] as const
-
 function statusVariant(
   status: AutomationRunStatus | null | undefined,
   running?: boolean,
@@ -79,23 +74,15 @@ function triggerLabel(
   a: Automation,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
-  const tr = a.trigger
-  if (tr.kind === 'manual') return t('automation.trigger.manual')
-  const time = `${String(tr.hour).padStart(2, '0')}:${String(tr.minute).padStart(2, '0')}`
-  if (tr.kind === 'daily') {
-    return t('automation.trigger.dailyAt', { time })
-  }
-  const wd = ((tr.weekday % 7) + 7) % 7
-  return t('automation.trigger.weeklyAt', {
-    weekday: t(WEEKDAY_KEYS[wd]!),
-    time,
-  })
+  return automationTriggerLabel(a.trigger, t)
 }
 
 function TriggerIcon({ kind }: { kind: Automation['trigger']['kind'] }) {
   const className = 'h-4 w-4'
   if (kind === 'daily') return <Clock className={className} strokeWidth={1.75} aria-hidden />
   if (kind === 'weekly') return <CalendarClock className={className} strokeWidth={1.75} aria-hidden />
+  // Interval used to fall through to the manual "hand" icon.
+  if (kind === 'interval') return <Timer className={className} strokeWidth={1.75} aria-hidden />
   return <Hand className={className} strokeWidth={1.75} aria-hidden />
 }
 

@@ -117,6 +117,19 @@ function clampWeekday(n: number): number {
   return Math.min(6, Math.max(0, Math.trunc(n)))
 }
 
+/** Smallest interval the host can honour (host tick is ~30s). */
+export const AUTOMATION_INTERVAL_MIN_MINUTES = 1
+/** Largest interval — bounds nextRunAt arithmetic on corrupt disk data. */
+export const AUTOMATION_INTERVAL_MAX_MINUTES = 365 * 24 * 60
+
+function clampIntervalMinutes(n: number): number {
+  if (!Number.isFinite(n)) return AUTOMATION_INTERVAL_MIN_MINUTES
+  return Math.min(
+    AUTOMATION_INTERVAL_MAX_MINUTES,
+    Math.max(AUTOMATION_INTERVAL_MIN_MINUTES, Math.trunc(n)),
+  )
+}
+
 /**
  * Coerce unknown trigger JSON into a valid AutomationTrigger.
  * Invalid shapes fall back to `{ kind: 'manual' }`.
@@ -127,6 +140,15 @@ export function normalizeTrigger(raw: unknown): AutomationTrigger {
   const kind = typeof o.kind === 'string' ? o.kind : ''
 
   if (kind === 'manual') return { kind: 'manual' }
+
+  if (kind === 'interval') {
+    return {
+      kind: 'interval',
+      intervalMinutes: clampIntervalMinutes(
+        asFiniteNumber(o.intervalMinutes, 30),
+      ),
+    }
+  }
 
   if (kind === 'daily') {
     return {
@@ -242,6 +264,13 @@ export function normalizeAutomation(raw: unknown, fallbackNow: number = Date.now
 
   const projectPath = normalizeOptionalPath(o.projectPath)
   if (projectPath !== undefined) auto.projectPath = projectPath
+
+  // Owning conversation (chat composer scheduled task). Empty → null.
+  if (o.sessionId == null || o.sessionId === '') {
+    auto.sessionId = null
+  } else if (typeof o.sessionId === 'string') {
+    auto.sessionId = o.sessionId.trim() || null
+  }
 
   const llmProvider = normalizeOptionalString(o.llmProvider)
   if (llmProvider) auto.llmProvider = llmProvider

@@ -5,7 +5,7 @@
 import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Zap } from 'lucide-react'
-import type { Automation } from '@/domain/automations'
+import { automationTriggerLabel, type Automation } from '@/domain/automations'
 import { cn } from '@/lib/utils'
 import { useAutomationStore } from '@/store/automationStore'
 import { useUiStore } from '@/store/uiStore'
@@ -13,31 +13,11 @@ import { SIDEBAR_ACTIVE_RAIL } from '@/components/layout/sidebarActiveRail'
 import { enterAutomationsSection } from '@/components/layout/sidebarActions'
 import { useInFlightIds } from './useAutomationInFlight'
 
-const WEEKDAY_KEYS = [
-  'automation.weekday.0',
-  'automation.weekday.1',
-  'automation.weekday.2',
-  'automation.weekday.3',
-  'automation.weekday.4',
-  'automation.weekday.5',
-  'automation.weekday.6',
-] as const
-
 function triggerSubtitle(
   a: Automation,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
-  const tr = a.trigger
-  if (tr.kind === 'manual') return t('automation.trigger.manual')
-  const time = `${String(tr.hour).padStart(2, '0')}:${String(tr.minute).padStart(2, '0')}`
-  if (tr.kind === 'daily') {
-    return t('automation.trigger.dailyAt', { time })
-  }
-  const wd = ((tr.weekday % 7) + 7) % 7
-  return t('automation.trigger.weeklyAt', {
-    weekday: t(WEEKDAY_KEYS[wd]!),
-    time,
-  })
+  return automationTriggerLabel(a.trigger, t)
 }
 
 function sortEnabled(

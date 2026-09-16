@@ -104,6 +104,7 @@ export function nextWeeklyAt(
 /**
  * Next scheduled fire time at or after `fromMs` (local TZ, inclusive).
  * Interval triggers → fromMs + intervalMinutes * 60_000.
+ * Manual triggers → `null` (no schedule; host tick must never fire them).
  *
  * Use for **seeding** `nextRunAt` when enabling / first load (slot may be due now).
  * After fire/skip, use {@link rollNextRunAt} (exclusive) so the same slot cannot re-fire.
@@ -112,6 +113,7 @@ export function computeNextRunAt(
   trigger: AutomationTrigger,
   fromMs: number,
 ): number | null {
+  if (trigger.kind === 'manual') return null
   if (trigger.kind === 'interval') {
     return fromMs + trigger.intervalMinutes * 60_000
   }

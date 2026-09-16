@@ -95,6 +95,7 @@ fn save_manifest(trash: &Path, m: &AutomationsTrashManifest) -> Result<(), Strin
 fn trigger_kind_label(a: &Automation) -> String {
     match &a.trigger {
         crate::automations::AutomationTrigger::Manual => "manual".into(),
+        crate::automations::AutomationTrigger::Interval { .. } => "interval".into(),
         crate::automations::AutomationTrigger::Daily { .. } => "daily".into(),
         crate::automations::AutomationTrigger::Weekly { .. } => "weekly".into(),
     }
@@ -292,6 +293,7 @@ mod tests {
             prompt: "do work".into(),
             enabled: true,
             trigger: AutomationTrigger::Manual,
+            session_id: None,
             project_path: None,
             llm_provider: None,
             model: None,

@@ -194,6 +194,8 @@ export type CreateAutomationInput = {
   prompt?: string
   enabled?: boolean
   trigger?: AutomationTrigger
+  /** Owning conversation (chat composer scheduled task). */
+  sessionId?: string | null
   projectPath?: string | null
   llmProvider?: string
   model?: string
@@ -353,6 +355,9 @@ function patchAutomationInList(
 function triggersEqual(a: AutomationTrigger, b: AutomationTrigger): boolean {
   if (a.kind !== b.kind) return false
   if (a.kind === 'manual') return true
+  if (a.kind === 'interval' && b.kind === 'interval') {
+    return a.intervalMinutes === b.intervalMinutes
+  }
   if (a.kind === 'daily' && b.kind === 'daily') {
     return a.hour === b.hour && a.minute === b.minute
   }
@@ -597,6 +602,7 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
       updatedAt: now,
       nextRunAt:
         trigger.kind === 'manual' ? null : computeNextRunAt(trigger, now),
+      ...(input.sessionId !== undefined ? { sessionId: input.sessionId } : {}),
       ...(input.projectPath !== undefined
         ? { projectPath: input.projectPath }
         : {}),

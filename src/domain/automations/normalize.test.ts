@@ -22,6 +22,54 @@ describe('normalizeTrigger', () => {
     expect(normalizeTrigger({ kind: 'hourly' })).toEqual({ kind: 'manual' })
   })
 
+  it('keeps interval triggers (regression: they used to collapse to manual)', () => {
+    // The composer's default scheduled task is `interval`. normalizeTrigger had
+    // no interval branch, so it fell through to `{ kind: 'manual' }` — the saved
+    // automation never fired and the composer icon never showed a task.
+    expect(normalizeTrigger({ kind: 'interval', intervalMinutes: 30 })).toEqual({
+      kind: 'interval',
+      intervalMinutes: 30,
+    })
+    expect(normalizeAutomation({
+      id: mintAutomationId(),
+      name: 'x',
+      prompt: 'y',
+      enabled: true,
+      trigger: { kind: 'interval', intervalMinutes: 15 },
+      createdAt: 1,
+      updatedAt: 1,
+    })?.trigger).toEqual({ kind: 'interval', intervalMinutes: 15 })
+  })
+
+  it('clamps the interval to a sane minute range', () => {
+    // 0 / negative would let the host fire on every tick.
+    expect(normalizeTrigger({ kind: 'interval', intervalMinutes: 0 })).toEqual({
+      kind: 'interval',
+      intervalMinutes: 1,
+    })
+    expect(normalizeTrigger({ kind: 'interval', intervalMinutes: -5 })).toEqual({
+      kind: 'interval',
+      intervalMinutes: 1,
+    })
+    expect(normalizeTrigger({ kind: 'interval', intervalMinutes: 90.7 })).toEqual({
+      kind: 'interval',
+      intervalMinutes: 90,
+    })
+    expect(normalizeTrigger({ kind: 'interval', intervalMinutes: 1e9 })).toEqual({
+      kind: 'interval',
+      intervalMinutes: 365 * 24 * 60,
+    })
+    // Missing / non-numeric → the default interval, not 0.
+    expect(normalizeTrigger({ kind: 'interval' })).toEqual({
+      kind: 'interval',
+      intervalMinutes: 30,
+    })
+    expect(normalizeTrigger({ kind: 'interval', intervalMinutes: 'abc' })).toEqual({
+      kind: 'interval',
+      intervalMinutes: 30,
+    })
+  })
+
   it('clamps daily hour/minute', () => {
     expect(normalizeTrigger({ kind: 'daily', hour: 25, minute: -1 })).toEqual({
       kind: 'daily',
@@ -188,6 +236,25 @@ describe('normalizeCatalog', () => {
     expect(a!.lastSessionId).toBe('sess_1')
     expect(a!.lastRunAt).toBe(123)
     expect(a!.nextRunAt).toBeNull()
+  })
+
+  it('keeps the owning conversation id (sessionId) and blanks empties', () => {
+    const id = mintAutomationId()
+    const base = {
+      id,
+      name: 'x',
+      prompt: 'y',
+      enabled: true,
+      trigger: { kind: 'manual' } as const,
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    expect(normalizeAutomation({ ...base, sessionId: 'sess_a' })!.sessionId).toBe('sess_a')
+    expect(normalizeAutomation({ ...base, sessionId: '  sess_a  ' })!.sessionId).toBe('sess_a')
+    expect(normalizeAutomation({ ...base, sessionId: '   ' })!.sessionId).toBeNull()
+    expect(normalizeAutomation({ ...base, sessionId: null })!.sessionId).toBeNull()
+    // Absent → still null so callers can compare with `===`.
+    expect(normalizeAutomation(base)!.sessionId).toBeNull()
   })
 
   it('catalog lastStatus: unknown/corrupt → null (not pending badge)', () => {

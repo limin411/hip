@@ -49,6 +49,8 @@ type Draft = {
   name: string
   prompt: string
   triggerKind: AutomationTriggerKind
+  /** Interval triggers only; ignored for manual / daily / weekly. */
+  intervalMinutes: number
   hour: number
   minute: number
   weekday: number
@@ -66,6 +68,7 @@ function emptyDraft(): Draft {
     name: '',
     prompt: '',
     triggerKind: 'manual',
+    intervalMinutes: 60,
     hour: 9,
     minute: 0,
     weekday: 1,
@@ -100,8 +103,10 @@ function draftFromAutomation(a: Automation): Draft {
     name: a.name,
     prompt: a.prompt,
     triggerKind: tr.kind,
-    hour: tr.kind === 'manual' ? 9 : tr.hour,
-    minute: tr.kind === 'manual' ? 0 : tr.minute,
+    intervalMinutes: tr.kind === 'interval' ? tr.intervalMinutes : 60,
+    // interval has no wall-clock fields — fall back to the editor defaults.
+    hour: tr.kind === 'daily' || tr.kind === 'weekly' ? tr.hour : 9,
+    minute: tr.kind === 'daily' || tr.kind === 'weekly' ? tr.minute : 0,
     weekday: tr.kind === 'weekly' ? tr.weekday : 1,
     projectPath: a.projectPath?.trim() ?? '',
     agentId: a.agentId ?? '',
@@ -116,6 +121,9 @@ function draftFromAutomation(a: Automation): Draft {
 
 function toTrigger(d: Draft): AutomationTrigger {
   if (d.triggerKind === 'manual') return { kind: 'manual' }
+  if (d.triggerKind === 'interval') {
+    return { kind: 'interval', intervalMinutes: d.intervalMinutes }
+  }
   if (d.triggerKind === 'daily') {
     return { kind: 'daily', hour: d.hour, minute: d.minute }
   }
@@ -566,9 +574,26 @@ export function AutomationEditorModal({
               aria-label={t('automation.editor.trigger')}
             >
               <option value="manual">{t('automation.trigger.manual')}</option>
+              <option value="interval">{t('automation.trigger.interval')}</option>
               <option value="daily">{t('automation.trigger.daily')}</option>
               <option value="weekly">{t('automation.trigger.weekly')}</option>
             </select>
+
+            {draft.triggerKind === 'interval' ? (
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className={cn(inputClassName, 'h-9 w-auto min-w-[7.5rem]')}
+                value={draft.intervalMinutes}
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  if (Number.isFinite(n)) patch({ intervalMinutes: n })
+                }}
+                data-testid="automation-editor-interval"
+                aria-label={t('automation.editor.interval')}
+              />
+            ) : null}
 
             {draft.triggerKind === 'weekly' ? (
               <select
@@ -586,7 +611,7 @@ export function AutomationEditorModal({
               </select>
             ) : null}
 
-            {draft.triggerKind !== 'manual' ? (
+            {draft.triggerKind !== 'manual' && draft.triggerKind !== 'interval' ? (
               <input
                 type="time"
                 className={cn(inputClassName, 'h-9 w-auto min-w-[7.5rem]')}

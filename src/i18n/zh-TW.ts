@@ -2144,8 +2144,11 @@ export const zhTW = {
       "manual": "手動",
       "daily": "每日",
       "weekly": "每週",
+      "interval": "間隔",
       "dailyAt": "每日 · {{time}}",
-      "weeklyAt": "{{weekday}} · {{time}}"
+      "weeklyAt": "{{weekday}} · {{time}}",
+      "intervalAt": "每隔 {{minutes}} 分鐘",
+      "intervalHoursAt": "每隔 {{hours}} 小時"
     },
     "weekday": {
       "0": "週日",
@@ -2243,6 +2246,7 @@ export const zhTW = {
       "promptRequired": "請填寫提示詞",
       "trigger": "觸發方式",
       "triggerManualHint": "僅在點擊「執行」時執行，不設排程。",
+      "interval": "間隔（分鐘）",
       "weekday": "星期",
       "time": "時間",
       "project": "專案目錄",

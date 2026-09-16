@@ -2140,8 +2140,11 @@ export const ko = {
       "manual": "수동",
       "daily": "매일",
       "weekly": "매주",
+      "interval": "간격",
       "dailyAt": "매일 · {{time}}",
-      "weeklyAt": "{{weekday}} · {{time}}"
+      "weeklyAt": "{{weekday}} · {{time}}",
+      "intervalAt": "{{minutes}}분마다",
+      "intervalHoursAt": "{{hours}}시간마다"
     },
     "weekday": {
       "0": "일요일",
@@ -2239,6 +2242,7 @@ export const ko = {
       "promptRequired": "프롬프트는 필수입니다",
       "trigger": "트리거",
       "triggerManualHint": "「실행」을 누를 때만 실행됩니다. 일정 없음.",
+      "interval": "간격(분)",
       "weekday": "요일",
       "time": "시간",
       "project": "프로젝트 폴더",

@@ -9,21 +9,23 @@ interface ScheduledTaskBannerProps {
 
 export function ScheduledTaskBanner({ onEdit }: ScheduledTaskBannerProps) {
   const { t } = useTranslation()
-  const { taskInfo, deleteScheduledTask, getFrequencyText, getTimeText } = useScheduledTask()
+  const { taskInfo, dismissBanner, getFrequencyText, getTimeText } = useScheduledTask()
 
-  if (!taskInfo) {
+  // `bannerDismissed` is per-task: hiding it here must not resurrect on re-render,
+  // and creating a new task (new id) shows the banner again.
+  if (!taskInfo || taskInfo.bannerDismissed) {
     return null
   }
 
   const frequencyText = getFrequencyText(taskInfo.frequency, taskInfo.intervalMinutes, taskInfo.weekday)
-  
-  // For interval, show interval info; for daily/weekly, show time
-  const getTimeDisplay = () => {
-    if (taskInfo.frequency === 'interval') {
-      return frequencyText
-    }
-    return `${frequencyText} ${getTimeText(taskInfo.hour, taskInfo.minute)} 执行`
-  }
+
+  const titleText =
+    taskInfo.frequency === 'interval'
+      ? t('scheduledTask.banner.title', { frequency: frequencyText, time: '' })
+      : t('scheduledTask.banner.title', {
+          frequency: frequencyText,
+          time: getTimeText(taskInfo.hour, taskInfo.minute),
+        })
 
   return (
     <div
@@ -37,9 +39,12 @@ export function ScheduledTaskBanner({ onEdit }: ScheduledTaskBannerProps) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-meta text-ink-secondary">
-          {t('scheduledTask.banner.title', { frequency: getTimeDisplay(), time: '' })}
-        </p>
+        <p className="truncate text-meta text-ink-secondary">{titleText}</p>
+        {taskInfo.prompt && (
+          <p className="truncate text-caption text-ink-secondary" data-testid="scheduled-task-banner-prompt">
+            {taskInfo.prompt}
+          </p>
+        )}
         {taskInfo.nextRun && (
           <p className="truncate text-caption text-ink-tertiary">
             {t('scheduledTask.banner.nextRun', { time: taskInfo.nextRun })}
@@ -61,7 +66,7 @@ export function ScheduledTaskBanner({ onEdit }: ScheduledTaskBannerProps) {
         <button
           type="button"
           className="rounded-sm p-0.5 text-ink-tertiary hover:text-ink-secondary"
-          onClick={deleteScheduledTask}
+          onClick={dismissBanner}
           aria-label={t('scheduledTask.banner.close')}
           data-testid="scheduled-task-banner-close"
         >

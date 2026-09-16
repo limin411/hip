@@ -22,6 +22,13 @@ const BODY_MAX_BYTES: usize = 20 * 1024 * 1024;
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AutomationTrigger {
     Manual,
+    // Enum-level `rename_all` only renames variant names, not their fields —
+    // without this the wire key would be `interval_minutes` and the TS side
+    // (`intervalMinutes`) would silently read undefined.
+    #[serde(rename_all = "camelCase")]
+    Interval {
+        interval_minutes: i64,
+    },
     Daily {
         hour: i64,
         minute: i64,
@@ -41,6 +48,8 @@ pub struct Automation {
     pub prompt: String,
     pub enabled: bool,
     pub trigger: AutomationTrigger,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -163,6 +172,15 @@ fn is_permission_mode(s: &str) -> bool {
 fn validate_trigger(t: &AutomationTrigger, auto_id: &str) -> Result<(), String> {
     match t {
         AutomationTrigger::Manual => Ok(()),
+        AutomationTrigger::Interval { interval_minutes } => {
+            // 1 minute floor (host tick ~30s); 1 year ceiling bounds nextRunAt.
+            if !(1..=525600).contains(interval_minutes) {
+                return Err(format!(
+                    "invalid interval_minutes on {auto_id}: {interval_minutes}"
+                ));
+            }
+            Ok(())
+        }
         AutomationTrigger::Daily { hour, minute } => {
             if !(0..=23).contains(hour) {
                 return Err(format!("invalid hour on {auto_id}: {hour}"));
@@ -420,6 +438,7 @@ mod tests {
                 hour: 9,
                 minute: 0,
             },
+            session_id: None,
             project_path: Some("/Users/me/proj".into()),
             llm_provider: Some("openai".into()),
             model: Some("gpt-4o".into()),
@@ -608,8 +627,40 @@ mod tests {
     }
 
     #[test]
+    fn interval_trigger_uses_camel_case_wire_and_rejects_zero() {
+        let t = AutomationTrigger::Interval {
+            interval_minutes: 30,
+        };
+        let json = serde_json::to_value(&t).unwrap();
+        assert_eq!(json["kind"], "interval");
+        assert_eq!(json["intervalMinutes"], 30);
+        assert!(validate_trigger(&t, "auto_x").is_ok());
+        assert!(
+            validate_trigger(
+                &AutomationTrigger::Interval {
+                    interval_minutes: 0
+                },
+                "auto_x"
+            )
+            .unwrap_err()
+            .contains("invalid interval_minutes")
+        );
+    }
+
+    #[test]
     fn rejects_invalid_trigger_ranges() {
         let mut cat = sample_catalog();
+        cat.automations[0].trigger = AutomationTrigger::Interval {
+            interval_minutes: 0,
+        };
+        assert!(
+            validate_catalog(&cat)
+                .unwrap_err()
+                .contains("invalid interval_minutes"),
+            "a zero interval must not reach disk (it would fire on every tick)"
+        );
+
+        cat = sample_catalog();
         cat.automations[0].trigger = AutomationTrigger::Daily {
             hour: 24,
             minute: 0,
@@ -685,6 +736,7 @@ mod tests {
                 hour: 10,
                 minute: 30,
             },
+            session_id: None,
             project_path: None,
             llm_provider: None,
             model: None,

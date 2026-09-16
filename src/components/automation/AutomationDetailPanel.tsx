@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { MessageSquare, Pencil, Play, TriangleAlert, X } from 'lucide-react'
-import type { Automation } from '@/domain/automations'
+import { automationTriggerLabel, type Automation } from '@/domain/automations'
 import { sessionService } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
 import { Badge } from '@/components/ui/Badge'
@@ -20,31 +20,11 @@ export type AutomationDetailPanelProps = {
   className?: string
 }
 
-const WEEKDAY_KEYS = [
-  'automation.weekday.0',
-  'automation.weekday.1',
-  'automation.weekday.2',
-  'automation.weekday.3',
-  'automation.weekday.4',
-  'automation.weekday.5',
-  'automation.weekday.6',
-] as const
-
 function triggerLabel(
   a: Automation,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
-  const tr = a.trigger
-  if (tr.kind === 'manual') return t('automation.trigger.manual')
-  const time = `${String(tr.hour).padStart(2, '0')}:${String(tr.minute).padStart(2, '0')}`
-  if (tr.kind === 'daily') {
-    return t('automation.trigger.dailyAt', { time })
-  }
-  const wd = ((tr.weekday % 7) + 7) % 7
-  return t('automation.trigger.weeklyAt', {
-    weekday: t(WEEKDAY_KEYS[wd]!),
-    time,
-  })
+  return automationTriggerLabel(a.trigger, t)
 }
 
 /**

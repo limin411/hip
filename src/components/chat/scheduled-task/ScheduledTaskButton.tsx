@@ -4,7 +4,12 @@ import { Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { ComposerChip } from '@/components/chat/ComposerChip'
 import { ScheduledTaskPopover } from './ScheduledTaskPopover'
-import { useScheduledTask } from './useScheduledTask'
+import {
+  DEFAULT_INTERVAL_MINUTES,
+  DEFAULT_SCHEDULE_HOUR,
+  useScheduledTask,
+  type ScheduledTaskDraft,
+} from './useScheduledTask'
 import { useActiveSessionId } from '@/domain'
 
 export function ScheduledTaskButton() {
@@ -14,7 +19,7 @@ export function ScheduledTaskButton() {
   const { taskInfo, createScheduledTask, updateScheduledTask, deleteScheduledTask } = useScheduledTask()
 
   const hasTask = !!taskInfo
-  
+
   // Get display label
   const getLabel = () => {
     if (!taskInfo) return undefined
@@ -26,7 +31,7 @@ export function ScheduledTaskButton() {
     }
     return `${String(taskInfo.hour).padStart(2, '0')}:${String(taskInfo.minute).padStart(2, '0')}`
   }
-  
+
   const label = getLabel()
 
   const handleClick = () => {
@@ -37,11 +42,26 @@ export function ScheduledTaskButton() {
     setOpen(true)
   }
 
+  const submit = (draft: ScheduledTaskDraft) => {
+    if (hasTask) {
+      updateScheduledTask(draft)
+    } else {
+      createScheduledTask(draft)
+    }
+    setOpen(false)
+  }
+
   return (
     <>
       <ComposerChip
         active={hasTask}
-        title={hasTask 
+        // A configured task is a persistent, easy-to-miss state, and the shared
+        // neutral `active` tint (#e6e6e6 vs #f0f0f0 on hover) reads as "unchanged".
+        // Use the accent "configured" badge treatment (matches AgentCard etc.).
+        className={
+          hasTask ? 'bg-accent/10 text-accent hover:bg-accent/15' : undefined
+        }
+        title={hasTask
           ? t('scheduledTask.tooltip.active', { time: label ?? '' })
           : t('scheduledTask.tooltip.inactive')
         }
@@ -58,19 +78,14 @@ export function ScheduledTaskButton() {
         open={open}
         onOpenChange={setOpen}
         initialFrequency={taskInfo?.frequency ?? 'interval'}
-        initialIntervalMinutes={taskInfo?.intervalMinutes ?? 30}
-        initialHour={taskInfo?.hour ?? 9}
+        initialIntervalMinutes={taskInfo?.intervalMinutes ?? DEFAULT_INTERVAL_MINUTES}
+        initialHour={taskInfo?.hour ?? DEFAULT_SCHEDULE_HOUR}
         initialMinute={taskInfo?.minute ?? 0}
         initialWeekday={taskInfo?.weekday ?? 0}
+        initialPrompt={taskInfo?.prompt ?? ''}
         hasExistingTask={hasTask}
-        onCreate={(frequency, intervalMinutes, hour, minute, weekday) => {
-          createScheduledTask(frequency, intervalMinutes, hour, minute, weekday)
-          setOpen(false)
-        }}
-        onUpdate={(frequency, intervalMinutes, hour, minute, weekday) => {
-          updateScheduledTask(frequency, intervalMinutes, hour, minute, weekday)
-          setOpen(false)
-        }}
+        onCreate={submit}
+        onUpdate={submit}
         onDelete={() => {
           deleteScheduledTask()
           setOpen(false)

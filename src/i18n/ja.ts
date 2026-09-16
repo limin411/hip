@@ -2140,8 +2140,11 @@ export const ja = {
       "manual": "手動",
       "daily": "毎日",
       "weekly": "毎週",
+      "interval": "間隔",
       "dailyAt": "毎日 · {{time}}",
-      "weeklyAt": "{{weekday}} · {{time}}"
+      "weeklyAt": "{{weekday}} · {{time}}",
+      "intervalAt": "{{minutes}} 分ごと",
+      "intervalHoursAt": "{{hours}} 時間ごと"
     },
     "weekday": {
       "0": "日曜日",
@@ -2239,6 +2242,7 @@ export const ja = {
       "promptRequired": "プロンプトは必須です",
       "trigger": "トリガー",
       "triggerManualHint": "「実行」をクリックしたときのみ。スケジュールなし。",
+      "interval": "間隔（分）",
       "weekday": "曜日",
       "time": "時刻",
       "project": "プロジェクトフォルダ",

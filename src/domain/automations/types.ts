@@ -1,14 +1,16 @@
 /** Product automation — NOT session CronManager / Workflow DAG. */
 
-export type AutomationTriggerKind = 'interval' | 'daily' | 'weekly'
+export type AutomationTriggerKind = 'manual' | 'interval' | 'daily' | 'weekly'
 
 /**
  * Trigger config.
+ * - `manual`: no schedule — never fires from the host tick
  * - `interval`: every N minutes (minimum 1)
  * - `daily`: at specific hour:minute
  * - `weekly`: on specific weekday at hour:minute
  */
 export type AutomationTrigger =
+  | { kind: 'manual' }
   | { kind: 'interval'; intervalMinutes: number }
   | { kind: 'daily'; hour: number; minute: number }
   | { kind: 'weekly'; weekday: number; hour: number; minute: number }
@@ -50,6 +52,11 @@ export type Automation = {
   prompt: string
   enabled: boolean
   trigger: AutomationTrigger
+  /**
+   * Conversation the automation belongs to (chat composer "scheduled task").
+   * Null / absent → not conversation-scoped (created from the automations page).
+   */
+  sessionId?: string | null
   projectPath?: string | null
   /** Optional pin; empty → resolve via activeModelKey at run time */
   llmProvider?: string

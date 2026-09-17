@@ -295,6 +295,50 @@ describe('automationStore', () => {
     expect(saveAutomations.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('removeOwnedBy deletes only the tasks of the deleted conversation', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({ id: 'auto_own_1', sessionId: 's-owner' }),
+        auto({ id: 'auto_own_2', sessionId: 's-owner' }),
+        auto({ id: 'auto_other', sessionId: 's-other' }),
+        auto({ id: 'auto_legacy' }),
+      ],
+      loaded: true,
+    })
+
+    await useAutomationStore.getState().removeOwnedBy('s-owner')
+
+    expect(useAutomationStore.getState().automations.map((a) => a.id)).toEqual([
+      'auto_other',
+      'auto_legacy',
+    ])
+    expect(softDeleteAutomation.mock.calls.map((c) => c[0])).toEqual([
+      'auto_own_1',
+      'auto_own_2',
+    ])
+  })
+
+  it('removeOwnedBy keeps deleting the rest when one soft-delete fails', async () => {
+    const both = [
+      auto({ id: 'auto_fail_1', sessionId: 's-owner' }),
+      auto({ id: 'auto_fail_2', sessionId: 's-owner' }),
+    ]
+    useAutomationStore.setState({ automations: both, loaded: true })
+    // First IPC fails → remove() rolls back and re-hydrates the catalog from disk.
+    listAutomations.mockResolvedValueOnce({ version: 1, automations: both })
+    softDeleteAutomation.mockRejectedValueOnce(new Error('ipc down'))
+
+    await expect(
+      useAutomationStore.getState().removeOwnedBy('s-owner'),
+    ).resolves.toBeUndefined()
+
+    // A failed first delete must not strand the second task.
+    expect(softDeleteAutomation.mock.calls.map((c) => c[0])).toEqual([
+      'auto_fail_1',
+      'auto_fail_2',
+    ])
+  })
+
   it('update rejects rename onto another automation name', async () => {
     useAutomationStore.setState({
       automations: [
@@ -766,7 +810,7 @@ describe('automationStore', () => {
     expect(createSession).not.toHaveBeenCalled()
   })
 
-  it('falls back to a fresh session when the owning conversation is gone', async () => {
+  it('retires an owner-bound row whose conversation is gone (no re-homing)', async () => {
     useAutomationStore.setState({
       automations: [
         auto({ id: 'auto_orphan', name: 'Orphan', prompt: 'go', sessionId: 's-deleted' }),
@@ -782,8 +826,34 @@ describe('automationStore', () => {
       nowMs: 5003,
     })
 
+    // Deleting a conversation deletes its scheduled tasks: the row is dropped
+    // (soft-deleted into the automation trash) instead of being re-homed.
+    expect(softDeleteAutomation).toHaveBeenCalledWith('auto_orphan')
+    expect(useAutomationStore.getState().automations).toHaveLength(0)
+    expect(createSession).not.toHaveBeenCalled()
+    expect(renameSession).not.toHaveBeenCalled()
+    expect(sendMessageToSession).not.toHaveBeenCalled()
+    // Nothing ran, so nothing is logged as a run either.
+    expect(useAutomationStore.getState().runs).toHaveLength(0)
+    expect(isInFlight('auto_orphan')).toBe(false)
+  })
+
+  it('owner-less legacy rows keep the fresh-session path', async () => {
+    useAutomationStore.setState({
+      automations: [auto({ id: 'auto_legacy', name: 'Legacy', prompt: 'go' })],
+      loaded: true,
+      sessionListReady: true,
+    })
+
+    await useAutomationStore.getState().runNow('auto_legacy', {
+      trigger: 'schedule',
+      focus: false,
+      nowMs: 5007,
+    })
+
+    expect(softDeleteAutomation).not.toHaveBeenCalled()
     expect(createSession).toHaveBeenCalledTimes(1)
-    expect(renameSession).toHaveBeenCalledWith(expect.any(String), '⏱ Orphan')
+    expect(renameSession).toHaveBeenCalledWith(expect.any(String), '⏱ Legacy')
     expect(isProjectPathReady).not.toHaveBeenCalled()
   })
 

@@ -268,6 +268,7 @@ export class SessionActions {
     debugSessionDelete('local trash + softDelete transport', { sessionId: id, reason })
 
     useDomainStore.getState().deleteSession(id)
+    this.dropOwnedAutomations(id)
     void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
       useTrashBadgeStore.getState().adjustSessions(1)
     })
@@ -313,6 +314,7 @@ export class SessionActions {
       ...opts?.meta,
     })
     useDomainStore.getState().deleteSession(id)
+    this.dropOwnedAutomations(id)
     void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
       useTrashBadgeStore.getState().adjustSessions(-1)
     })
@@ -329,6 +331,25 @@ export class SessionActions {
   /** Restore a soft-deleted session from the recycle bin. */
   restoreSession(id: string): void {
     this.transport.send({ type: 'session:restore', sessionId: id })
+  }
+
+  /**
+   * Deleting a conversation deletes the scheduled tasks it owns — they have no
+   * transcript left to run in, and re-homing them would spawn the very sessions
+   * the composer path exists to avoid. Restoring the conversation does not bring
+   * them back.
+   *
+   * Dynamic import: `automationStore` → `sessionService` → this module would be
+   * an import cycle (same reason as the trash-badge call above).
+   */
+  private dropOwnedAutomations(sessionId: string): void {
+    void import('@/store/automationStore')
+      .then(({ useAutomationStore }) =>
+        useAutomationStore.getState().removeOwnedBy(sessionId),
+      )
+      .catch(() => {
+        // Best effort: a failure must not break conversation deletion.
+      })
   }
 
   /** Request trash list (also opportunistic purge on sidecar). */

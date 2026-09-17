@@ -245,6 +245,12 @@ export interface AutomationStore {
    * Live catalog is updated by the Tauri command (not `saveCatalog()` alone).
    */
   remove: (id: string) => Promise<void>
+  /**
+   * The conversation was deleted → every scheduled task it owns is deleted with
+   * it. A task is meaningless without the transcript it belongs to, and firing
+   * it anywhere else would spawn sessions the composer path exists to avoid.
+   */
+  removeOwnedBy: (sessionId: string) => Promise<void>
   setEnabled: (id: string, enabled: boolean) => Promise<void>
 
   runNow: (automationId: string, opts?: RunNowOpts) => Promise<void>
@@ -679,6 +685,18 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
     }
   },
 
+  removeOwnedBy: async (sessionId) => {
+    const owned = get().automations.filter((a) => a.sessionId === sessionId)
+    for (const a of owned) {
+      try {
+        await get().remove(a.id)
+      } catch {
+        // remove() already recorded the error and re-hydrated the catalog; the
+        // remaining tasks are still worth cleaning up.
+      }
+    }
+  },
+
   setEnabled: async (id, enabled) => {
     const now = Date.now()
     set((s) => {
@@ -967,13 +985,17 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
  *
  * - `reuse`: the conversation that owns the task (composer scheduled task) —
  *   the prompt joins that transcript, which is what "scheduled task" means to
- *   the user. `sessionId` there.
- * - `create`: owner-less rows (automations created before the composer recorded
- *   `sessionId`, or whose conversation was deleted) keep the historical
- *   behaviour and mint a fresh `⏱ name` session.
+ *   the user.
+ * - `retire`: an owner-bound row whose conversation no longer exists. Deleting a
+ *   conversation deletes its tasks, so the row is dropped instead of being
+ *   re-homed into a fresh session (one clone per fire is exactly the litter the
+ *   composer path exists to avoid).
+ * - `create`: rows with no owning conversation at all — data from the removed
+ *   automations page. Kept on the historical fresh-session path.
  */
 type FireTarget =
   | { kind: 'reuse'; sessionId: string }
+  | { kind: 'retire' }
   | { kind: 'create'; config: SessionConfig }
 
 /** The live owning conversation, when it still exists. */
@@ -993,9 +1015,9 @@ function resolveOwnerSession(a: Automation) {
 async function resolveFireTarget(
   a: Automation,
 ): Promise<{ ok: true; target: FireTarget } | { ok: false; error: string }> {
-  const owner = resolveOwnerSession(a)
-
-  if (owner) {
+  if (a.sessionId) {
+    const owner = resolveOwnerSession(a)
+    if (!owner) return { ok: true, target: { kind: 'retire' } }
     if (!(await isProjectPathReady(owner.config.cwd ?? ''))) {
       return { ok: false, error: 'project_missing' }
     }
@@ -1063,6 +1085,12 @@ async function runNowBody(
       return
     }
     const target = resolved.target
+    if (target.kind === 'retire') {
+      // Conversation gone (delete hook lagged, or it vanished outside the app).
+      // `remove` soft-deletes and releases the claim this body took.
+      await get().remove(automationId)
+      return
+    }
 
     // Delete-vs-run race: re-check catalog after await; release if removed.
     const stillThere = get().automations.some((x) => x.id === automationId)

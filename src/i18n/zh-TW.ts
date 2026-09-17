@@ -2068,78 +2068,6 @@ export const zhTW = {
     "listRowHint": "{{name}} · 雙擊重新命名 · 右鍵刪除"
   },
   "automation": {
-    "title": "自動化",
-    "subtitle": "依排程或手動執行提示詞 — 僅本機，需 hip 保持執行。",
-    "emptyTitle": "開始設定自動化",
-    "emptyDesc": "把重複的 AI 工作固化為可命名任務，支援手動或定時觸發。",
-    "startCta": "開始自動化",
-    "loading": "載入中…",
-    "untitled": "未命名自動化",
-    "localOnlyHint": "在本機執行。定時任務需 hip 保持開啟或隱藏到系統匣。",
-    "projectRequired": "此範本需要選擇專案目錄。",
-    "templatesHeading": "範本",
-    "templatesHint": "選擇起點，再調整提示詞與觸發方式。",
-    "skillsHeading": "從技能建立",
-    "skillsSearch": "搜尋技能…",
-    "skillsEmpty": "沒有符合的技能。",
-    "seedOnlyHint": "僅把技能說明寫入提示詞；是否真正用到技能仍取決於 agent 是否已載入該技能。",
-    "skillDisabled": "技能已關閉",
-    "skillMissing": "技能不可用",
-    "createFromSkill": "從技能建立",
-    "softWarnings": {
-      "no_work_items_context": "agent 不會自動載入事項目錄 — 請在提示詞中貼上或描述待辦。",
-      "needs_edit_permission": "程式碼類執行可能需要編輯權限以讀取或修改專案檔案。"
-    },
-    "skillSeedName": "{{name}} 自動化",
-    "skillSeedPrompt": "若可用，請使用技能「{{name}}」。\n\n技能說明：\n{{description}}\n\n請依該技能的說明完成本次執行。",
-    "templates": {
-      "requiresProject": "需要專案目錄",
-      "blank": {
-        "name": "空白自動化",
-        "description": "從空提示詞開始，自行設定觸發方式。",
-        "prompt": ""
-      },
-      "dailyStandup": {
-        "name": "每日站會草稿",
-        "description": "依近期工作習慣草擬站會要點。",
-        "prompt": "請草擬一份簡潔的每日站會更新：昨天可能完成的、今天計畫、以及阻塞項。可參考 memory/會話習慣；不要編造專案細節。保持簡短可編輯。"
-      },
-      "weeklyReview": {
-        "name": "週複盤",
-        "description": "總結本週並建議下週重點。",
-        "prompt": "寫一份簡短週複盤：亮點、未閉環事項、下週建議重點。優先具體條目。不要假設可存取外部日曆。"
-      },
-      "codeReview": {
-        "name": "程式碼審查",
-        "description": "審查專案目錄中的本機 git 變更。",
-        "prompt": "請審查本專案目前未提交與近期變更。指出缺陷、缺測、風險與風格問題，並給出可操作修復建議。優先用工具閱讀 diff 與相關檔案。"
-      },
-      "depsAudit": {
-        "name": "依賴稽核建議",
-        "description": "針對專案依賴清單給出維護建議。",
-        "prompt": "檢查本專案的套件清單與鎖檔。總結過時或有風險的依賴，並建議升級或清理步驟。除非要求，不要修改檔案。"
-      },
-      "docRefresh": {
-        "name": "文件更新",
-        "description": "對照程式碼草擬 README 更新。",
-        "prompt": "比較 README（及鄰近文件）與目前程式碼。提出過時段落與缺失安裝步驟的簡潔草稿。優先修補式大綱，而非全文重寫。"
-      },
-      "inboxTriage": {
-        "name": "待辦梳理",
-        "description": "協助排定優先級（請貼上或描述待辦）。",
-        "prompt": "請幫我梳理待辦。我可能會貼上列表或口頭描述。依緊急度分組，建議下一步，並標出卡住的項目。注意：你不會自動載入事項目錄——僅使用我在對話中提供的內容。"
-      },
-      "perfPass": {
-        "name": "效能改進建議",
-        "description": "對倉庫提出可驗證的效能假設。",
-        "prompt": "探索本倉庫的效能機會（熱點路徑、套件體積、N+1、多餘渲染等）。按優先級列出假設及驗證方式。除非要求，不要改程式碼。"
-      },
-      "skillBootstrap": {
-        "name": "從技能開始",
-        "description": "用技能說明預填提示詞（僅種子，不保證執行）。",
-        "prompt": ""
-      }
-    },
     "trigger": {
       "manual": "手動",
       "daily": "每日",
@@ -2149,24 +2077,6 @@ export const zhTW = {
       "weeklyAt": "{{weekday}} · {{time}}",
       "intervalAt": "每隔 {{minutes}} 分鐘",
       "intervalHoursAt": "每隔 {{hours}} 小時"
-    },
-    "weekday": {
-      "0": "週日",
-      "1": "週一",
-      "2": "週二",
-      "3": "週三",
-      "4": "週四",
-      "5": "週五",
-      "6": "週六"
-    },
-    "status": {
-      "pending": "等待中",
-      "running": "執行中",
-      "waiting_user": "等待你操作",
-      "succeeded": "成功",
-      "failed": "失敗",
-      "skipped": "已跳過",
-      "cancelled": "已取消"
     },
     "skipReasons": {
       "skip_previous_running": "上一次執行仍在進行",
@@ -2187,101 +2097,10 @@ export const zhTW = {
       "no_model_configured": "請先設定模型再執行自動化。",
       "model_unresolvable": "所選模型無法解析。"
     },
-    "banner": {
-      "needTray": "定時執行需要 hip 保持存活",
-      "needTrayDesc": "目前關閉視窗會退出 hip，或系統匣圖示已關閉。建議「關閉時隱藏到系統匣」，以便每日/每週任務在背景準時觸發。",
-      "needTrayDescWithLogin": "目前關閉視窗會退出 hip，或系統匣圖示已關閉。建議「關閉時隱藏到系統匣」並開啟「登入時啟動」，以便重啟後定時任務仍能背景執行。",
-      "openWindowSettings": "視窗與背景設定",
-      "dismiss": "知道了"
-    },
-    "list": {
-      "searchPlaceholder": "搜尋自動化…",
-      "filterAria": "篩選自動化",
-      "filterAll": "全部",
-      "filterEnabled": "已啟用",
-      "filterDisabled": "已停用",
-      "emptySearch": "無符合",
-      "emptySearchHint": "試試其他關鍵詞，或清除搜尋。",
-      "emptyFilter": "此篩選下無項目",
-      "emptyFilterHint": "試試「全部」，或新建自動化。",
-      "clearSearch": "清除搜尋",
-      "showAll": "顯示全部",
-      "enableAria": "啟用 {{name}}",
-      "moreAria": "更多操作 · {{name}}",
-      "runNow": "執行",
-      "runAndOpen": "執行並開啟",
-      "edit": "編輯",
-      "delete": "刪除",
-      "deleteConfirm": "將此自動化移入回收站？之後可以恢復。",
-      "deleteConfirmNamed": "將「{{name}}」移入回收站？之後可以恢復。",
-      "nextRun": "下次 · {{when}}",
-      "nextManual": "僅手動",
-      "lastRun": "上次 · {{when}}",
-      "count": "{{shown}} / {{total}}",
-      "stats": "{{enabled}} 已啟用 · 共 {{total}} · {{running}} 執行中",
-      "sortAria": "排序",
-      "sortNextRun": "下次執行",
-      "sortRecent": "最近執行",
-      "sortName": "名稱",
-      "sortFailedFirst": "失敗優先",
-      "newBlank": "空白自動化",
-      "newFromTemplate": "從範本…"
-    },
     "editor": {
-      "createTitle": "新建自動化",
-      "editTitle": "編輯自動化",
-      "cancel": "取消",
-      "save": "建立",
-      "saveAndRun": "建立並執行",
-      "saveEdit": "儲存",
-      "saveEditAndRun": "儲存並執行",
-      "saveMenuAria": "更多儲存選項",
-      "footerCreateHint": "從選單選擇「建立並執行」可立刻試跑提示詞。",
-      "name": "名稱",
-      "namePlaceholder": "例如：每日程式碼審查",
-      "nameRequired": "請填寫名稱",
       "nameDuplicate": "已存在同名自動化「{{name}}」",
-      "prompt": "提示詞",
-      "promptPlaceholder": "描述這個自動化要做什麼…",
-      "promptRequired": "請填寫提示詞",
-      "trigger": "觸發方式",
-      "triggerManualHint": "僅在點擊「執行」時執行，不設排程。",
-      "interval": "間隔（分鐘）",
-      "weekday": "星期",
-      "time": "時間",
-      "project": "專案目錄",
-      "selectProject": "選擇專案",
-      "projectOptional": "未選擇專案時，將以對話方式執行。",
-      "projectRequiredHint": "此範本必填",
-      "pickProject": "選擇…",
-      "changeProject": "更換…",
-      "clearProject": "清除專案",
-      "advanced": "模型與 Agent",
-      "advancedSet": "已自訂",
-      "model": "模型",
-      "modelDefault": "目前模型（預設）",
-      "modelDefaultShort": "自動",
-      "modelEmpty": "沒有已啟用且設定金鑰的提供商。請在設定中配置模型。",
-      "modelUnavailable": "{{key}}（不可用）",
-      "modelUnusedByAgent": "由 Agent 管理",
-      "modelAgentHint": "ACP Agent 使用自身的模型配置。",
-      "agent": "Agent",
-      "agentDefault": "內建",
-      "agentEmpty": "沒有已啟用的 ACP Agent。請在 設定 → Agents 中新增。",
-      "agentUnavailable": "{{id}}（不可用）"
     },
-    "run": {
-      "history": "最近執行",
-      "openSession": "開啟工作階段",
-      "noRuns": "尚無執行紀錄",
-      "close": "關閉執行歷史",
-      "triggerManual": "手動",
-      "triggerSchedule": "排程",
-      "triggerCatchup": "補跑",
-      "sessionDeleted": "該會話已被刪除"
     },
-    "sessionTitle": "⏱ {{name}}"
-  },
   "tabs": {
     "closeTab": "關閉標籤頁",
     "newSession": "新增工作階段",

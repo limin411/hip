@@ -2064,78 +2064,6 @@ export const ko = {
   },
 
   "automation": {
-    "title": "자동화",
-    "subtitle": "예약 또는 수동으로 프롬프트 실행 — 로컬 전용, hip이 실행 중일 때만.",
-    "emptyTitle": "자동화 설정",
-    "emptyDesc": "반복 AI 작업을 이름 있는 작업으로. 수동 또는 예약 트리거.",
-    "startCta": "자동화 시작",
-    "loading": "로드 중…",
-    "untitled": "제목 없는 자동화",
-    "localOnlyHint": "이 컴퓨터에서 실행. 예약 실행에는 hip을 열어 두거나 트레이에 숨겨 두어야 합니다.",
-    "projectRequired": "이 템플릿에는 프로젝트 폴더가 필요합니다.",
-    "templatesHeading": "템플릿",
-    "templatesHint": "시작점을 고른 뒤 프롬프트와 일정을 조정하세요.",
-    "skillsHeading": "스킬에서",
-    "skillsSearch": "스킬 검색…",
-    "skillsEmpty": "일치하는 스킬이 없습니다.",
-    "seedOnlyHint": "스킬 설명만 프롬프트에 넣습니다. 실행은 agent가 해당 스킬을 로드했는지에 달립니다.",
-    "skillDisabled": "스킬이 꺼져 있음",
-    "skillMissing": "스킬을 사용할 수 없음",
-    "createFromSkill": "스킬에서 만들기",
-    "softWarnings": {
-      "no_work_items_context": "agent는 work-items 카탈로그를 자동으로 불러오지 않습니다 — 프롬프트에 할 일을 붙여 넣거나 설명하세요.",
-      "needs_edit_permission": "코드 관련 실행에는 프로젝트 파일을 읽거나 수정하기 위해 편집 권한이 필요할 수 있습니다."
-    },
-    "skillSeedName": "{{name}} 자동화",
-    "skillSeedPrompt": "가능하면 스킬 「{{name}}」을(를) 사용하세요.\n\n스킬 설명:\n{{description}}\n\n스킬 안내에 따라 이번 실행을 완료하세요.",
-    "templates": {
-      "requiresProject": "프로젝트 폴더 필요",
-      "blank": {
-        "name": "빈 자동화",
-        "description": "빈 프롬프트에서 시작해 일정을 직접 정합니다.",
-        "prompt": ""
-      },
-      "dailyStandup": {
-        "name": "일일 스탠드업 초안",
-        "description": "최근 작업 습관으로 스탠드업 요점 초안.",
-        "prompt": "간결한 일일 스탠드업 초안: 어제 한 일, 오늘 계획, 블로커. memory/세션 습관이 있으면 참고하고 가짜 프로젝트 세부사항은 만들지 마세요."
-      },
-      "weeklyReview": {
-        "name": "주간 리뷰",
-        "description": "한 주를 요약하고 다음 주 초점을 제안.",
-        "prompt": "짧은 주간 리뷰: 하이라이트, 열린 루프, 다음 주 제안. 구체 불릿 우선. 외부 캘린더는 가정하지 마세요."
-      },
-      "codeReview": {
-        "name": "코드 리뷰",
-        "description": "프로젝트 로컬 git 변경을 리뷰.",
-        "prompt": "이 프로젝트의 미커밋·최근 변경을 리뷰하세요. 버그, 누락 테스트, 위험, 스타일을 지적하고 구체 수정을 제안. 도구로 diff와 관련 파일을 읽으세요."
-      },
-      "depsAudit": {
-        "name": "의존성 감사 제안",
-        "description": "매니페스트 의존성 위생 제안.",
-        "prompt": "패키지 매니페스트와 락파일을 검사. 오래되었거나 위험한 의존성을 요약하고 업그레이드/정리 제안. 요청 없으면 파일을 수정하지 마세요."
-      },
-      "docRefresh": {
-        "name": "문서 갱신",
-        "description": "코드에 맞춰 README 갱신 초안.",
-        "prompt": "README(인접 문서)와 현재 코드를 비교. 오래된 절과 빠진 설정 단계의 간결한 초안 제안. 전면 재작성보다 패치형 아웃라인 우선."
-      },
-      "inboxTriage": {
-        "name": "할 일 정리",
-        "description": "할 일 우선순위 도움(붙여넣기 또는 설명).",
-        "prompt": "할 일 정리를 도와주세요. 목록을 붙이거나 설명합니다. 긴급도로 묶고 다음 행동을 제안하며 막힌 항목을 표시. work-items 카탈로그는 자동 로드되지 않습니다 — 채팅에 제공한 내용만 사용."
-      },
-      "perfPass": {
-        "name": "성능 제안",
-        "description": "저장소 성능 개선 가설.",
-        "prompt": "이 저장소의 성능 기회(핫 패스, 번들, N+1, 불필요 리렌더)를 탐색. 검증 방법과 함께 가설을 순위화. 요청 없으면 코드를 바꾸지 마세요."
-      },
-      "skillBootstrap": {
-        "name": "스킬에서",
-        "description": "스킬 설명으로 프롬프트 시드(프롬프트만).",
-        "prompt": ""
-      }
-    },
     "trigger": {
       "manual": "수동",
       "daily": "매일",
@@ -2145,24 +2073,6 @@ export const ko = {
       "weeklyAt": "{{weekday}} · {{time}}",
       "intervalAt": "{{minutes}}분마다",
       "intervalHoursAt": "{{hours}}시간마다"
-    },
-    "weekday": {
-      "0": "일요일",
-      "1": "월요일",
-      "2": "화요일",
-      "3": "수요일",
-      "4": "목요일",
-      "5": "금요일",
-      "6": "토요일"
-    },
-    "status": {
-      "pending": "대기",
-      "running": "실행 중",
-      "waiting_user": "사용자 대기",
-      "succeeded": "성공",
-      "failed": "실패",
-      "skipped": "건너뜀",
-      "cancelled": "취소됨"
     },
     "skipReasons": {
       "skip_previous_running": "이전 실행이 아직 진행 중",
@@ -2183,101 +2093,10 @@ export const ko = {
       "no_model_configured": "자동화를 실행하기 전에 모델을 설정하세요.",
       "model_unresolvable": "선택한 모델을 해석할 수 없습니다."
     },
-    "banner": {
-      "needTray": "예약 실행에는 hip이 계속 실행되어야 합니다",
-      "needTrayDesc": "닫으면 종료되거나 트레이가 꺼져 있습니다. 「트레이로 숨기기」로 백그라운드 예약 실행을 유지하세요.",
-      "needTrayDescWithLogin": "닫으면 종료되거나 트레이가 꺼져 있습니다. 「트레이로 숨기기」와 「로그인 시 시작」을 켜 재부팅 후에도 예약 작업이 유지되게 하세요.",
-      "openWindowSettings": "창 및 백그라운드 설정",
-      "dismiss": "닫기"
-    },
-    "list": {
-      "searchPlaceholder": "자동화 검색…",
-      "filterAria": "자동화 필터",
-      "filterAll": "전체",
-      "filterEnabled": "사용",
-      "filterDisabled": "사용 안 함",
-      "emptySearch": "일치 없음",
-      "emptySearchHint": "다른 키워드를 쓰거나 검색을 지우세요.",
-      "emptyFilter": "이 필터에 항목 없음",
-      "emptyFilterHint": "전체를 보거나 새 자동화를 만드세요.",
-      "clearSearch": "검색 지우기",
-      "showAll": "전체 보기",
-      "enableAria": "{{name}} 사용",
-      "moreAria": "추가 작업 · {{name}}",
-      "runNow": "실행",
-      "runAndOpen": "실행하고 열기",
-      "edit": "편집",
-      "delete": "삭제",
-      "deleteConfirm": "이 자동화를 휴지통으로 옮길까요? 나중에 복원할 수 있습니다.",
-      "deleteConfirmNamed": "\"{{name}}\"을(를) 휴지통으로 옮길까요? 나중에 복원할 수 있습니다.",
-      "nextRun": "다음 · {{when}}",
-      "nextManual": "수동만",
-      "lastRun": "최근 · {{when}}",
-      "count": "{{shown}} / {{total}}",
-      "stats": "{{enabled}} 사용 · 총 {{total}} · {{running}} 실행 중",
-      "sortAria": "정렬",
-      "sortNextRun": "다음 실행",
-      "sortRecent": "최근 실행",
-      "sortName": "이름",
-      "sortFailedFirst": "실패 우선",
-      "newBlank": "빈 자동화",
-      "newFromTemplate": "템플릿에서…"
-    },
     "editor": {
-      "createTitle": "새 자동화",
-      "editTitle": "자동화 편집",
-      "cancel": "취소",
-      "save": "만들기",
-      "saveAndRun": "만들고 실행",
-      "saveEdit": "저장",
-      "saveEditAndRun": "저장하고 실행",
-      "saveMenuAria": "추가 저장 옵션",
-      "footerCreateHint": "메뉴에서 「만들고 실행」을 선택해 프롬프트를 바로 시험해 보세요.",
-      "name": "이름",
-      "namePlaceholder": "예: 일일 코드 리뷰",
-      "nameRequired": "이름은 필수입니다",
       "nameDuplicate": "“{{name}}” 이름의 자동화가 이미 있습니다",
-      "prompt": "프롬프트",
-      "promptPlaceholder": "이 자동화가 무엇을 할지 설명하세요…",
-      "promptRequired": "프롬프트는 필수입니다",
-      "trigger": "트리거",
-      "triggerManualHint": "「실행」을 누를 때만 실행됩니다. 일정 없음.",
-      "interval": "간격(분)",
-      "weekday": "요일",
-      "time": "시간",
-      "project": "프로젝트 폴더",
-      "selectProject": "프로젝트 선택",
-      "projectOptional": "프로젝트가 없으면 채팅으로 실행됩니다.",
-      "projectRequiredHint": "이 템플릿에서는 필수",
-      "pickProject": "선택…",
-      "changeProject": "변경…",
-      "clearProject": "프로젝트 지우기",
-      "advanced": "모델 및 Agent",
-      "advancedSet": "사용자 지정됨",
-      "model": "모델",
-      "modelDefault": "활성 모델(기본)",
-      "modelDefaultShort": "자동",
-      "modelEmpty": "활성화되고 API 키가 있는 제공자가 없습니다. 설정에서 모델을 구성하세요.",
-      "modelUnavailable": "{{key}}(사용 불가)",
-      "modelUnusedByAgent": "Agent가 관리",
-      "modelAgentHint": "ACP Agent는 자체 모델 설정을 사용합니다.",
-      "agent": "Agent",
-      "agentDefault": "내장",
-      "agentEmpty": "사용 가능한 ACP Agent가 없습니다. 설정 → Agents에서 추가하세요.",
-      "agentUnavailable": "{{id}}(사용 불가)"
     },
-    "run": {
-      "history": "최근 실행",
-      "openSession": "세션 열기",
-      "noRuns": "아직 실행 없음",
-      "close": "실행 기록 닫기",
-      "triggerManual": "수동",
-      "triggerSchedule": "예약",
-      "triggerCatchup": "따라잡기",
-      "sessionDeleted": "이 세션은 삭제되었습니다"
     },
-    "sessionTitle": "⏱ {{name}}"
-  },
   "tabs": {
     "closeTab": "탭 닫기",
     "newSession": "새 세션",

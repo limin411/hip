@@ -2064,78 +2064,6 @@ export const ja = {
   },
 
   "automation": {
-    "title": "自動化",
-    "subtitle": "スケジュールまたは手動でプロンプトを実行 — ローカルのみ、hip の実行中に有効。",
-    "emptyTitle": "自動化を設定",
-    "emptyDesc": "繰り返しの AI 作業を名前付きジョブに。手動またはスケジュールで起動。",
-    "startCta": "自動化を始める",
-    "loading": "読み込み中…",
-    "untitled": "無題の自動化",
-    "localOnlyHint": "このコンピュータで実行。スケジュール実行には hip を開いたままかトレイに隠す必要があります。",
-    "projectRequired": "このテンプレートにはプロジェクトフォルダが必要です。",
-    "templatesHeading": "テンプレート",
-    "templatesHint": "起点を選び、プロンプトとスケジュールを調整します。",
-    "skillsHeading": "スキルから",
-    "skillsSearch": "スキルを検索…",
-    "skillsEmpty": "一致するスキルがありません。",
-    "seedOnlyHint": "スキル説明をプロンプトに書き込むだけです。実行には agent がそのスキルを読み込んでいる必要があります。",
-    "skillDisabled": "スキルは無効です",
-    "skillMissing": "スキルが利用できません",
-    "createFromSkill": "スキルから作成",
-    "softWarnings": {
-      "no_work_items_context": "agent は work-items カタログを自動では読み込みません — プロンプトに TODO を貼るか説明してください。",
-      "needs_edit_permission": "コード系の実行では、プロジェクト内のファイルを読む・変更するために編集権限が必要な場合があります。"
-    },
-    "skillSeedName": "{{name}} 自動化",
-    "skillSeedPrompt": "可能ならスキル「{{name}}」を使ってください。\n\nスキル説明:\n{{description}}\n\nスキルの指示に従って実行してください。",
-    "templates": {
-      "requiresProject": "プロジェクトフォルダが必要",
-      "blank": {
-        "name": "空の自動化",
-        "description": "空のプロンプトから開始し、スケジュールを自分で決めます。",
-        "prompt": ""
-      },
-      "dailyStandup": {
-        "name": "デイリースタンドアップ草案",
-        "description": "最近の作業習慣からスタンドアップ要点を草案。",
-        "prompt": "簡潔なデイリースタンドアップを草案してください: 昨日やったこと、今日の予定、ブロッカー。memory/セッション習慣があれば参照し、架空のプロジェクト詳細は書かないでください。"
-      },
-      "weeklyReview": {
-        "name": "週次レビュー",
-        "description": "週をまとめ、来週の焦点を提案。",
-        "prompt": "短い週次レビューを書いてください: ハイライト、未完了、来週の提案。具体的な箇条書きを優先。外部カレンダーは想定しないでください。"
-      },
-      "codeReview": {
-        "name": "コードレビュー",
-        "description": "プロジェクトのローカル git 変更をレビュー。",
-        "prompt": "このプロジェクトの未コミットと最近の変更をレビューしてください。バグ、不足テスト、リスク、スタイルを指摘し、具体的な修正を提案。diff と関連ファイルをツールで読んでください。"
-      },
-      "depsAudit": {
-        "name": "依存関係監査の提案",
-        "description": "マニフェストの依存関係衛生を提案。",
-        "prompt": "このプロジェクトのパッケージマニフェストとロックファイルを確認。古い・危険な依存関係をまとめ、アップグレードや整理を提案。指示がなければファイルを変更しないでください。"
-      },
-      "docRefresh": {
-        "name": "ドキュメント更新",
-        "description": "コードに合わせて README 更新案を草案。",
-        "prompt": "README（近傍ドキュメント含む）と現コードを比較。古い節と不足しているセットアップ手順の簡潔な草案を提案。全文書き直しよりパッチ風のアウトラインを優先。"
-      },
-      "inboxTriage": {
-        "name": "受信トレイ仕分け",
-        "description": "TODO の優先度付けを支援（貼り付けまたは説明）。",
-        "prompt": "TODO の仕分けを手伝ってください。リストを貼るか説明します。緊急度でグループ化し、次の一手を提案し、詰まって見えるものを指摘。work-items カタログは自動では読み込まれません — チャットで渡した内容のみ使用。"
-      },
-      "perfPass": {
-        "name": "パフォーマンス提案",
-        "description": "リポジトリのパフォーマンス改善仮説。",
-        "prompt": "このリポジトリのパフォーマンス機会を探索（ホットパス、バンドル、N+1、不要な再レンダー）。検証方法付きで仮説を順位付け。指示がなければコードを変更しないでください。"
-      },
-      "skillBootstrap": {
-        "name": "スキルから",
-        "description": "スキル説明からプロンプトを種まき（プロンプトのみ）。",
-        "prompt": ""
-      }
-    },
     "trigger": {
       "manual": "手動",
       "daily": "毎日",
@@ -2145,24 +2073,6 @@ export const ja = {
       "weeklyAt": "{{weekday}} · {{time}}",
       "intervalAt": "{{minutes}} 分ごと",
       "intervalHoursAt": "{{hours}} 時間ごと"
-    },
-    "weekday": {
-      "0": "日曜日",
-      "1": "月曜日",
-      "2": "火曜日",
-      "3": "水曜日",
-      "4": "木曜日",
-      "5": "金曜日",
-      "6": "土曜日"
-    },
-    "status": {
-      "pending": "保留",
-      "running": "実行中",
-      "waiting_user": "入力待ち",
-      "succeeded": "成功",
-      "failed": "失敗",
-      "skipped": "スキップ",
-      "cancelled": "キャンセル"
     },
     "skipReasons": {
       "skip_previous_running": "前回の実行が継続中",
@@ -2183,101 +2093,10 @@ export const ja = {
       "no_model_configured": "自動化の前にモデルを設定してください。",
       "model_unresolvable": "選択したモデルを解決できません。"
     },
-    "banner": {
-      "needTray": "スケジュール実行には hip の常駐が必要です",
-      "needTrayDesc": "閉じると終了するか、トレイがオフです。「トレイに隠す」でバックグラウンドのスケジュール実行を維持できます。",
-      "needTrayDescWithLogin": "閉じると終了するか、トレイがオフです。「トレイに隠す」と「ログイン時に起動」を推奨し、再起動後もスケジュールを維持します。",
-      "openWindowSettings": "ウィンドウとバックグラウンド設定",
-      "dismiss": "閉じる"
-    },
-    "list": {
-      "searchPlaceholder": "自動化を検索…",
-      "filterAria": "自動化をフィルター",
-      "filterAll": "すべて",
-      "filterEnabled": "有効",
-      "filterDisabled": "無効",
-      "emptySearch": "一致なし",
-      "emptySearchHint": "別のキーワードを試すか、検索をクリア。",
-      "emptyFilter": "このフィルターに該当なし",
-      "emptyFilterHint": "「すべて」を試すか、新規作成。",
-      "clearSearch": "検索をクリア",
-      "showAll": "すべて表示",
-      "enableAria": "{{name}} を有効化",
-      "moreAria": "その他の操作 · {{name}}",
-      "runNow": "実行",
-      "runAndOpen": "実行して開く",
-      "edit": "編集",
-      "delete": "削除",
-      "deleteConfirm": "この自動化をゴミ箱に移しますか？後から復元できます。",
-      "deleteConfirmNamed": "「{{name}}」をゴミ箱に移しますか？後から復元できます。",
-      "nextRun": "次回 · {{when}}",
-      "nextManual": "手動のみ",
-      "lastRun": "前回 · {{when}}",
-      "count": "{{shown}} / {{total}}",
-      "stats": "{{enabled}} 有効 · 全 {{total}} · {{running}} 実行中",
-      "sortAria": "並び替え",
-      "sortNextRun": "次回実行",
-      "sortRecent": "最近の実行",
-      "sortName": "名前",
-      "sortFailedFirst": "失敗優先",
-      "newBlank": "空白の自動化",
-      "newFromTemplate": "テンプレートから…"
-    },
     "editor": {
-      "createTitle": "新しい自動化",
-      "editTitle": "自動化を編集",
-      "cancel": "キャンセル",
-      "save": "作成",
-      "saveAndRun": "作成して実行",
-      "saveEdit": "保存",
-      "saveEditAndRun": "保存して実行",
-      "saveMenuAria": "その他の保存オプション",
-      "footerCreateHint": "メニューの「作成して実行」ですぐにプロンプトを試せます。",
-      "name": "名前",
-      "namePlaceholder": "例：デイリーコードレビュー",
-      "nameRequired": "名前は必須です",
       "nameDuplicate": "「{{name}}」という名前の自動化は既に存在します",
-      "prompt": "プロンプト",
-      "promptPlaceholder": "この自動化で何をするか説明してください…",
-      "promptRequired": "プロンプトは必須です",
-      "trigger": "トリガー",
-      "triggerManualHint": "「実行」をクリックしたときのみ。スケジュールなし。",
-      "interval": "間隔（分）",
-      "weekday": "曜日",
-      "time": "時刻",
-      "project": "プロジェクトフォルダ",
-      "selectProject": "プロジェクトを選択",
-      "projectOptional": "プロジェクトなしの場合はチャットとして実行されます。",
-      "projectRequiredHint": "このテンプレートでは必須",
-      "pickProject": "選択…",
-      "changeProject": "変更…",
-      "clearProject": "プロジェクトをクリア",
-      "advanced": "モデルと Agent",
-      "advancedSet": "カスタム済み",
-      "model": "モデル",
-      "modelDefault": "現在のモデル（デフォルト）",
-      "modelDefaultShort": "自動",
-      "modelEmpty": "有効で API キー設定済みのプロバイダがありません。設定でモデルを構成してください。",
-      "modelUnavailable": "{{key}}（利用不可）",
-      "modelUnusedByAgent": "Agent が管理",
-      "modelAgentHint": "ACP Agent は自身のモデル設定を使います。",
-      "agent": "Agent",
-      "agentDefault": "組み込み",
-      "agentEmpty": "有効な ACP Agent がありません。設定 → Agents で追加してください。",
-      "agentUnavailable": "{{id}}（利用不可）"
     },
-    "run": {
-      "history": "最近の実行",
-      "openSession": "セッションを開く",
-      "noRuns": "まだ実行がありません",
-      "close": "実行履歴を閉じる",
-      "triggerManual": "手動",
-      "triggerSchedule": "スケジュール",
-      "triggerCatchup": "キャッチアップ",
-      "sessionDeleted": "このセッションは削除されました"
     },
-    "sessionTitle": "⏱ {{name}}"
-  },
   "tabs": {
     "closeTab": "タブを閉じる",
     "newSession": "新しいセッション",

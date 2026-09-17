@@ -33,6 +33,12 @@ export interface HostGroupListProps {
 
 const UNGROUPED_KEY = '__ungrouped__'
 
+/** Host cards: 1 col → 2 (sm) → 3 (xl), same ladder as the settings card grids. */
+const HOST_CARD_GRID = 'grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3'
+
+/** Shared by host cards and the trailing "new connection" tile so rows stay even. */
+const HOST_CARD_MIN_H = 'min-h-[148px]'
+
 /** Left group nav + right host list for the selected group. */
 export function HostGroupList({
   groups,
@@ -212,10 +218,10 @@ export function HostGroupList({
                 }}
               />
             ) : (
-              <ul className="flex flex-col gap-1" data-testid="host-list">
+              <ul className={HOST_CARD_GRID} data-testid="host-list">
                 {pagedHosts.map((h) => (
-                  <li key={h.id}>
-                    <HostRow
+                  <li key={h.id} className="flex min-w-0">
+                    <HostCard
                       host={h}
                       onEdit={onEditHost}
                       onDelete={onDeleteHost}
@@ -225,18 +231,19 @@ export function HostGroupList({
                   </li>
                 ))}
                 {onAddHost ? (
-                  <li>
+                  <li className="flex min-w-0">
                     <button
                       type="button"
                       data-testid="host-add"
                       onClick={() => onAddHost(selectedGroupIdForAdd)}
                       className={cn(
-                        'flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-surface-muted/20 px-3 py-[var(--row-pad-y-session)] text-body font-medium text-ink-tertiary transition-colors',
+                        HOST_CARD_MIN_H,
+                        'flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-surface-muted/20 p-3 text-body font-medium text-ink-tertiary transition-colors',
                         'hover:border-strong hover:bg-state-hover hover:text-ink',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                       )}
                     >
-                      <Plus size={15} strokeWidth={2} aria-hidden />
+                      <Plus size={18} strokeWidth={2} aria-hidden />
                       {t('terminals.newRemote')}
                     </button>
                   </li>
@@ -388,7 +395,7 @@ export function HostGroupList({
   )
 }
 
-function HostRow({
+function HostCard({
   host,
   onEdit,
   onDelete,
@@ -424,29 +431,37 @@ function HostRow({
         }
       }}
       className={cn(
-        'group flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-[var(--row-pad-y-session)]',
+        HOST_CARD_MIN_H,
+        'group flex h-full w-full min-w-0 flex-col rounded-lg border border-border bg-surface p-4',
         'transition-colors hover:border-strong hover:bg-surface-subtle',
         canConnect &&
           'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
       )}
     >
-      <Server size={16} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1.5">
-          {activeSessions ? (
-            <span
-              className="h-1.5 w-1.5 shrink-0 rounded-full bg-success"
-              role="img"
-              title={t('terminals.connected')}
-              aria-label={t('terminals.connected')}
-              data-testid={`host-connected-${host.id}`}
-            />
-          ) : null}
-          <span className="truncate text-body font-medium text-ink">{host.label}</span>
+      <div className="flex min-w-0 items-start gap-3">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong"
+          aria-hidden
+        >
+          <Server size={18} strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {activeSessions ? (
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-success"
+                role="img"
+                title={t('terminals.connected')}
+                aria-label={t('terminals.connected')}
+                data-testid={`host-connected-${host.id}`}
+              />
+            ) : null}
+            <span className="truncate text-body font-medium text-ink">{host.label}</span>
+          </div>
+          <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{subtitle}</div>
         </div>
-        <div className="truncate font-mono text-caption text-ink-tertiary">{subtitle}</div>
       </div>
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="mt-auto flex items-center justify-between gap-2 pt-4">
         <Button
           type="button"
           variant="secondary"
@@ -462,7 +477,7 @@ function HostRow({
           <Plug size={13} aria-hidden />
           {t('terminals.connect')}
         </Button>
-        <div className="flex items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <div className="flex shrink-0 items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
           <Button
             type="button"
             variant="ghost"

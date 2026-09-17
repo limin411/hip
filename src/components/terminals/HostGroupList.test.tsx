@@ -225,6 +225,36 @@ describe('HostGroupList master-detail', () => {
     expect(onConnect).not.toHaveBeenCalled()
   })
 
+  it('lays hosts out as cards in a responsive grid', () => {
+    const onAddHost = vi.fn()
+    render(
+      <HostGroupList
+        groups={groups}
+        hosts={hosts}
+        onEditHost={noop}
+        onDeleteHost={noop}
+        onRenameGroup={noop}
+        onDeleteGroup={noop}
+        onAddHost={onAddHost}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('host-group-select-g1'))
+    const list = screen.getByTestId('host-list')
+    expect(list).toHaveClass('grid')
+    expect(list.className).toContain('sm:grid-cols-2')
+    expect(list.className).toContain('xl:grid-cols-3')
+
+    // Every card, plus the new-connection tile, is a direct grid item.
+    const card = screen.getByTestId('host-row-h1')
+    expect(card.closest('li')?.parentElement).toBe(list)
+    expect(screen.getByTestId('host-add').closest('li')?.parentElement).toBe(list)
+
+    // Actions live inside the card (not in a separate trailing column).
+    for (const id of ['host-connect-h1', 'host-edit-h1', 'host-delete-h1']) {
+      expect(within(card).getByTestId(id)).toBeInTheDocument()
+    }
+  })
+
   it('empty group shows empty placeholder and add', () => {
     const onAddHost = vi.fn()
     render(

@@ -2,13 +2,28 @@
 //!
 //! Product content directory (like work-items), not under `config/`.
 //! IPC: list/save catalog and list/save runs with flat payloads.
-//! Corrupt files are backed up as `<name>.corrupt-<ts>` (mirrors work-items).
+//!
+//! Unreadable files are **never moved away**: `dev` and packaged builds share
+//! one `~/.hip`, so a build that predates a schema change must not be able to
+//! erase the other side's data. On a parse failure the entries this build can
+//! read are recovered and a `<name>.recovered-<ts>` copy of the original is
+//! kept, so nothing is lost at rest.
 
 use serde::{Deserialize, Serialize};
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tauri::AppHandle;
 use tauri::Emitter;
+
+/// Highest catalog schema this build can interpret.
+///
+/// **Bump this on any incompatible change** (new trigger variant, new required
+/// field, renamed key). A file whose `version` is higher is left untouched by
+/// older builds — not loaded, not quarantined, not overwritten — so upgrading
+/// again restores the user's tasks.
+pub const SUPPORTED_CATALOG_VERSION: u32 = 1;
+/// Highest runs-log schema this build can interpret (same contract as above).
+pub const SUPPORTED_RUNS_LOG_VERSION: u32 = 1;
 
 const NAME_MAX: usize = 200;
 /// Prompt max size in UTF-8 **bytes** (256 KiB). Matches domain `AUTOMATION_PROMPT_MAX`.
@@ -212,7 +227,7 @@ fn validate_trigger(t: &AutomationTrigger, auto_id: &str) -> Result<(), String> 
 
 /// Validate catalog before save (Rust is the authority for persist).
 pub fn validate_catalog(catalog: &AutomationsCatalog) -> Result<(), String> {
-    if catalog.version != 1 {
+    if catalog.version != SUPPORTED_CATALOG_VERSION {
         return Err(format!("unsupported catalog version {}", catalog.version));
     }
 
@@ -252,7 +267,7 @@ pub fn validate_catalog(catalog: &AutomationsCatalog) -> Result<(), String> {
 
 /// Validate runs log before save.
 pub fn validate_runs_log(log: &AutomationRunsLog) -> Result<(), String> {
-    if log.version != 1 {
+    if log.version != SUPPORTED_RUNS_LOG_VERSION {
         return Err(format!("unsupported runs log version {}", log.version));
     }
 
@@ -282,60 +297,141 @@ pub fn validate_runs_log(log: &AutomationRunsLog) -> Result<(), String> {
 
 // ── Load / save ──────────────────────────────────────────────────────────────
 
-fn backup_corrupt(path: &Path, basename: &str) -> Option<PathBuf> {
-    let ts = std::time::SystemTime::now()
+fn now_ms() -> u128 {
+    std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let backup_name = format!("{basename}.corrupt-{ts}");
-    let backup = path.with_file_name(backup_name);
-    match std::fs::rename(path, &backup) {
-        Ok(()) => {
-            eprintln!(
-                "[tauri] automations: backed up corrupt file to {}",
-                backup.display()
-            );
-            Some(backup)
+        .unwrap_or(0)
+}
+
+/// Read only the `version` field of a catalog/log body.
+fn probe_version(body: &str) -> Option<u32> {
+    #[derive(Deserialize)]
+    struct Probe {
+        #[serde(default)]
+        version: u32,
+    }
+    serde_json::from_str::<Probe>(body).ok().map(|p| p.version)
+}
+
+/// `version` recorded on disk (`None` when missing or unreadable).
+fn on_disk_version(path: &Path) -> Option<u32> {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|body| probe_version(&body))
+}
+
+/// Best-effort recovery for a body that failed to deserialize as a whole:
+/// keep the entries that do parse. An unreadable body is usually a *newer*
+/// schema, so a partial view is better than an empty one.
+fn salvage_entries<T: serde::de::DeserializeOwned>(body: &str, field: &str) -> Option<Vec<T>> {
+    let root: serde_json::Value = serde_json::from_str(body).ok()?;
+    let entries = root.get(field)?.as_array()?;
+    let mut kept = Vec::with_capacity(entries.len());
+    let mut skipped = 0usize;
+    for entry in entries {
+        match serde_json::from_value::<T>(entry.clone()) {
+            Ok(v) => kept.push(v),
+            Err(_) => skipped += 1,
         }
-        Err(e) => {
-            eprintln!("[tauri] automations: failed to backup corrupt file: {e}");
-            None
-        }
+    }
+    if skipped > 0 {
+        eprintln!(
+            "[tauri] automations: {field}: recovered {} entry(ies), skipped {skipped} this build cannot read",
+            kept.len()
+        );
+    }
+    Some(kept)
+}
+
+/// Copy an unreadable file aside as `<name>.recovered-<ts>`.
+///
+/// The original is deliberately **left in place**: moving it away is what made
+/// automations vanish for every build at once. The copy exists so a later save
+/// by this (older) build cannot destroy the entries it could not read.
+fn preserve_unreadable_copy(path: &Path, basename: &str) {
+    let copy = path.with_file_name(format!("{basename}.recovered-{}", now_ms()));
+    match std::fs::copy(path, &copy) {
+        Ok(_) => eprintln!(
+            "[tauri] automations: unreadable file left in place; copy at {}",
+            copy.display()
+        ),
+        Err(e) => eprintln!("[tauri] automations: failed to copy unreadable file: {e}"),
     }
 }
 
-/// Load catalog. Missing → empty. Corrupt → backup + empty.
+/// Load catalog. Missing → empty. Unreadable → recover what this build can read
+/// and keep the original file on disk.
 pub fn load_catalog(path: &Path) -> AutomationsCatalog {
-    match std::fs::read_to_string(path) {
-        Ok(body) => match serde_json::from_str::<AutomationsCatalog>(&body) {
-            Ok(cat) => cat,
-            Err(_) => {
-                let _ = backup_corrupt(path, "catalog.json");
-                default_catalog()
-            }
-        },
-        Err(e) if e.kind() == io::ErrorKind::NotFound => default_catalog(),
+    let body = match std::fs::read_to_string(path) {
+        Ok(body) => body,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return default_catalog(),
         Err(e) => {
-            eprintln!("[tauri] automations: read catalog failed ({}): {e}", path.display());
-            default_catalog()
+            eprintln!(
+                "[tauri] automations: read catalog failed ({}): {e}",
+                path.display()
+            );
+            return default_catalog();
+        }
+    };
+    if let Some(v) = probe_version(&body) {
+        if v > SUPPORTED_CATALOG_VERSION {
+            eprintln!(
+                "[tauri] automations: catalog v{v} was written by a newer hip (this build reads up to v{SUPPORTED_CATALOG_VERSION}); leaving the file untouched",
+            );
+            return default_catalog();
+        }
+    }
+    match serde_json::from_str::<AutomationsCatalog>(&body) {
+        Ok(cat) => cat,
+        Err(e) => {
+            eprintln!(
+                "[tauri] automations: catalog parse failed ({}): {e}",
+                path.display()
+            );
+            preserve_unreadable_copy(path, "catalog.json");
+            AutomationsCatalog {
+                version: SUPPORTED_CATALOG_VERSION,
+                automations: salvage_entries::<Automation>(&body, "automations").unwrap_or_default(),
+            }
         }
     }
 }
 
-/// Load runs log. Missing → empty. Corrupt → backup + empty.
+/// Load runs log. Missing → empty. Unreadable → recover what this build can read
+/// and keep the original file on disk.
 pub fn load_runs_log(path: &Path) -> AutomationRunsLog {
-    match std::fs::read_to_string(path) {
-        Ok(body) => match serde_json::from_str::<AutomationRunsLog>(&body) {
-            Ok(log) => log,
-            Err(_) => {
-                let _ = backup_corrupt(path, "runs.json");
-                default_runs_log()
-            }
-        },
-        Err(e) if e.kind() == io::ErrorKind::NotFound => default_runs_log(),
+    let body = match std::fs::read_to_string(path) {
+        Ok(body) => body,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return default_runs_log(),
         Err(e) => {
-            eprintln!("[tauri] automations: read runs failed ({}): {e}", path.display());
-            default_runs_log()
+            eprintln!(
+                "[tauri] automations: read runs failed ({}): {e}",
+                path.display()
+            );
+            return default_runs_log();
+        }
+    };
+    if let Some(v) = probe_version(&body) {
+        if v > SUPPORTED_RUNS_LOG_VERSION {
+            eprintln!(
+                "[tauri] automations: runs log v{v} was written by a newer hip (this build reads up to v{SUPPORTED_RUNS_LOG_VERSION}); leaving the file untouched",
+            );
+            return default_runs_log();
+        }
+    }
+    match serde_json::from_str::<AutomationRunsLog>(&body) {
+        Ok(log) => log,
+        Err(e) => {
+            eprintln!(
+                "[tauri] automations: runs log parse failed ({}): {e}",
+                path.display()
+            );
+            preserve_unreadable_copy(path, "runs.json");
+            AutomationRunsLog {
+                version: SUPPORTED_RUNS_LOG_VERSION,
+                runs: salvage_entries::<AutomationRun>(&body, "runs").unwrap_or_default(),
+            }
         }
     }
 }
@@ -343,6 +439,13 @@ pub fn load_runs_log(path: &Path) -> AutomationRunsLog {
 /// Persist catalog via shared atomic 0o600 helper.
 pub fn save_catalog(path: &Path, catalog: &AutomationsCatalog) -> Result<(), String> {
     validate_catalog(catalog)?;
+    if let Some(v) = on_disk_version(path) {
+        if v > SUPPORTED_CATALOG_VERSION {
+            return Err(format!(
+                "refusing to overwrite automations catalog v{v} (this hip build writes v{SUPPORTED_CATALOG_VERSION})"
+            ));
+        }
+    }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -359,6 +462,13 @@ pub fn save_catalog(path: &Path, catalog: &AutomationsCatalog) -> Result<(), Str
 /// Persist runs log via shared atomic 0o600 helper.
 pub fn save_runs_log(path: &Path, log: &AutomationRunsLog) -> Result<(), String> {
     validate_runs_log(log)?;
+    if let Some(v) = on_disk_version(path) {
+        if v > SUPPORTED_RUNS_LOG_VERSION {
+            return Err(format!(
+                "refusing to overwrite runs log v{v} (this hip build writes v{SUPPORTED_RUNS_LOG_VERSION})"
+            ));
+        }
+    }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -537,43 +647,26 @@ mod tests {
     }
 
     #[test]
-    fn corrupt_catalog_backed_up_and_returns_default() {
-        let p = catalog_path("corrupt-cat");
+    fn unreadable_catalog_returns_default_and_keeps_the_original() {
+        let p = fresh_dir("corrupt-cat").join("catalog.json");
         std::fs::write(&p, b"not-json{{{{").unwrap();
         let cat = load_catalog(&p);
         assert_eq!(cat, default_catalog());
-        assert!(!p.exists(), "corrupt original should be renamed away");
-        let parent = p.parent().unwrap();
-        let backups: Vec<_> = std::fs::read_dir(parent)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|n| n.starts_with("catalog.json.corrupt-"))
-            .collect();
         assert!(
-            !backups.is_empty(),
-            "expected catalog.json.corrupt-<ts> backup"
+            p.exists(),
+            "the original must stay put — renaming it away is what made tasks disappear"
         );
+        assert_eq!(recovered_copies(&p).len(), 1);
     }
 
     #[test]
-    fn corrupt_runs_backed_up_and_returns_default() {
-        let p = runs_path("corrupt-runs");
+    fn unreadable_runs_returns_default_and_keeps_the_original() {
+        let p = fresh_dir("corrupt-runs").join("runs.json");
         std::fs::write(&p, b"not-json{{{{").unwrap();
         let log = load_runs_log(&p);
         assert_eq!(log, default_runs_log());
-        assert!(!p.exists(), "corrupt original should be renamed away");
-        let parent = p.parent().unwrap();
-        let backups: Vec<_> = std::fs::read_dir(parent)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|n| n.starts_with("runs.json.corrupt-"))
-            .collect();
-        assert!(
-            !backups.is_empty(),
-            "expected runs.json.corrupt-<ts> backup"
-        );
+        assert!(p.exists(), "the original must stay put");
+        assert_eq!(recovered_copies(&p).len(), 1);
     }
 
     #[test]
@@ -786,5 +879,117 @@ mod tests {
         save_catalog(&p, &cat).unwrap();
         let loaded = load_catalog(&p);
         assert_eq!(loaded, cat);
+    }
+
+    /// Test dir with no leftovers (a stale `.recovered-*` would break counting).
+    fn fresh_dir(name: &str) -> PathBuf {
+        let dir = tmp_dir(name);
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for e in entries.flatten() {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+        dir
+    }
+
+    fn recovered_copies(path: &Path) -> Vec<String> {
+        let prefix = format!(
+            "{}.recovered-",
+            path.file_name().unwrap().to_string_lossy()
+        );
+        std::fs::read_dir(path.parent().unwrap())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.starts_with(&prefix))
+            .collect()
+    }
+
+    /// Regression: a build that predates a schema change read a newer catalog,
+    /// called the whole file corrupt and renamed it away — every task vanished
+    /// for both builds. Unknown entries must now be survivable.
+    #[test]
+    fn unreadable_entries_keep_file_and_recover_the_rest() {
+        let p = fresh_dir("partial-recover").join("catalog.json");
+        let mut value = serde_json::to_value(sample_catalog()).unwrap();
+        value["automations"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "auto_future1",
+                "name": "Future task",
+                "prompt": "x",
+                "enabled": true,
+                "trigger": { "kind": "cronlike", "expr": "* * * * *" },
+                "createdAt": 1,
+                "updatedAt": 2
+            }));
+        let body = serde_json::to_string_pretty(&value).unwrap();
+        std::fs::write(&p, &body).unwrap();
+
+        let loaded = load_catalog(&p);
+        assert_eq!(loaded.automations.len(), 1, "readable entries must still load");
+        assert_eq!(loaded.automations[0].id, sample_auto().id);
+        assert_eq!(loaded.version, SUPPORTED_CATALOG_VERSION);
+
+        assert_eq!(
+            std::fs::read_to_string(&p).unwrap(),
+            body,
+            "the file must be neither moved nor rewritten"
+        );
+        assert_eq!(
+            recovered_copies(&p).len(),
+            1,
+            "an untouched copy of the original must be kept"
+        );
+    }
+
+    #[test]
+    fn newer_catalog_version_is_neither_loaded_nor_overwritten() {
+        let p = fresh_dir("newer-version").join("catalog.json");
+        let mut value = serde_json::to_value(sample_catalog()).unwrap();
+        value["version"] = serde_json::json!(SUPPORTED_CATALOG_VERSION + 1);
+        let body = serde_json::to_string_pretty(&value).unwrap();
+        std::fs::write(&p, &body).unwrap();
+
+        assert!(
+            load_catalog(&p).automations.is_empty(),
+            "a newer schema must not be guessed at"
+        );
+        assert!(recovered_copies(&p).is_empty(), "a newer file is not corrupt");
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), body);
+
+        let err = save_catalog(&p, &sample_catalog()).unwrap_err();
+        assert!(err.contains("refusing to overwrite"), "got: {err}");
+        assert_eq!(
+            std::fs::read_to_string(&p).unwrap(),
+            body,
+            "a refused save must leave the newer file intact"
+        );
+    }
+
+    #[test]
+    fn newer_runs_log_version_is_neither_loaded_nor_overwritten() {
+        let p = fresh_dir("newer-runs-version").join("runs.json");
+        let mut value = serde_json::to_value(sample_runs_log()).unwrap();
+        value["version"] = serde_json::json!(SUPPORTED_RUNS_LOG_VERSION + 1);
+        let body = serde_json::to_string_pretty(&value).unwrap();
+        std::fs::write(&p, &body).unwrap();
+
+        assert!(load_runs_log(&p).runs.is_empty());
+        assert!(save_runs_log(&p, &sample_runs_log())
+            .unwrap_err()
+            .contains("refusing to overwrite"));
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), body);
+    }
+
+    #[test]
+    fn non_json_catalog_is_left_in_place() {
+        let p = fresh_dir("not-json").join("catalog.json");
+        std::fs::write(&p, "{\"version\": 1, \"automations\": [").unwrap();
+
+        assert!(load_catalog(&p).automations.is_empty());
+        assert!(p.exists(), "the file must survive a parse failure");
+        assert_eq!(recovered_copies(&p).len(), 1);
     }
 }

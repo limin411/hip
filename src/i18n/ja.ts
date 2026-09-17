@@ -1673,13 +1673,11 @@ export const ja = {
     "filterCode": "プロジェクト",
     "filterKnowledge": "ドキュメント",
     "filterWorkItems": "ワークアイテム",
-    "filterAutomations": "自動化",
     "kind": {
       "space": "スペース",
       "doc": "ドキュメント",
       "folder": "フォルダー",
-      "workItem": "ワークアイテム",
-      "automation": "自動化"
+      "workItem": "ワークアイテム"
     },
     "parentMissing": "先に親ノードまたはスペースを復元してください",
     "restore": "復元",
@@ -2064,16 +2062,6 @@ export const ja = {
   },
 
   "automation": {
-    "trigger": {
-      "manual": "手動",
-      "daily": "毎日",
-      "weekly": "毎週",
-      "interval": "間隔",
-      "dailyAt": "毎日 · {{time}}",
-      "weeklyAt": "{{weekday}} · {{time}}",
-      "intervalAt": "{{minutes}} 分ごと",
-      "intervalHoursAt": "{{hours}} 時間ごと"
-    },
     "skipReasons": {
       "skip_previous_running": "前回の実行が継続中",
       "skip_global_cap": "同時実行数の上限",

@@ -25,7 +25,6 @@ describe('trashEntryProvider', () => {
         kind: 'trashEntry',
         payload: {
           key: 'session:s1',
-          source: 'session',
           id: 's1',
           title: 'Old chat',
           onRestore,

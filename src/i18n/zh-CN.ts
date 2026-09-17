@@ -1693,13 +1693,11 @@ export const zhCN = {
       filterCode: '项目',
       filterKnowledge: '文档管理',
       filterWorkItems: '事项',
-      filterAutomations: '自动化',
       kind: {
         space: '空间',
         doc: '文档',
         folder: '文件夹',
         workItem: '事项',
-        automation: '自动化',
       },
       parentMissing: '请先恢复父节点',
       restore: '恢复',
@@ -2086,16 +2084,6 @@ export const zhCN = {
     },
 
     automation: {
-      trigger: {
-        manual: '手动',
-        daily: '每日',
-        weekly: '每周',
-        interval: '间隔',
-        dailyAt: '每日 · {{time}}',
-        weeklyAt: '{{weekday}} · {{time}}',
-        intervalAt: '每隔 {{minutes}} 分钟',
-        intervalHoursAt: '每隔 {{hours}} 小时',
-      },
       skipReasons: {
         skip_previous_running: '上一次运行仍在进行',
         skip_global_cap: '同时运行的自动化过多',

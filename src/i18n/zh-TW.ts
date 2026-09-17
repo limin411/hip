@@ -1678,13 +1678,11 @@ export const zhTW = {
     "filterCode": "專案",
     "filterKnowledge": "文件管理",
     "filterWorkItems": "事項",
-    "filterAutomations": "自動化",
     "kind": {
       "space": "知識空間",
       "doc": "文件",
       "folder": "資料夾",
-      "workItem": "事項",
-      "automation": "自動化"
+      "workItem": "事項"
     },
     "parentMissing": "請先恢復父節點或知識空間",
     "restore": "恢復",
@@ -2068,16 +2066,6 @@ export const zhTW = {
     "listRowHint": "{{name}} · 雙擊重新命名 · 右鍵刪除"
   },
   "automation": {
-    "trigger": {
-      "manual": "手動",
-      "daily": "每日",
-      "weekly": "每週",
-      "interval": "間隔",
-      "dailyAt": "每日 · {{time}}",
-      "weeklyAt": "{{weekday}} · {{time}}",
-      "intervalAt": "每隔 {{minutes}} 分鐘",
-      "intervalHoursAt": "每隔 {{hours}} 小時"
-    },
     "skipReasons": {
       "skip_previous_running": "上一次執行仍在進行",
       "skip_global_cap": "同時執行的自動化過多",

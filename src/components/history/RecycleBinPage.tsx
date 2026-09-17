@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   MessageSquare,
   Code2,
-  Zap,
   RotateCcw,
   Trash2,
   Search,
@@ -23,42 +22,23 @@ import { daysLeftInTrash, resolveTrashRetentionDays } from '@/lib/trashRetention
 import { formatAbsolute, formatRelativeTime } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 import { useTrashBadgeStore } from '@/store/trashBadgeStore'
-import {
-  emptyAutomationsTrash,
-  hardDeleteAutomationTrashEntry,
-  listAutomationsTrash,
-  purgeExpiredAutomationsTrash,
-  type AutomationTrashItem,
-} from '@/ipc/automations'
-import { useAutomationStore } from '@/store/automationStore'
 import { useUiStore } from '@/store/uiStore'
-import { toast } from 'sonner'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 
 /** Show pagination when total items exceed one page. */
 const PAGE_SIZE = 10
 
-type KindFilter = 'all' | 'chat' | 'code' | 'automations'
+type KindFilter = 'all' | 'chat' | 'code'
 
-type UnifiedRow =
-  | {
-      key: string
-      source: 'session'
-      id: string
-      title: string
-      surface: 'chat' | 'code' | 'terminal'
-      deletedAt: number
-      preview?: string
-      deleteDerivedMemories: boolean
-    }
-  | {
-      key: string
-      source: 'automation'
-      id: string
-      title: string
-      deletedAt: number
-      triggerKind: string
-    }
+type UnifiedRow = {
+  key: string
+  id: string
+  title: string
+  surface: 'chat' | 'code' | 'terminal'
+  deletedAt: number
+  preview?: string
+  deleteDerivedMemories: boolean
+}
 
 export function RecycleBinPage({
   embeddedInShell = false,
@@ -77,29 +57,11 @@ export function RecycleBinPage({
   const retentionDays = resolveTrashRetentionDays(retentionRaw)
   const locale = i18n.language || 'en'
 
-  const [automations, setAutomations] = useState<AutomationTrashItem[]>([])
-  const [automationsLoaded, setAutomationsLoaded] = useState(false)
   const [query, setQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [page, setPage] = useState(1)
   const [hardDeleteKey, setHardDeleteKey] = useState<string | null>(null)
   const [emptyOpen, setEmptyOpen] = useState(false)
-
-  const refreshAutomations = useCallback(async () => {
-    try {
-      const days = resolveTrashRetentionDays(
-        useHipConfigStore.getState().config.trash?.retentionDays,
-      )
-      await purgeExpiredAutomationsTrash(days).catch(() => [])
-      const items = await listAutomationsTrash()
-      setAutomations(items)
-      useTrashBadgeStore.getState().setAutomationCount(items.length)
-    } catch {
-      setAutomations([])
-    } finally {
-      setAutomationsLoaded(true)
-    }
-  }, [])
 
   useEffect(() => {
     if (!hipLoaded) void loadHip()
@@ -107,53 +69,37 @@ export function RecycleBinPage({
 
   useEffect(() => {
     sessionService.requestTrashList()
-    void refreshAutomations()
-    const onFocus = () => {
-      sessionService.requestTrashList()
-      void refreshAutomations()
-    }
+    const onFocus = () => sessionService.requestTrashList()
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [refreshAutomations])
+  }, [])
 
-  const rows = useMemo<UnifiedRow[]>(() => {
-    const sessionRows: UnifiedRow[] = sessions.map((s) => ({
-      key: `session:${s.id}`,
-      source: 'session' as const,
-      id: s.id,
-      title: s.title,
-      surface: s.surface,
-      deletedAt: s.deletedAt,
-      preview: s.preview,
-      deleteDerivedMemories: s.deleteDerivedMemories,
-    }))
-    const automationRows: UnifiedRow[] = automations.map((a) => ({
-      key: `automation:${a.id}`,
-      source: 'automation' as const,
-      id: a.id,
-      title: a.name,
-      deletedAt: a.deletedAt,
-      triggerKind: a.triggerKind,
-    }))
-    return [...sessionRows, ...automationRows].sort(
-      (a, b) => b.deletedAt - a.deletedAt,
-    )
-  }, [sessions, automations])
+  const rows = useMemo<UnifiedRow[]>(
+    () =>
+      sessions.map((s) => ({
+        key: `session:${s.id}`,
+        id: s.id,
+        title: s.title,
+        surface: s.surface,
+        deletedAt: s.deletedAt,
+        preview: s.preview,
+        deleteDerivedMemories: s.deleteDerivedMemories,
+      })),
+    [sessions],
+  )
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     let list = rows
     if (kindFilter === 'chat' || kindFilter === 'code') {
-      list = list.filter((r) => r.source === 'session' && r.surface === kindFilter)
-    } else if (kindFilter === 'automations') {
-      list = list.filter((r) => r.source === 'automation')
+      list = list.filter((r) => r.surface === kindFilter)
     }
     if (q) {
-      list = list.filter((r) => {
-        if (r.title.toLowerCase().includes(q)) return true
-        if (r.source === 'session' && (r.preview ?? '').toLowerCase().includes(q)) return true
-        return false
-      })
+      list = list.filter(
+        (r) =>
+          r.title.toLowerCase().includes(q) ||
+          (r.preview ?? '').toLowerCase().includes(q),
+      )
     }
     return list
   }, [rows, query, kindFilter])
@@ -161,8 +107,7 @@ export function RecycleBinPage({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  const loaded =
-    sessionsLoaded && automationsLoaded
+  const loaded = sessionsLoaded
   const hardTarget = hardDeleteKey
     ? filtered.find((r) => r.key === hardDeleteKey) ?? rows.find((r) => r.key === hardDeleteKey) ?? null
     : null
@@ -236,13 +181,6 @@ export function RecycleBinPage({
             <TabsTrigger className="px-2.5" value="code" data-testid="recycle-bin-filter-code">
               {t('trash.filterCode')}
             </TabsTrigger>
-            <TabsTrigger
-              className="px-2.5"
-              value="automations"
-              data-testid="recycle-bin-filter-automations"
-            >
-              {t('trash.filterAutomations')}
-            </TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -308,57 +246,29 @@ export function RecycleBinPage({
         <div className="flex flex-col gap-1.5">
           {paged.map((row) => {
             const left = daysLeftInTrash(row.deletedAt, retentionDays)
-            const Icon =
-              row.source === 'automation'
-                ? Zap
-                : row.surface === 'chat'
-                  ? MessageSquare
-                  : Code2
+            const Icon = row.surface === 'chat' ? MessageSquare : Code2
             const kindLabel =
-              row.source === 'automation'
-                ? t('trash.kind.automation')
-                : row.surface === 'chat'
-                  ? t('sidebar.nav.chats')
-                  : t('sidebar.nav.projects')
-            const secondary =
-              row.source === 'session'
-                ? row.preview
-                : t(`automation.trigger.${row.triggerKind as 'manual'}`, {
-                    defaultValue: row.triggerKind,
-                  })
+              row.surface === 'chat'
+                ? t('sidebar.nav.chats')
+                : t('sidebar.nav.projects')
             const deletedWhen = formatRelativeTime(row.deletedAt, locale)
             const deletedAbs = formatAbsolute(row.deletedAt, locale)
             const restoreRow = () => {
-              if (row.source === 'session') {
-                sessionService.restoreSession(row.id)
-                useTrashListStore.getState().removeSession(row.id)
-                useTrashBadgeStore.getState().adjustSessions(-1)
-              } else {
-                void useAutomationStore
-                  .getState()
-                  .restoreTrashEntry(row.id)
-                  .then(() => {
-                    setAutomations((a) => a.filter((x) => x.id !== row.id))
-                    toast.success(t('trash.restoredToast'))
-                  })
-                  .catch((e) => {
-                    toast.error(e instanceof Error ? e.message : String(e))
-                  })
-              }
+              sessionService.restoreSession(row.id)
+              useTrashListStore.getState().removeSession(row.id)
+              useTrashBadgeStore.getState().adjustSessions(-1)
             }
             return (
               <div
                 key={row.key}
                 data-testid="recycle-bin-row"
                 data-row-key={row.key}
-                data-row-source={row.source}
                 className="group rounded-lg border border-border/80 bg-surface transition-colors duration-chrome hover:bg-state-hover/50"
               >
                 <DeclarativeContextMenu
                   kind="trashEntry"
                   payload={{
                     key: row.key,
-                    source: row.source,
                     id: row.id,
                     title: row.title,
                     onRestore: restoreRow,
@@ -375,18 +285,16 @@ export function RecycleBinPage({
                     </span>
                     <span
                       className={
-                        row.source === 'session'
-                          ? row.surface === 'code'
-                            ? 'shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-success'
-                            : 'shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-accent'
-                          : 'shrink-0 rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary'
+                        row.surface === 'code'
+                          ? 'shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-success'
+                          : 'shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-accent'
                       }
                     >
                       {kindLabel}
                     </span>
-                    {secondary ? (
+                    {row.preview ? (
                       <span className="min-w-0 max-w-[12rem] truncate text-meta text-ink-tertiary">
-                        {secondary}
+                        {row.preview}
                       </span>
                     ) : null}
                   </div>
@@ -483,21 +391,12 @@ export function RecycleBinPage({
                 variant="danger"
                 size="sm"
                 onClick={() => {
-                  if (hardTarget.source === 'session') {
-                    sessionService.hardDeleteSession(hardTarget.id, {
-                      deleteDerivedMemories: hardTarget.deleteDerivedMemories,
-                      reason: 'trash-permanent',
-                      meta: { source: 'RecycleBinPage' },
-                    })
-                    useTrashListStore.getState().removeSession(hardTarget.id)
-                  } else {
-                    void hardDeleteAutomationTrashEntry(hardTarget.id)
-                      .then(() => {
-                        setAutomations((a) => a.filter((x) => x.id !== hardTarget.id))
-                        useTrashBadgeStore.getState().adjustAutomations(-1)
-                      })
-                      .catch((e) => toast.error(e instanceof Error ? e.message : String(e)))
-                  }
+                  sessionService.hardDeleteSession(hardTarget.id, {
+                    deleteDerivedMemories: hardTarget.deleteDerivedMemories,
+                    reason: 'trash-permanent',
+                    meta: { source: 'RecycleBinPage' },
+                  })
+                  useTrashListStore.getState().removeSession(hardTarget.id)
                   setHardDeleteKey(null)
                 }}
               >
@@ -533,12 +432,6 @@ export function RecycleBinPage({
                   sessionService.emptySessionTrash()
                   useTrashListStore.getState().clear()
                   useTrashBadgeStore.getState().setSessionCount(0)
-                  void emptyAutomationsTrash()
-                    .then(() => {
-                      setAutomations([])
-                      useTrashBadgeStore.getState().setAutomationCount(0)
-                    })
-                    .catch(() => {})
                   setEmptyOpen(false)
                 }}
               >

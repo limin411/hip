@@ -8,8 +8,6 @@ const saveAutomations = vi.fn()
 const listAutomationRuns = vi.fn()
 const saveAutomationRuns = vi.fn()
 const softDeleteAutomation = vi.fn()
-const restoreAutomationTrashEntry = vi.fn()
-const listAutomationsTrash = vi.fn()
 
 vi.mock('@/ipc/automations', () => ({
   listAutomations: (...a: unknown[]) => listAutomations(...a),
@@ -17,8 +15,6 @@ vi.mock('@/ipc/automations', () => ({
   listAutomationRuns: (...a: unknown[]) => listAutomationRuns(...a),
   saveAutomationRuns: (...a: unknown[]) => saveAutomationRuns(...a),
   softDeleteAutomation: (...a: unknown[]) => softDeleteAutomation(...a),
-  restoreAutomationTrashEntry: (...a: unknown[]) => restoreAutomationTrashEntry(...a),
-  listAutomationsTrash: (...a: unknown[]) => listAutomationsTrash(...a),
 }))
 
 const createSession = vi.fn()
@@ -121,8 +117,6 @@ describe('automationStore', () => {
       enabled: true,
       triggerKind: 'manual',
     })
-    restoreAutomationTrashEntry.mockReset()
-    listAutomationsTrash.mockReset().mockResolvedValue([])
     createSession.mockReset().mockImplementation(() => `sess_${createSession.mock.calls.length}`)
     sendMessageToSession.mockReset()
     renameSession.mockReset()
@@ -294,16 +288,6 @@ describe('automationStore', () => {
     expect(softDeleteAutomation).toHaveBeenCalledWith('auto_u')
     // update + setEnabled still persist live catalog; remove uses soft-delete IPC.
     expect(saveAutomations.mock.calls.length).toBeGreaterThanOrEqual(2)
-  })
-
-  it('restoreTrashEntry reinserts automation from recycle bin', async () => {
-    const restored = auto({ id: 'auto_restored', name: 'Back' })
-    restoreAutomationTrashEntry.mockResolvedValueOnce(restored)
-    useAutomationStore.setState({ automations: [], loaded: true })
-    const id = await useAutomationStore.getState().restoreTrashEntry('tentry_x')
-    expect(id).toBe('auto_restored')
-    expect(useAutomationStore.getState().automations[0]?.name).toBe('Back')
-    expect(restoreAutomationTrashEntry).toHaveBeenCalledWith('tentry_x')
   })
 
   it('update rejects rename onto another automation name', async () => {

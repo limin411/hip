@@ -34,14 +34,6 @@ function App() {
       console.error('Failed to preload plugins:', err)
       usePluginsStore.setState({ loaded: true })
     })
-    void import('@/ipc/automations')
-      .then(({ listAutomationsTrash }) => listAutomationsTrash())
-      .then((items) =>
-        import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
-          useTrashBadgeStore.getState().setAutomationCount(items.length)
-        }),
-      )
-      .catch(() => undefined)
   }, [])
 
   if (!providersLoaded) {

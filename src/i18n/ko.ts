@@ -1673,13 +1673,11 @@ export const ko = {
     "filterCode": "프로젝트",
     "filterKnowledge": "문서",
     "filterWorkItems": "작업 항목",
-    "filterAutomations": "자동화",
     "kind": {
       "space": "공간",
       "doc": "문서",
       "folder": "폴더",
-      "workItem": "작업 항목",
-      "automation": "자동화"
+      "workItem": "작업 항목"
     },
     "parentMissing": "먼저 상위 노드나 공간을 복원하세요",
     "restore": "복원",
@@ -2064,16 +2062,6 @@ export const ko = {
   },
 
   "automation": {
-    "trigger": {
-      "manual": "수동",
-      "daily": "매일",
-      "weekly": "매주",
-      "interval": "간격",
-      "dailyAt": "매일 · {{time}}",
-      "weeklyAt": "{{weekday}} · {{time}}",
-      "intervalAt": "{{minutes}}분마다",
-      "intervalHoursAt": "{{hours}}시간마다"
-    },
     "skipReasons": {
       "skip_previous_running": "이전 실행이 아직 진행 중",
       "skip_global_cap": "동시 실행 한도",

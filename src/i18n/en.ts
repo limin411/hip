@@ -1735,13 +1735,11 @@ export const en = {
       filterCode: 'Projects',
       filterKnowledge: 'Documents',
       filterWorkItems: 'Work items',
-      filterAutomations: 'Automations',
       kind: {
         space: 'Space',
         doc: 'Document',
         folder: 'Folder',
         workItem: 'Work item',
-        automation: 'Automation',
       },
       parentMissing: 'Restore the parent node first',
       restore: 'Restore',
@@ -2141,16 +2139,6 @@ export const en = {
     },
 
     automation: {
-      trigger: {
-        manual: 'Manual',
-        daily: 'Daily',
-        weekly: 'Weekly',
-        interval: 'Interval',
-        dailyAt: 'Daily · {{time}}',
-        weeklyAt: '{{weekday}} · {{time}}',
-        intervalAt: 'Every {{minutes}} minutes',
-        intervalHoursAt: 'Every {{hours}} hours',
-      },
       skipReasons: {
         skip_previous_running: 'Previous run still active',
         skip_global_cap: 'Too many automations running',

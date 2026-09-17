@@ -196,9 +196,9 @@ export function HostLibrary() {
         <Skeleton className="h-8 w-48 rounded-md" />
         <Skeleton className="h-4 w-72 max-w-full rounded-md" />
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          <Skeleton className="h-[148px] rounded-lg" />
-          <Skeleton className="h-[148px] rounded-lg" />
-          <Skeleton className="h-[148px] rounded-lg" />
+          <Skeleton className="h-[84px] rounded-lg" />
+          <Skeleton className="h-[84px] rounded-lg" />
+          <Skeleton className="h-[84px] rounded-lg" />
         </div>
       </div>
     )

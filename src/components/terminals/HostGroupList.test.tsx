@@ -249,10 +249,14 @@ describe('HostGroupList master-detail', () => {
     expect(card.closest('li')?.parentElement).toBe(list)
     expect(screen.getByTestId('host-add').closest('li')?.parentElement).toBe(list)
 
-    // Actions live inside the card (not in a separate trailing column).
+    // Actions live inside the card (not in a separate trailing column)…
     for (const id of ['host-connect-h1', 'host-edit-h1', 'host-delete-h1']) {
       expect(within(card).getByTestId(id)).toBeInTheDocument()
     }
+    // …with edit / delete in the header (top-right) and connect on the line below.
+    const edit = within(card).getByTestId('host-edit-h1')
+    expect(edit.compareDocumentPosition(within(card).getByTestId('host-connect-h1')) &
+      Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('empty group shows empty placeholder and add', () => {

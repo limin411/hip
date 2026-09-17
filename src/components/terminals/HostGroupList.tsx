@@ -37,7 +37,7 @@ const UNGROUPED_KEY = '__ungrouped__'
 const HOST_CARD_GRID = 'grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3'
 
 /** Shared by host cards and the trailing "new connection" tile so rows stay even. */
-const HOST_CARD_MIN_H = 'min-h-[148px]'
+const HOST_CARD_MIN_H = 'min-h-[84px]'
 
 /** Left group nav + right host list for the selected group. */
 export function HostGroupList({
@@ -238,12 +238,12 @@ export function HostGroupList({
                       onClick={() => onAddHost(selectedGroupIdForAdd)}
                       className={cn(
                         HOST_CARD_MIN_H,
-                        'flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-surface-muted/20 p-3 text-body font-medium text-ink-tertiary transition-colors',
+                        'flex h-full w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-muted/20 p-3 text-body font-medium text-ink-tertiary transition-colors',
                         'hover:border-strong hover:bg-state-hover hover:text-ink',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
                       )}
                     >
-                      <Plus size={18} strokeWidth={2} aria-hidden />
+                      <Plus size={16} strokeWidth={2} aria-hidden />
                       {t('terminals.newRemote')}
                     </button>
                   </li>
@@ -432,77 +432,84 @@ function HostCard({
       }}
       className={cn(
         HOST_CARD_MIN_H,
-        'group flex h-full w-full min-w-0 flex-col rounded-lg border border-border bg-surface p-4',
+        'group flex h-full w-full min-w-0 items-start gap-3 rounded-lg border border-border bg-surface p-3',
         'transition-colors hover:border-strong hover:bg-surface-subtle',
         canConnect &&
           'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
       )}
     >
-      <div className="flex min-w-0 items-start gap-3">
-        <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong"
-          aria-hidden
-        >
-          <Server size={18} strokeWidth={1.75} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            {activeSessions ? (
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full bg-success"
-                role="img"
-                title={t('terminals.connected')}
-                aria-label={t('terminals.connected')}
-                data-testid={`host-connected-${host.id}`}
-              />
-            ) : null}
-            <span className="truncate text-body font-medium text-ink">{host.label}</span>
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong"
+        aria-hidden
+      >
+        <Server size={18} strokeWidth={1.75} />
+      </span>
+
+      <div className="min-w-0 flex-1">
+        {/* Line 1 — host name, with edit / delete parked in the card's top-right corner. */}
+        <div className="flex min-w-0 items-center gap-1.5">
+          {activeSessions ? (
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-success"
+              role="img"
+              title={t('terminals.connected')}
+              aria-label={t('terminals.connected')}
+              data-testid={`host-connected-${host.id}`}
+            />
+          ) : null}
+          <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
+            {host.label}
+          </span>
+          <div className="flex shrink-0 items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              data-testid={`host-edit-${host.id}`}
+              title={t('terminals.editHost')}
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(host)
+              }}
+            >
+              <Pencil size={14} aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              data-testid={`host-delete-${host.id}`}
+              title={t('terminals.deleteHost')}
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(host)
+              }}
+            >
+              <Trash2 size={14} aria-hidden />
+            </Button>
           </div>
-          <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{subtitle}</div>
         </div>
-      </div>
-      <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={!canConnect}
-          title={t('terminals.connect')}
-          data-testid={`host-connect-${host.id}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onConnect?.(host)
-          }}
-        >
-          <Plug size={13} aria-hidden />
-          {t('terminals.connect')}
-        </Button>
-        <div className="flex shrink-0 items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+
+        {/* Line 2 — address, with connect trailing on the same baseline. */}
+        <div className="mt-1 flex min-w-0 items-center gap-2">
+          <span className="min-w-0 flex-1 truncate font-mono text-caption text-ink-tertiary">
+            {subtitle}
+          </span>
           <Button
             type="button"
-            variant="ghost"
-            size="icon"
-            data-testid={`host-edit-${host.id}`}
-            title={t('terminals.editHost')}
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            disabled={!canConnect}
+            title={t('terminals.connect')}
+            data-testid={`host-connect-${host.id}`}
             onClick={(e) => {
               e.stopPropagation()
-              onEdit(host)
+              onConnect?.(host)
             }}
           >
-            <Pencil size={14} aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            data-testid={`host-delete-${host.id}`}
-            title={t('terminals.deleteHost')}
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(host)
-            }}
-          >
-            <Trash2 size={14} aria-hidden />
+            <Plug size={13} aria-hidden />
+            {t('terminals.connect')}
           </Button>
         </div>
       </div>

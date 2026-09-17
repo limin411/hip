@@ -1,11 +1,7 @@
 export const ko = {
   translation: {
   "chat": {
-    "title": "대화",
     "loading": "불러오는 중…",
-    "newChat": "새 대화",
-    "newChatDesc": "새 대화를 시작합니다…",
-    "sendMessage": "메시지를 보내 대화를 시작하세요",
     "inputPlaceholder": "hip에 메시지 보내기… (Enter 전송, Shift+Enter 줄바꿈)",
     "resizeInput": "드래그하여 입력창 크기 조정",
     "goal": {
@@ -43,7 +39,6 @@ export const ko = {
       "listLabel": "파일 참조",
       "hint": "입력하여 프로젝트 파일 검색",
       "noMatch": "일치하는 파일이 없습니다",
-      "noRoot": "프로젝트 폴더를 열면 @로 파일을 참조할 수 있습니다",
       "loading": "검색 중…",
       "dirSuffix": "폴더",
       "typeNotAttachable": "“{{name}}”은(는) 첨부할 수 없습니다. 경로는 텍스트로 유지됩니다",
@@ -74,7 +69,6 @@ export const ko = {
       "incognitoOff": "시크릿 모드 꺼짐"
     },
     "send": "전송",
-    "user": "사용자",
     "you": "당신",
     "togglePanel": "아티팩트 패널 전환",
     "connectionConnected": "연결됨",
@@ -94,14 +88,11 @@ export const ko = {
     "projectGuidanceLoaded": "{{name}}의 프로젝트 지침이 에이전트 컨텍스트에 주입되었습니다",
     "projectGuidanceHint": "이 규칙은 이 폴더에 자동으로 적용됩니다.",
     "projectGuidanceLoading": "미리보기 로드 중…",
-    "projectGuidanceShowPreview": "미리보기 보기",
-    "projectGuidancePreviewFallback": "(미리보기 불가)",
     "newConversationGreeting": "무엇을 만들까요?",
     "codeGreeting": "무엇을 만들어 볼까요?",
     "codeNeedFolder": "코딩을 시작하려면 프로젝트 폴더를 선택하세요",
     "roundtable": {
       "chip": "원탁 회의",
-      "chipAria": "첫 메시지의 원탁 모드 전환",
       "chipHint": "필요할 때 hip이 다라운드 토론을 진행하고 결정합니다",
       "disabledHint": "스킬 또는 슬래시 명령 사용 중에는 사용할 수 없습니다",
       "modeSelect": "모드 선택",
@@ -109,7 +100,6 @@ export const ko = {
       "controlPermissionDesc": "컴퓨터 전체 조작 (고위험)",
       "controlPermission": "제어 권한",
       "controlPermissionHint": "고위험 권한: 활성화하면 에이전트가 현재 폴더에 국한되지 않고 컴퓨터 전체를 조작할 수 있습니다",
-      "helper": "간단한 질문은 일반 대화로 답합니다. 복잡한 안건에서는 고문들이 여러 라운드 토론하고, hip이 라운드 수·단계 결론·최종 결정을 합니다.",
       "badge": "원탁",
       "metaRounds": "라운드 {{ran}}/{{planned}}",
       "metaAdvisors": "고문 발언 {{count}}회",
@@ -125,45 +115,8 @@ export const ko = {
         "done": "원탁 · 완료"
       }
     },
-    "greeting": {
-      "default": "무엇을 만들까요?",
-      "wave": "안녕하세요!",
-      "swim": "수영 중",
-      "jump": "점프!",
-      "puff": "파워 업!",
-      "dance": "춤추는 중!",
-      "happy": "너무 행복해요!",
-      "think": "음...",
-      "stretch": "크게 스트레칭!",
-      "splash": "첨벙!",
-      "point": "저기 봐!",
-      "surprise": "와!!",
-      "sleepy": "너무 졸려...",
-      "angry": "그르릉!",
-      "clap": "브라보!",
-      "peekaboo": "까꿍!",
-      "spin": "빙글빙글!",
-      "tumble": "데굴데굴!"
-    },
     "greetingSub": {
       "default": "코딩하고 채팅하는 AI 어시스턴트",
-      "wave": "오늘은 무엇을 도와드릴까요?",
-      "swim": "코드의 바다를 항해 중",
-      "jump": "버그쯤이야 문제없어요",
-      "puff": "일할 준비 완료",
-      "dance": "오늘 기분 최고예요",
-      "happy": "오늘은 좋은 날이네요",
-      "think": "흥미로운 질문이네요",
-      "stretch": "행동 개시 준비",
-      "splash": "첨벙첨벙",
-      "point": "이것 좀 보세요",
-      "surprise": "깜짝이야!",
-      "sleepy": "zzzZZZ...",
-      "angry": "버그가 또 나타났어요!",
-      "clap": "잘했어요!",
-      "peekaboo": "내가 어디 있을까요",
-      "spin": "360도!",
-      "tumble": "체조 시간"
     },
     "emptyGreeting": {
       "timeOfDay": {
@@ -294,7 +247,6 @@ export const ko = {
     "regenerate": "재생성",
     "thinking": "생각 중…",
     "retry": "재시도",
-    "stopped": "중지됨",
     "thinkingMode": "생각 모드",
     "thoughtFor": "{{seconds}}초 동안 생각함",
     "delegatedTo": "{{role}}에게 위임됨",
@@ -307,15 +259,6 @@ export const ko = {
     "jumpToLatest": "최신으로 이동",
     "loadEarlier": "이전 메시지 불러오기",
     "plan": {
-      "chipLabel": "계획",
-      "chipTitle": "계획 모드 강제 — 코딩 전에 조사하고 승인 받기",
-      "whenToUse":
-        "구현 경로가 모호한 작업에 적합(아키텍처, 다중 파일 재설계). 순수 분석, 오타, 명확한 소규모 수정에는 비권장.",
-      "busyTitle": "턴이 실행 중일 때는 계획 모드를 변경할 수 없습니다",
-      "forceOnTitle": "계획 모드 켜짐",
-      "forceOnBody": "다음 턴은 먼저 계획을 세웁니다. 작업을 보내거나 /plan your task를 사용하세요.",
-      "forceOffTitle": "계획 모드 꺼짐",
-      "forceOffBody": "더 이상 턴에 먼저 계획이 필요하지 않습니다.",
       "respondFailedTitle": "계획 응답 실패",
       "respondFailedBody": "계획 응답을 적용할 수 없습니다({{reason}}). 승인 상태를 복원했습니다."
     },
@@ -391,17 +334,6 @@ export const ko = {
         "default": "제공자 기본값"
       }
     },
-    "style": "스타일",
-    "styleNone": "없음",
-    "styleCustom": "사용자 정의",
-    "styleHint": "대화별 지침",
-    "styleManage": "스타일 관리…",
-    "styleDialogTitle": "대화 스타일",
-    "styleName": "이름",
-    "styleInstructions": "지침",
-    "styleNew": "새 스타일",
-    "styleDelete": "스타일 삭제",
-    "styleEmpty": "아직 저장된 스타일이 없습니다. 아래에서 새로 만드세요.",
     "agentRestarted": "외부 에이전트가 다시 시작되었습니다 — 이전 컨텍스트는 유지되지 않았습니다.",
     "acpCliff": {
       "title": "외부 에이전트 모드",
@@ -495,8 +427,6 @@ export const ko = {
       "step2CodeBody": "Code 세션은 도구가 파일을 읽고 쓸 수 있도록 폴더가 필요합니다.",
       "step3Title": "첫 메시지 보내기",
       "step3Body": "Enter로 시작하세요. 모델과 권한은 언제든 바꿀 수 있습니다.",
-      "folderTitle": "프로젝트 폴더 선택",
-      "folderSubtitle": "Code 세션은 도구가 파일을 읽고 쓸 수 있도록 폴더가 필요합니다.",
       "folderCta": "폴더 선택"
     },
     "activity": {
@@ -579,17 +509,13 @@ export const ko = {
     "runtimeStop": "중지",
     "outline": "개요",
     "outlineEmpty": "보낸 메시지가 점프 목록으로 여기에 표시됩니다",
-    "outlineCount": "{{count}}턴",
-    "outlineCount_one": "{{count}}턴",
     "sources": "출처",
     "sourcesEmpty": "웹 출처가 아직 없습니다",
     "sourcesEmptyHint": "내장 또는 MCP 도구로 웹 검색·가져오기를 하면 링크가 여기에 표시됩니다",
     "sourcesCount": "출처 {{count}}개",
-    "sourcesCount_one": "출처 {{count}}개",
     "sourcesQuery": "「{{query}}」",
     "terminal": "터미널",
     "closePanel": "패널 닫기",
-    "moreTabs": "탭 더 보기",
     "noArtifacts": "생성된 문서와 이미지가 여기에 표시됩니다",
     "copyArtifact": "복사",
     "panelSlot": {
@@ -610,12 +536,7 @@ export const ko = {
       "noCwdDesc": "파일 탭에서 먼저 프로젝트 폴더를 바인딩하세요",
       "clean": "작업 트리 깨끗함",
       "cleanDesc": "커밋되지 않은 변경 사항이 여기에 표시됩니다",
-      "error": "변경 사항을 읽을 수 없음",
-      "retry": "재시도",
-      "changedFiles": "변경된 파일 {{count}}개",
-      "changedFiles_one": "변경된 파일 {{count}}개",
       "moreFiles": "표시되지 않은 파일 {{count}}개 더 있음 — 변경 범위를 좁히거나 터미널에서 git을 사용하여 모두 탐색하세요",
-      "moreFiles_one": "표시되지 않은 파일 {{count}}개 더 있음 — 변경 범위를 좁히거나 터미널에서 git을 사용하여 모두 탐색하세요",
       "binary": "바이너리 파일 변경됨",
       "statusAdded": "추가됨",
       "statusModified": "수정됨",
@@ -657,16 +578,11 @@ export const ko = {
       "switchCheckedOut": "이 브랜치는 다른 워크스페이스에서 이미 체크아웃되어 있습니다: {{path}}"
     },
     "changesView": {
-      "uncommitted": "커밋되지 않은 변경사항",
-      "commitLog": "커밋",
-      "noCommits": "아직 커밋 없음",
-      "commitLogError": "커밋 로그를 읽을 수 없음",
       "toolbarMenu": "변경사항 도구 모음 메뉴",
       "recentCommits": "최근 커밋",
       "collapseAll": "모두 접기",
       "expandAll": "모두 펼치기",
       "refresh": "새로고침",
-      "resizeCommits": "커밋 목록 높이 조절",
       "baseLabel": "비교 기준",
       "noSessionStart": "세션 시작 스냅샷이 아직 없습니다",
       "ignoreWhitespace": "공백 변경 무시",
@@ -687,8 +603,6 @@ export const ko = {
       "explainInjected": "설명 요청을 입력란에 추가했습니다",
       "groupByStatus": "상태별 그룹화",
       "panelTooNarrow": "패널이 너무 좁아 분할 보기 불가",
-      "backToUncommitted": "커밋되지 않은 변경으로 돌아가기",
-      "commitDiffError": "커밋 변경사항을 불러올 수 없음",
       "discardSuccess": "{{path}}를 HEAD로 복원함 (사본은 휴지통에 보관)",
       "discardFailed": "{{path}} 폐기 실패: {{error}}",
       "review": "검토",
@@ -739,14 +653,11 @@ export const ko = {
       "worker": "작업자",
       "subagent": "하위 에이전트"
     },
-    "toolsCount": "도구 {{count}}개",
-    "delegatedBy": "위임자",
     "arguments": "인수",
     "output": "출력",
     "failed": "실패",
     "truncated": "잘림",
     "noTools": "도구 호출 없음",
-    "tokens": "{{count}}토큰",
     "selectFolder": "프로젝트 폴더 선택",
     "selectFolderDesc": "에이전트가 읽고 쓸 폴더를 선택하고 여기서 탐색하세요",
     "terminalView": {
@@ -791,7 +702,6 @@ export const ko = {
     "sandboxPending": "첫 번째 메시지를 보내면 샌드박스 작업 공간이 생성됩니다",
     "needsSessionScope": "미리 보려면 세션 범위가 필요합니다",
     "turnOutputs": "이번 턴에 {{count}}개의 출력",
-    "turnOutputs_one": "이번 턴에 {{count}}개의 출력"
   },
 
   "settings": {
@@ -871,7 +781,6 @@ export const ko = {
     "trashRetention": "휴지통 보관 기간",
     "trashRetentionDesc": "소프트 삭제된 세션은 이 일수(1~365일) 후에 영구적으로 제거됩니다.",
     "trashRetentionUnit": "일",
-    "windowSection": "창 및 백그라운드",
     "closeAction": "창을 닫을 때",
     "closeActionDesc": "트레이로 숨기면 agent, 터미널, sidecar가 계속 실행됩니다. 완전히 종료하려면 트레이 메뉴 또는 「hip 종료」를 사용하세요.",
     "closeActions": {
@@ -881,7 +790,6 @@ export const ko = {
     },
     "trayEnabled": "시스템 트레이 아이콘",
     "trayEnabledDesc": "트레이에서 창을 복원하거나 종료할 수 있습니다. 켜면 「창을 닫을 때」가 「시스템 트레이로 숨기기」로 바뀌며, 숨기기/매번 확인을 고르면 트레이도 자동으로 켜집니다.",
-    "closeActionsAskNote": "창을 닫을 때마다 묻습니다.",
     "launchAtLogin": "로그인 시 시작",
     "launchAtLoginDesc": "컴퓨터에 로그인할 때 hip을 시작합니다. 로그인 항목에서 실행되면 기본적으로 트레이로 숨깁니다.",
     "notifyOnAgentComplete": "에이전트 완료 시 알림",
@@ -949,7 +857,6 @@ export const ko = {
       "kinds": {
         "message": "메시지",
         "codeBlock": "코드 블록",
-        "sessionTab": "세션 탭",
         "sessionHistory": "히스토리",
         "fileEntry": "파일 트리",
         "filePreview": "파일 미리보기",
@@ -973,14 +880,6 @@ export const ko = {
         "trashEntry": "휴지통"
       }
     },
-    "apiKey": "DeepSeek API 키",
-    "apiKeyDesc": "이 기기에 로컬로 저장됩니다. 에이전트 런타임에서 사용됩니다.",
-    "apiKeyConfigured": "설정됨",
-    "apiKeyNotConfigured": "설정되지 않음",
-    "apiKeyPlaceholder": "sk-...",
-    "apiKeySave": "저장",
-    "apiKeyClear": "지우기",
-    "apiKeyError": "API 키 업데이트에 실패했습니다. 다시 시도해 주세요.",
     "model": "모델 설정",
     "modelConfig": {
       "currentModel": "현재 모델",
@@ -1109,7 +1008,6 @@ export const ko = {
       "delete": "삭제",
       "cancel": "취소",
       "save": "저장",
-      "menuMore": "더 보기",
       "error": "작업 실패. 다시 시도해 주세요.",
       "deleteConfirmTitle": "\"{{name}}\"을(를) 삭제할까요?",
       "deleteConfirmBody": "이 MCP 설정이 제거됩니다. 나중에 다시 추가할 수 있습니다.",
@@ -1117,7 +1015,6 @@ export const ko = {
       "statusConnecting": "연결 중…",
       "statusDisconnected": "연결 끊김",
       "statusError": "오류",
-      "toolCountLabel": "도구 {{count}}개",
       "reconnect": "재연결",
       "pluginSectionTitle": "플러그인 MCPs",
       "pluginSectionHint": "설치된 플러그인에서 제공합니다. 여기서 편집하거나 삭제할 수 없습니다. 제거하려면 플러그인 마켓에서 플러그인을 제거하세요. 플러그인 마켓에서 플러그인을 비활성화하면 해당 MCP 서버가 꺼집니다.",
@@ -1132,10 +1029,6 @@ export const ko = {
       "toolDisableAll": "없음",
       "toolNoMatch": "일치하는 도구 없음",
       "noToolsDiscovered": "아직 발견된 도구가 없습니다. 먼저 서버를 저장하고 활성화하세요.",
-      "statEnabled": "활성화됨",
-      "statConnected": "연결됨",
-      "statErrors": "오류",
-      "statTools": "사용 가능한 도구",
       "myServersTitle": "내 서버",
       "toolSingular": "도구",
       "toolPlural": "도구",
@@ -1202,13 +1095,6 @@ export const ko = {
     "hooksLabel": "Hooks",
     "memoryLabel": "메모리",
     "productHelp": {
-      "navLabel": "도움말",
-      "title": "제품 도움말",
-      "intro": "hip의 작동 방식 — 표면, 설정, 메모리, 스킬 및 로컬 데이터. 에이전트가 use_skill(\"hip\")으로 로드하는 가이드와 동일합니다.",
-      "version": "버전 {{version}}",
-      "docsRev": "문서 개정 {{rev}}",
-      "sectionsLabel": "도움말 주제",
-      "sourceNote": "출처: packages/product-content/ (en) 및 locales/zh-CN|zh-TW|ja|ko. 에이전트 스킬은 영어를 유지하며, 도움말은 UI 언어를 따릅니다.",
       "sections": {
         "overview": "개요",
         "memory": "메모리",
@@ -1363,7 +1249,6 @@ export const ko = {
     "skill": {
       "title": "Skills",
       "intro": "Claude 형식의 스킬 (SKILL.md 폴더). hip은 활성화된 스킬을 필요 시 로드합니다. 데이터 디렉토리에 폴더를 배치하여 스킬을 추가하세요.",
-      "upload": "스킬 업로드 (.zip)",
       "empty": "아직 설치된 스킬이 없습니다.",
       "emptyHint": "~/.hip/skills/ (또는 설정된 데이터 디렉토리) 아래에 스킬 폴더를 넣어주세요.",
       "hasScripts": "스크립트 포함",
@@ -1376,7 +1261,6 @@ export const ko = {
       "deleteConfirmTitle": "\"{{name}}\" 스킬을 삭제할까요?",
       "deleteConfirmBody": "디스크에서 스킬 폴더가 제거되며, 되돌릴 수 없습니다.",
       "cancel": "취소",
-      "installError": "설치에 실패했습니다. .zip 파일에 SKILL.md가 포함되어 있는지 확인하세요.",
       "loadError": "이 스킬 파일을 읽을 수 없습니다.",
       "pluginSkills": "플러그인 스킬",
       "pluginSkillsHint": "설치된 플러그인이 소유한 스킬입니다. 여기서 각 스킬을 켜거나 끌 수 있으며, 삭제하려면 플러그인 마켓에서 플러그인을 제거해야 합니다. 플러그인 마켓에서 플러그인이 비활성화되면 모든 스킬이 꺼집니다.",
@@ -1389,8 +1273,6 @@ export const ko = {
     "agents": {
       "title": "에이전트 관리",
       "intro": "외부 에이전트를 등록합니다. 기본 제공 hip 에이전트는 항상 기본값입니다.",
-      "add": "에이전트 추가",
-      "empty": "아직 외부 에이전트가 없습니다.",
       "name": "이름",
       "command": "명령어",
       "args": "인수 (공백으로 구분)",
@@ -1459,21 +1341,10 @@ export const ko = {
     "plugins": {
       "title": "플러그인 마켓",
       "intro": "~/.hip/plugins 아래에 설치된 플러그인입니다. 기능은 .plugin/plugin.json에서 제공되며(마켓플레이스 세부 정보는 선택적 PLUGIN.md), 해당 디렉터리에 패키지를 배치하여 추가합니다. 인앱 설치 기능은 없습니다.",
-      "install": "플러그인 설치",
-      "urlLabel": "Git 저장소 URL",
-      "urlPlaceholder": "https://github.com/owner/repo.git",
       "cancel": "취소",
       "componentCounts": "Skills {{skills}}개 · MCPs {{mcpServers}}개 · 에이전트 {{agents}}개 · Hooks {{hooks}}개",
-      "statusCloning": "클로닝 중",
-      "statusScanning": "스캔 중",
-      "statusGeneratingManifest": "매니페스트 생성 중",
-      "statusRegistering": "등록 중",
-      "statusDone": "완료",
-      "statusError": "오류",
       "installError": "설치에 실패했습니다. Git URL과 네트워크 연결을 확인하세요.",
-      "installSuccess": "플러그인이 성공적으로 설치되었습니다.",
       "deleteError": "제거에 실패했습니다. 플러그인이 아직 사용 중일 수 있습니다.",
-      "retry": "재시도",
       "empty": "설치된 플러그인이 없습니다",
       "emptyHint": "~/.hip/plugins/ 아래에 .plugin/plugin.json이 포함된 패키지를 배치하거나 hip-plugins.json에 경로를 등록하세요.",
       "deleteConfirmTitle": "\"{{name}}\" 플러그인을 제거하시겠습니까?",
@@ -1542,33 +1413,13 @@ export const ko = {
     },
     "hooks": {
       "title": "Hooks",
-      "intro": "플러그인이 선언한 라이프사이클 훅과 연결 가능한 이벤트를 확인하세요. 이 페이지는 읽기 전용입니다. 훅을 변경하려면 로컬 설정 파일을 수정하세요.",
       "introShort": "플러그인이 선언한 라이프사이클 이벤트의 읽기 전용 개요입니다(정적 스캔, 실시간 세션 프로브 아님). 도구 훅은 메인 루프, 작업 하위 에이전트, 워크플로 에이전트 노드에서 실행됩니다(게이트나 외부 ACP 세션 제외). 행을 펼치면 소스와 경로 정보를 확인할 수 있으며, 플러그인 훅 파일을 수정하여 설정을 변경하세요.",
       "pluginManagedHint": "플러그인 훅은 여기서 삭제할 수 없습니다. 제거하려면 플러그인 마켓에서 전체 플러그인을 제거하세요.",
-      "editHint": "훅은 플러그인이 plugin.json의 hooks 필드를 통해 선언하며, 핸들러는 플러그인 디렉터리 아래 CJS 모듈에 있습니다. 설치 또는 업데이트 후 선언된 개수로 여기에 표시됩니다.",
-      "loading": "로딩 중…",
-      "configuredTitle": "선언된 훅",
-      "configuredDesc": "훅을 선언한 설치된 플러그인입니다. 목록에서 강조 표시된 이벤트는 해당 파일의 정적 스캔 결과입니다(실시간 세션 레지스트리 아님).",
       "configuredSummary": "플러그인 {{sources}}개 · 훅 {{count}}개",
       "eventsOn": "이벤트 {{count}}개 선언됨",
-      "configuredEmpty": "아직 선언된 훅이 없습니다",
       "configuredEmptyHint": "아직 선언된 훅이 없습니다. 플러그인에서 훅을 선언하면 목록에 표시됩니다.",
-      "sourcePlugin": "플러그인",
       "hookCount": "훅 {{count}}개",
-      "catalogTitle": "라이프사이클 훅 이벤트",
-      "catalogDesc": "이 이벤트들은 플러그인 훅 모듈에서 등록할 수 있습니다.",
-      "howToTitle": "설정 방법",
-      "howToStep1": "플러그인의 .plugin/plugin.json에서 \"hooks\": \"./hooks.cjs\"로 설정하세요(경로는 플러그인 루트 기준).",
-      "howToStep2": "해당 CJS 모듈에서 배열을 내보내세요: 각 항목에는 event, 선택적 matcher, async handler가 필요합니다.",
-      "howToStep3": "플러그인을 재설치하거나 새로고침한 후 새 세션을 시작하면 사이드카가 훅을 등록합니다. 이 페이지에는 선언된 개수와 스캔된 이벤트 이름이 표시됩니다.",
       "diagram": {
-        "title": "라이프사이클 이벤트",
-        "subtitle": "훅은 세션 → 턴 → 도구 호출 → 마무리 순서로 실행됩니다. 강조 표시된 행은 플러그인이 선언한 것입니다(정적 스캔).",
-        "subtitleFishbone": "라이프사이클 단계별 목록입니다. 강조 표시 = 플러그인이 선언함. 행을 펼치면 소스와 경로 정보를 볼 수 있습니다.",
-        "clickHint": "행을 클릭하여 펼치기",
-        "ariaLabel": "{{count}}개의 선언된 이벤트가 있는 훅 라이프사이클 목록",
-        "legendConfigured": "선언됨",
-        "legendAvailable": "선언되지 않음",
         "configuredBadge": "선언됨",
         "notConfigured": "선언되지 않음",
         "scanHint": "강조 표시 = 정적 플러그인 스캔",
@@ -1577,9 +1428,6 @@ export const ko = {
         "pathWorkflow": "워크플로우 에이전트",
         "pathExcluded": "Not 게이트 / 외부 ACP",
         "pathWorkflowNote": "워크플로우 턴 이벤트는 노드별이 아니라 실행당 한 번 발생합니다.",
-        "collapse": "접기",
-        "expandSources": "{{count}}개의 플러그인 소스",
-        "expandEmpty": "이 이벤트를 선언한 플러그인이 없습니다.",
         "expandEmptyHint": "이 이벤트를 선언한 플러그인이 없습니다.",
         "expandScanDisclaimer": "아래 플러그인들은 정적 스캔을 통해 이 이벤트를 선언합니다. 세션에 등록되는지는 플러그인 로드 및 세션 유형에 따라 다릅니다.",
         "phaseSession": "세션",
@@ -1587,11 +1435,6 @@ export const ko = {
         "phaseTurnEnd": "턴 마무리",
         "phaseActivity": "활동 (병렬)",
         "toolLoop": "도구 호출 루프 (반복 가능)",
-        "toolRuns": "↓ 도구 실행 ↓",
-        "successPath": "성공",
-        "failurePath": "실패",
-        "toolLoopHint": "각 모델 도구 호출은 이 루프를 한 번 통과합니다.",
-        "activityHint": "목표/활동 예산 훅은 메인 턴과 함께 실행됩니다."
       },
       "events": {
         "SessionStart": "세션의 첫 번째 채팅 메시지에서 실행됩니다(현재는 알림 수준).",
@@ -1683,11 +1526,6 @@ export const ko = {
     "memoryTrashNote": "장기 기억 휴지통은 설정 → 기억에서 관리합니다(기본 30일, 별도 정책 적용).",
     "openMemorySettings": "기억 설정 열기"
   },
-  "account": {
-    "menu": "계정 메뉴",
-    "userLabel": "계정",
-    "statusLocal": "로컬 · 로그인됨"
-  },
   "mainToolbar": {
     "newConversation": "새 대화",
     "aria": "세션 도구 모음"
@@ -1699,30 +1537,11 @@ export const ko = {
     "restore": "복원",
     "close": "닫기"
   },
-  "login": {
-    "slogan": "나보다 게으름을 잘 아는 사람은 없어",
-    "tagline2": "당신의 머신에 머무는 에이전트",
-    "tagline3": "채팅이 아닌 실제 작업을 배포하세요",
-    "brandLabel": "hip 워크벤치",
-    "brandLine1": "수익에 집착",
-    "brandLine2": "일하면서 빼먹기",
-    "brandHeadline": "수익에 집착. 일하면서 빼먹기.",
-    "sticker1": "✦ 출시하자",
-    "sticker2": "로컬 전용",
-    "sticker3": "드라마 없음",
-    "title": "hip에 로그인",
-    "subtitle": "계속할 방법을 선택하세요",
-    "email": "이메일로 계속",
-    "github": "GitHub로 계속",
-    "google": "Google로 계속",
-    "skip": "로그인 건너뛰기"
-  },
   "nav": {
     "chat": "작업",
     "code": "코딩",
     "trash": "휴지통",
     "history": "기록",
-    "automation": "자동화",
     "settings": "설정"
   },
   "placeholder": {
@@ -1732,7 +1551,6 @@ export const ko = {
     "automation": "자동화가 곧 출시됩니다 — 워크플로우와 예약 작업을 구성하세요."
   },
   "terminals": {
-    "title": "터미널 관리",
     "newLocal": "로컬 터미널",
     "newLocalFolder": "폴더에서 열기…",
     "newRemote": "새 연결",
@@ -1743,17 +1561,13 @@ export const ko = {
     "expandGroup": "그룹 펼치기",
     "collapseGroup": "그룹 접기",
     "deleteGroup": "그룹 삭제",
-    "emptyTitle": "열린 터미널 없음",
     "emptyHint": "채팅/코드 세션과 무관한 로컬 셸을 여기서 엽니다.",
-    "selectOrNew": "터미널 선택",
-    "selectOrNewHint": "사이드바에서 활성 터미널을 선택하거나 새 로컬 셸을 여세요.",
     "sidebarEmpty": "활성 터미널 없음",
     "quickConnectEmpty": "최근 연결이 없습니다",
     "close": "닫기",
     "connecting": "연결 중…",
     "cwdMissing": "디렉터리가 존재하지 않습니다",
     "hostMissing": "호스트가 더 이상 저장되어 있지 않습니다",
-    "sshComingSoon": "SSH 곧 지원",
     "sessionMissing": "터미널을 찾을 수 없음",
     "noCwd": "작업 디렉터리 없음",
     "kindLocal": "로컬",
@@ -1783,16 +1597,11 @@ export const ko = {
       "execTitle": "SSH 터미널에서 실행",
       "execHint": "보이는 공유 터미널에 입력됩니다.",
       "execTimedOut": "명령이 아직 실행 중일 수 있습니다",
-      "execPartial": "부분 출력을 가져왔습니다. 계속하기 전에 확인하세요",
-      "execRejected": "명령이 거부되었으며 아무것도 기록되지 않았습니다.",
       "execError": "명령 실행 실패",
-      "execAborted": "대기가 중단되었습니다",
-      "userInterleaved": "명령 실행 중 입력이 있어 결과가 섞였을 수 있습니다.",
       "handedOff": "인계됨 · 사용자 대기 중",
       "handoffBanner": "입력 중 — 완료 후 「인계」 를 눌러 어시스턴트 계속",
       "handoffCta": "인계",
       "queuedMsgs": "메시지 {{count}}건 대기 중 — 명령 종료 후 자동 전송",
-      "queuedMsgs_plural": "메시지 {{count}}건 대기 중 — 명령 종료 후 자동 전송",
       "confirmHighRisk": "고위험",
       "confirmOverwrite": "덮어쓰기",
       "confirmTitle": "이 명령을 실행할까요?",
@@ -1809,11 +1618,7 @@ export const ko = {
       "sessionsGroup": "{{title}}의 에이전트 채팅",
       "deleteTitle": "에이전트 채팅을 삭제할까요?",
       "deleteBody": "이 대화를 삭제합니다. SSH 터미널은 열린 상태로 유지됩니다.",
-      "contextChanged": "마지막 메시지 이후 터미널 상태가 바뀌었을 수 있습니다",
       "permissionTitle": "명령 승인",
-      "approve": "승인",
-      "reject": "거부",
-      "connectFirst": "먼저 연결"
     },
     "softCap": "너무 많은 터미널이 열려 있습니다(최대 8개, 코드 패널 터미널 포함). 먼저 하나를 닫으세요.",
         "emptyLibrary": "저장된 연결이 없습니다",
@@ -1853,7 +1658,6 @@ export const ko = {
     },
     "sftp": {
       "panelTitle": "파일",
-      "comingSoon": "SFTP 곧 지원",
       "loading": "불러오는 중…",
       "loadError": "원격 파일을 나열할 수 없습니다",
       "sessionClosed": "SSH 세션이 닫혔습니다. 파일을 보려면 다시 연결하세요.",
@@ -1875,10 +1679,7 @@ export const ko = {
     },
     "navigation": {
       "up": "상위 디렉터리로 이동",
-      "back": "뒤로",
-      "forward": "앞으로",
       "pathInput": "경로 입력 전환",
-      "root": "루트 디렉터리로 이동"
     },
     "breadcrumb": {
       "root": "루트",
@@ -1946,7 +1747,6 @@ export const ko = {
   },
   "workItems": {
     "title": "작업 항목",
-    "inbox": "수신함",
     "untitled": "제목 없음",
     "searchPlaceholder": "작업 항목 검색…",
     "newItem": "새 작업 항목",
@@ -1957,11 +1757,6 @@ export const ko = {
     "emptySearchHint": "검색을 지우면 목록이 다시 나타납니다. 다른 키워드를 시도해 보세요.",
     "clearSearch": "검색 지우기",
     "showAll": "전체 보기",
-    "viewTodo": "할 일 보기",
-    "detailEmpty": "작업 항목 선택",
-    "detailEmptyHint": "목록에서 선택하거나 새로 만드세요.",
-    "backToList": "목록으로",
-    "listFilter": "목록",
     "loading": "불러오는 중…",
     "filters": {
       "all": "전체",
@@ -1989,10 +1784,8 @@ export const ko = {
       "priority": "우선순위",
       "startOn": "시작일",
       "endOn": "종료일",
-      "list": "목록",
       "tags": "태그",
       "tagsPlaceholder": "태그 추가…",
-      "removeTag": "태그 {{tag}} 제거",
       "notes": "메모",
       "notesPlaceholder": "메모…"
     },
@@ -2003,9 +1796,6 @@ export const ko = {
       "archive": "보관",
       "unarchive": "보관 취소",
       "delete": "삭제"
-    },
-    "help": {
-      "cancelVsArchive": "취소는 하지 않기로 한 것입니다(「전체」에서 확인). 보관은 일상 목록에서 숨깁니다(「보관됨」에서 확인)."
     },
     "deleteConfirm": "이 작업 항목을 휴지통으로 이동할까요? 나중에 복원할 수 있습니다.",
     "modal": {
@@ -2040,15 +1830,7 @@ export const ko = {
       "recolor": "상태 색",
       "recolorAria": "{{status}} 색 변경"
     },
-    "listsSection": "목록",
-    "listsHeading": "목록",
-    "smartFilters": "스마트 필터",
     "filtersAria": "스마트 필터",
-    "newList": "새 목록",
-    "newListPrompt": "목록 이름",
-    "renameListPrompt": "목록 이름 바꾸기",
-    "deleteListConfirm": "목록 \"{{name}}\"을(를) 삭제할까요? 항목은 수집함으로 이동합니다.",
-    "listRowHint": "{{name}} · 더블클릭으로 이름 변경 · 우클릭으로 삭제"
   },
 
   "automation": {
@@ -2075,13 +1857,6 @@ export const ko = {
       "nameDuplicate": "“{{name}}” 이름의 자동화가 이미 있습니다",
     },
     },
-  "tabs": {
-    "closeTab": "탭 닫기",
-    "newSession": "새 세션",
-    "tabList": "열린 세션",
-    "knowledge": "문서",
-    "closeKnowledge": "문서 닫기"
-  },
   "sidebar": {
     "aria": "탐색 및 세션 기록",
     "navAria": "주 탐색",
@@ -2111,13 +1886,7 @@ export const ko = {
       "projects": "프로젝트 세션",
       "chats": "채팅 기록",
       "terminals": "터미널 관리",
-      "workItems": "작업 항목",
-      "automations": "자동화"
     },
-    "automationsHint": "메인 패널에서 작업을 활성화하면 여기에 표시됩니다.",
-    "automationsDisabledHint": "사용 안 함 작업 {{count}}개. 메인 패널에서 관리하세요.",
-    "automationsDisabledLink": "사용 안 함 {{count}} — 메인 패널에서 보기",
-    "viewAllAutomations": "메인 패널에서 전체 보기",
     "quickConnect": "빠른 연결",
     "badge": {
       "chat": "채팅",
@@ -2126,18 +1895,12 @@ export const ko = {
     "status": {
       "running": "실행 중"
     },
-    "viewAll": "모두 보기",
     "newSpace": "새로 만들기…",
     "newTask": "새 작업",
-    "newWorkItem": "새 작업 항목",
-    "newAutomation": "새 자동화",
-    "newProject": "새 프로젝트 세션",
     "newChat": "새 채팅",
     "newTerminal": "새 터미널",
     "emptySearch": "일치 없음",
     "emptySessions": "아직 세션이 없습니다",
-    "emptySpaces": "아직 문서가 없습니다. 폴더나 문서를 만드세요",
-    "emptyAutomations": "사용 중인 자동화 없음",
     "projectGroup": {
       "unbound": "프로젝트 폴더 없음",
       "missingBadge": "사용 불가",
@@ -2155,13 +1918,7 @@ export const ko = {
       "collapse": "{{name}} 접기"
     },
   },
-  "dropdown": {
-    "newChat": "새 워크 채팅",
-    "newCode": "새 코딩 작업",
-    "newKnowledge": "새 문서"
-  },
   "knowledge": {
-    "title": "문서",
     "browse": {
       "multiSelectCount": "{{count}}개 선택됨",
       "multiSelectDelete": "삭제",
@@ -2176,47 +1933,14 @@ export const ko = {
       "emptyTitle": "이 폴더는 비어 있습니다",
       "emptyDesc": "문서를 만들어 기록을 시작하세요.",
       "folderKind": "폴더",
-      "docKind": "문서",
-      "name": "이름",
-      "kind": "종류",
-      "modified": "수정 시간"
-    },
-    "empty": {
-      "selectTitle": "폴더 또는 문서 선택",
-      "selectHint": "사이드바에서 폴더 또는 문서를 선택하거나 새로 만드세요."
     },
     "home": {
-      "subtitle": "로컬 우선 · 폴더 트리 · Markdown",
-      "searchPlaceholder": "제목, 본문, 태그, 경로 검색…",
       "mySpaces": "모든 문서",
-      "recent": "최근",
-      "docCount_one": "문서 {{count}}개",
-      "docCount_other": "문서 {{count}}개",
-      "docCount": "문서 {{count}}개",
-      "docCountPending": "…",
-      "emptyTitle": "아직 문서가 없습니다",
-      "emptyHint": "폴더나 문서를 만들어 정리를 시작하세요.",
-      "createSpace": "새 폴더",
-      "searchResults": "검색 결과",
-      "searchEmpty": "검색어와 일치하는 문서가 없습니다.",
-      "searchIndexing": "검색 인덱스 구축 중…",
-      "searchIndexingProgress": "검색 인덱스 구축 중… {{done}}/{{total}}",
-      "searchIndexingProgressSpace": "검색 인덱스 구축 중… {{done}}/{{total}} · {{space}}",
-      "filterTags": "태그",
-      "filterStatus": "상태",
-      "filterClear": "필터 지우기"
     },
     "space": {
-      "nameLabel": "이름",
-      "namePlaceholder": "예: 제품 문서",
       "nameEmpty": "스페이스 이름을 입력하세요",
       "nameDuplicate": "“{{name}}” 이름의 스페이스가 이미 있습니다",
-      "deleteTitle": "“{{name}}”을(를) 삭제할까요?",
-      "deleteBody": "이 스페이스와 모든 문서가 영구 삭제되며 되돌릴 수 없습니다.",
       "menu": "스페이스 메뉴",
-      "iconLabel": "아이콘",
-      "iconNone": "아이콘 없음",
-      "iconCustomPlaceholder": "이모지 또는 붙여넣기…"
     },
           "blockRef": {
         "linkCopied": "블록 링크가 복사되었습니다",
@@ -2250,7 +1974,6 @@ export const ko = {
 "tree": {
       "newDoc": "문서",
       "newTable": "표",
-      "newBoard": "화이트보드",
       "newFolder": "폴더",
       "rename": "이름 바꾸기",
       "delete": "삭제",
@@ -2259,96 +1982,27 @@ export const ko = {
       "deleteDocBody": "이 문서가 영구 삭제되며 되돌릴 수 없습니다.",
       "deleteBoardBody": "이 화이트보드가 영구 삭제되며 되돌릴 수 없습니다.",
       "deleteFolderBody": "이 폴더와 그 안의 모든 항목이 영구 삭제되며 되돌릴 수 없습니다.",
-      "empty": "문서, 화이트보드 또는 폴더를 만들어 시작하세요",
       "filterPlaceholder": "트리 필터…",
-      "filterEmpty": "일치하는 항목 없음",
       "reveal": "Finder에서 보기",
       "copyPath": "경로 복사",
       "pathCopied": "경로가 복사되었습니다",
-      "sectionLabel": "페이지",
-      "backHome": "스페이스로 돌아가기",
-      "dragHandle": "드래그하여 순서 변경",
       "renameUpdateLinks": "이전 제목을 가리키는 위키 링크도 업데이트",
       "renameLinksDone": "{{count}}개 문서의 위키 링크를 업데이트했습니다"
     },
-    "board": {
-      "untitled": "제목 없는 화이트보드",
-      "titleLabel": "화이트보드 제목",
-      "loading": "화이트보드 불러오는 중…",
-      "loadFailed": "화이트보드를 열 수 없습니다",
-      "pendingImageDropped": "이미지 가져오기가 끝나기 전에 저장되지 않았습니다. 필요하면 다시 붙여넣으세요.",
-      "hydratePartial": "일부 화이트보드 이미지를 불러오지 못했습니다",
-      "legacyImported": "화이트보드를 새 형식으로 업그레이드했습니다",
-      "legacyPartial": "화이트보드를 업그레이드했습니다. 지원되지 않는 도형 {{count}}개를 건너뛰었으며 새 형식에서는 사용할 수 없습니다.",
-      "legacyUnsupported": "이 화이트보드에는 변환할 수 없는 도형이 있습니다. 편집 시 빈 보드가 열리며, 저장 시 확인 후 이전 파일을 교체합니다.",
-      "legacyUpgradeFailed": "업그레이드된 화이트보드를 저장하지 못했습니다. 이전 파일을 유지합니다. 다음 저장 시 재시도합니다.",
-      "legacyReplaceTitle": "레거시 화이트보드를 교체할까요?",
-      "legacyReplaceConfirm": "이 보드는 완전히 변환할 수 없습니다. 교체하면 이전 파일이 삭제되고 현재(빈 또는 편집된) 새 형식 보드가 유지됩니다.",
-      "legacyReplaceAction": "교체",
-      "legacyWriteBlocked": "저장이 차단되었습니다. 레거시 보드 교체를 먼저 확인하세요.",
-      "panelTitle": "캔버스",
-      "sectionStructure": "요소",
-      "sectionSelection": "선택",
-      "sectionSelectionIdle": "선택",
-      "sectionCanvas": "캔버스",
-      "sectionBoard": "캔버스",
-      "structureEmpty": "요소 없음 — 캔버스에 그려 보세요",
-      "selectionEmpty": "캔버스에서 도형을 선택해 편집하세요",
-      "selectionCount": "{{count}}개 선택됨",
-      "selectionCount_one": "{{count}}개 선택됨",
-      "structureTruncated": "{{shown}} / {{total}} 표시",
-      "stats": "{{elements}}개 요소 · {{images}}개 이미지",
-      "metaTitle": "제목",
-      "metaElements": "요소",
-      "metaImages": "이미지",
-      "metaUpdated": "수정 시각",
-      "locked": "잠김",
-      "styleFill": "채우기",
-      "styleStroke": "선",
-      "styleStrokeWidth": "선 굵기",
-      "styleFontSize": "글자 크기",
-      "styleText": "텍스트",
-      "styleMixed": "혼합",
-      "elementType": {
-        "rect": "사각형",
-        "ellipse": "타원",
-        "line": "선",
-        "arrow": "화살표",
-        "text": "텍스트",
-        "image": "이미지"
-      }
-    },
     "export": {
       "doc": "문서 내보내기…",
-      "boardJson": "화이트보드 내보내기 (JSON)…",
-      "boardPng": "화이트보드 내보내기 (PNG)…",
-      "boardJsonDone": "화이트보드 JSON 내보내기 완료",
-      "boardPngDone": "화이트보드 PNG 내보내기 완료",
-      "spaceZip": "스페이스를 ZIP으로 내보내기…",
       "docDone": "문서 내보내기 완료",
       "htmlDone": "HTML 내보내기 완료 (브라우저에서 열기; 필요 시 인쇄 → PDF 사용)",
-      "spaceDone": "스페이스 내보내기 완료 (자산 포함 이식 가능한 레이아웃)"
-    },
-    "import": {
-      "folder": "폴더 가져오기…",
-      "done": "{{count}}개 문서를 가져왔습니다"
     },
     "asset": {
-      "attach": "이미지 또는 PDF 첨부",
       "loading": "이미지 로딩 중…",
       "reveal": "Finder에서 보기",
-      "copyPath": "경로 복사",
-      "pathCopied": "경로가 복사되었습니다",
       "tooLargePaste": "이미지가 너무 커서 붙여넣을 수 없습니다. 파일을 저장한 후 첨부(최대 25MB)를 사용하세요.",
       "tooLargeDisk": "파일이 25MB 첨부 제한을 초과했습니다.",
       "unsupported": "지원되지 않는 파일 형식입니다. PNG, JPEG, GIF, WebP 또는 PDF를 사용하세요.",
       "importFailed": "파일을 첨부할 수 없습니다",
-      "placeholder": "이미지를 사용할 수 없음",
       "preview": "이미지 미리보기",
       "previewOpen": "이미지 확대 보기"
-    },
-    "folder": {
-      "untitled": "새 폴더"
     },
     "toolbar": {
       "label": "Markdown 서식",
@@ -2365,39 +2019,13 @@ export const ko = {
       "quote": "인용",
       "fence": "코드 블록"
     },
-    "bubble": {
-      "label": "서식",
-      "turnInto": "변환",
-      "paragraph": "본문",
-      "linkApply": "적용",
-      "linkRemove": "링크 제거",
-      "linkHref": "URL",
-      "clearMarks": "서식 지우기",
-      "linkSearch": "문서 검색…"
-    },
-    "block": {
-      "grip": "드래그 또는 블록 메뉴",
-      "delete": "삭제",
-      "duplicate": "복제",
-      "insertAbove": "위에 삽입",
-      "insertBelow": "아래에 삽입",
-      "turnInto": "변환"
-    },
-    "blockHandle": {
-      "add": "아래에 블록 추가"
-    },
     "tableInfo": {
       "title": "테이블 정보",
       "rowsCols": "{{rows}} 행 · {{cols}} 열",
-      "column": "열",
       "width": "{{width}}px",
       "empty": "빈 테이블: 아래의 「＋ 행 추가」로 시작"
     },
     "table": {
-      "addRow": "행 추가",
-      "addCol": "열 추가",
-      "delRow": "행 삭제",
-      "delCol": "열 삭제",
       "untitled": "제목 없는 표",
       "loadFailed": "표를 열 수 없습니다",
 
@@ -2414,8 +2042,6 @@ export const ko = {
         title: "필터",
         addCondition: "조건 추가",
         clear: "지우기",
-        column: "열",
-        operator: "연산자",
         value: "값",
         opContains: "포함",
         opEquals: "같음",
@@ -2425,7 +2051,6 @@ export const ko = {
       },
       columnMenu: {
 
-        rename: "이름 바꾸기",
         type: "유형",
         insertLeft: "왼쪽에 열 추가",
         insertRight: "오른쪽에 열 추가",
@@ -2454,7 +2079,6 @@ export const ko = {
       grid: {
         addRow: "행 추가",
         addColumn: "열 추가",
-        emptyHint: "셀을 더블클릭하여 입력",
         firstCellHint: "더블클릭하여 입력",
       },
       edit: {
@@ -2463,10 +2087,8 @@ export const ko = {
       toolbar: {
         undo: "실행 취소",
         redo: "다시 실행",
-        sort: "정렬",
         filter: "필터",
         stats: "통계",
-        importCsv: "CSV 가져오기",
         exportCsv: "CSV 내보내기",
         more: "더 보기",
         resetView: "보기 초기화",
@@ -2477,9 +2099,7 @@ export const ko = {
         "visibleRows": "표시 {{n}}/{{total}}개 행",
         "selectionCount": "{{n}}개 셀 선택됨",
         rowsCols: "{{rows}}개 행 · {{cols}}개 열",
-        saved: "저장됨",
         saving: "저장 중…",
-        ready: "준비됨",
       },
       toasts: {
         columnDeleted: "열이 삭제되었습니다(실행 취소 가능)",
@@ -2489,10 +2109,6 @@ export const ko = {
         rowAddedFiltered: "행이 추가되었습니다(현재 필터로 숨겨졌을 수 있음)",
       },
       dragDisabledHint: "정렬/필터 중에는 드래그할 수 없습니다",
-    },
-    "image": {
-      "alt": "대체 텍스트",
-      "delete": "삭제"
     },
     "slash": {
       "listLabel": "블록 삽입",
@@ -2545,8 +2161,6 @@ export const ko = {
       "untitled": "제목 없는 제목",
       "noDoc": "문서를 선택하면 개요를 볼 수 있습니다",
         "noBoard": "화이트보드에는 개요가 없습니다",
-      "count": "제목 {{count}}개",
-      "count_one": "제목 {{count}}개",
       "sectionOutline": "개요",
       "loading": "불러오는 중…",
     },
@@ -2560,7 +2174,6 @@ export const ko = {
     },
     "graph": {
       "title": "지식 그래프",
-      "open": "그래프",
       "neighborhood": "주변 그래프",
       "full": "전체 그래프",
       "fullConfirm": "이 공간에는 문서가 {{count}}개 있습니다({{threshold}}개 초과). 전체 그래프를 렌더링할까요?",
@@ -2590,49 +2203,11 @@ export const ko = {
       "caution": "주의",
       "important": "중요"
     },
-    "props": {
-      "none": "상태 없음",
-      "status": "상태",
-      "tags": "태그",
-      "aliases": "별칭",
-      "priority": "우선순위",
-      "priorityNone": "우선순위 없음",
-      "date": "날짜",
-      "addTag": "태그 추가…",
-      "removeTag": "{{tag}} 제거",
-      "tagsMax": "최대 {{count}}개 태그",
-      "options": {
-        "draft": "초안",
-        "active": "활성",
-        "done": "완료",
-        "low": "낮음",
-        "medium": "중간",
-        "high": "높음"
-      }
-    },
-    "views": {
-      "docs": "문서",
-      "colTitle": "제목",
-      "empty": "이 보기에 일치하는 문서가 없습니다.",
-      "emptyCol": "(비어 있음)",
-      "layoutTable": "테이블",
-      "layoutBoard": "보드",
-      "defaultAll": "전체",
-      "defaultBoard": "보드"
-    },
     "doc": {
       "edit": "편집",
-      "source": "소스",
-      "live": "실시간",
-      "preview": "미리보기",
-      "modeLabel": "문서 모드",
       "titleLabel": "문서 제목",
-      "done": "완료",
       "placeholder": "작성 시작…",
       "placeholderSlash": "텍스트 입력, 또는 / 로 명령",
-      "emptySlashHint": "'/'를 입력해 명령 열기",
-      "viewSource": "소스 보기",
-      "viewLive": "시각 편집",
       "untitled": "제목 없음",
       "metaUpdated": "업데이트 {{time}}",
       "metaCreated": "생성 {{time}}",
@@ -2641,14 +2216,10 @@ export const ko = {
       "saveFailed": "문서를 저장할 수 없습니다",
       "loadFailed": "문서를 불러올 수 없습니다",
       "saving": "저장 중…",
-      "saved": "저장됨",
       "liveLoading": "라이브 편집기 로딩 중…",
-      "liveParseFailed": "라이브 편집기에서 이 문서를 열 수 없습니다. 소스 모드로 전환했습니다.",
       "compatView": "호환 보기로 전환했습니다: 문서가 크거나 라이브 렌더링에 실패해 일반 텍스트로 편집합니다. 내용은 계속 완전히 편집할 수 있습니다.",
       "compatViewClose": "확인",
-      "largeDocForceSource": "문서가 너무 커서 라이브 편집이 불가능합니다. 소스 모드로 전환했습니다.",
       "saveRetry": "다시 시도",
-      "largeDocHint": "문서가 커서 성능상 소스 모드로 편집합니다. 전체 문서는 계속 편집할 수 있습니다.",
       "findPlaceholder": "문서에서 찾기",
       "findPrev": "이전",
       "findNext": "다음",
@@ -2661,11 +2232,8 @@ export const ko = {
         "lineCol": "{{line}}행 {{col}}열",
         "fmTitle": "YAML 프론트매터가 포함된 문서"
       },
-      "backlinkCount": "백링크 {{count}}개",
       "dialectLoss": "일부 특수 블록이 라이브 편집 후 단순화될 수 있습니다",
       "dialectLossHint": "단순화되었습니다. 소스 모드에서 원문을 확인하세요.",
-      "clearFormat": "서식 지우기",
-      "multiSelectHint": "Shift+클릭으로 블록 다중 선택",
       "copyBlockLink": "블록 링크 복사",
       "multiSelectAdd": "선택에 추가",
       "multiSelectClear": "선택에서 제외",
@@ -2694,8 +2262,6 @@ export const ko = {
       "brokenHint": "끊어진 링크: “{{title}}” — 클릭하여 만들기",
       "openHint": "“{{title}}” 열기",
       "noMatches": "일치하는 문서 없음",
-      "propertyStatus": "상태",
-      "propertyTags": "태그"
     },
     "template": {
       "pickTitle": "템플릿 선택",
@@ -2729,9 +2295,6 @@ export const ko = {
       "groupToday": "오늘",
       "groupEarlier": "이전"
     },
-    "error": {
-      "generic": "문제가 발생했습니다"
-    }
   },
   "common": {
     "clear": "지우기",
@@ -2739,9 +2302,6 @@ export const ko = {
     "close": "닫기",
     "confirm": "확인",
     "back": "뒤로",
-    "logout": "로그아웃",
-    "logoutConfirmTitle": "로그아웃할까요?",
-    "logoutConfirmDesc": "계속하려면 다시 로그인해야 합니다."
   },
   "dialog": {
     "closeWindowTitle": "창을 닫을 때",
@@ -2787,15 +2347,6 @@ export const ko = {
     "session": {
       "exportDebugBundle": "디버그 파일 내보내기"
     },
-    "copyFailed": "클립보드에 복사할 수 없습니다",
-    "sessionTab": {
-      "rename": "이름 바꾸기…",
-      "copyId": "세션 ID 복사",
-      "revealInHistory": "기록에서 열기",
-      "deleteOthers": "다른 탭 삭제…",
-      "deleteToRight": "오른쪽 모두 삭제",
-      "deleteAllOpen": "열린 세션 모두 삭제"
-    },
     "sessionHistory": {
       "open": "열기",
       "rename": "이름 바꾸기…"
@@ -2806,15 +2357,9 @@ export const ko = {
       "label": "제목",
       "save": "저장"
     },
-    "confirmDeleteSessions": {
-      "title": "대화 {{count}}개를 영구 삭제할까요?",
-      "body": "열린 대화 {{count}}개가 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
-      "action": "영구 삭제"
-    },
     "file": {
       "open": "열기",
       "copyPath": "경로 복사",
-      "pathCopied": "경로가 복사되었습니다",
       "copyRelativePath": "상대 경로 복사",
       "copyName": "이름 복사",
       "openContainingFolder": "폴더 열기",
@@ -2825,7 +2370,6 @@ export const ko = {
     },
     "diffFile": {
       "copyPath": "경로 복사",
-      "pathCopied": "경로가 복사되었습니다",
       "copyAbsolutePath": "절대 경로 복사",
       "openInFiles": "파일에서 열기",
       "collapse": "접기",
@@ -2882,14 +2426,12 @@ export const ko = {
     },
     "termFs": {
       "copyPath": "경로 복사",
-      "pathCopied": "경로가 복사되었습니다",
       "copyName": "이름 복사",
       "refresh": "새로 고침",
       "openContainingFolder": "포함 폴더 열기"
     },
     "filePreview": {
       "copyPath": "경로 복사",
-      "pathCopied": "경로가 복사되었습니다",
       "copyContent": "내용 복사",
       "contentNotText": "내용이 텍스트가 아닙니다",
       "openContainingFolder": "포함 폴더 열기",
@@ -2938,17 +2480,7 @@ export const ko = {
       "skills": "Skills",
       "favorites": "즐겨찾기",
       "recent": "최근",
-      "docs": "문서",
-      "recentDocs": "최근",
-      "count": "{{group}}（{{count}}）",
-      "knowledge": "문서"
     },
-    "navKnowledge": "문서",
-    "knowledgeHome": "문서 홈",
-    "knowledgeNewDoc": "새 문서",
-    "knowledgeNewBoard": "새 화이트보드",
-    "knowledgeIndexing": "검색 색인 구축 중…",
-    "knowledgeNeedSpace": "먼저 지식 공간을 열어주세요",
     "actions": {
       "newConversation": "새 대화",
       "keyboardShortcuts": "키보드 단축키",
@@ -2959,9 +2491,6 @@ export const ko = {
     "openTerminals": "터미널 관리 열기",
     "newLocalTerminal": "새 로컬 터미널",
     "quickConnect": "빠른 연결",
-    "openWorkItems": "작업 항목 열기",
-    "newWorkItem": "새 작업 항목",
-    "openAutomations": "자동화 열기",
     "settings": {
       "general": "설정: 일반",
       "updates": "설정: 업데이트 확인",
@@ -2974,7 +2503,6 @@ export const ko = {
       "plugins": "설정: 플러그인 마켓",
       "hooks": "설정: Hooks",
       "memory": "설정: 메모리",
-      "help": "설정: 제품 도움말"
     },
     "context": {
       "diff": "작업공간 변경사항 보기",

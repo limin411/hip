@@ -1,11 +1,7 @@
 export const ja = {
   translation: {
   "chat": {
-    "title": "会話",
     "loading": "読み込み中…",
-    "newChat": "新しい会話",
-    "newChatDesc": "新しい会話を始める…",
-    "sendMessage": "メッセージを送信して会話を開始",
     "inputPlaceholder": "hipにメッセージ…（Enterで送信、Shift+Enterで改行）",
     "resizeInput": "ドラッグして入力欄のサイズを変更",
     "goal": {
@@ -43,7 +39,6 @@ export const ja = {
       "listLabel": "ファイル参照",
       "hint": "入力してプロジェクト内のファイルを検索",
       "noMatch": "一致するファイルがありません",
-      "noRoot": "プロジェクトフォルダを開くと @ でファイルを参照できます",
       "loading": "検索中…",
       "dirSuffix": "フォルダ",
       "typeNotAttachable": "「{{name}}」は添付できません。パスはテキストのまま残します",
@@ -74,7 +69,6 @@ export const ja = {
       "incognitoOff": "シークレットモードオフ"
     },
     "send": "送信",
-    "user": "ユーザー",
     "you": "あなた",
     "togglePanel": "アーティファクトパネルの切り替え",
     "connectionConnected": "接続済み",
@@ -94,14 +88,11 @@ export const ja = {
     "projectGuidanceLoaded": "{{name}} からのプロジェクト指示がエージェントコンテキストに注入されました",
     "projectGuidanceHint": "これらのルールはこのフォルダーに自動的に適用されます。",
     "projectGuidanceLoading": "プレビューを読み込み中…",
-    "projectGuidanceShowPreview": "プレビューを表示",
-    "projectGuidancePreviewFallback": "（プレビューは利用できません）",
     "newConversationGreeting": "何を作りますか？",
     "codeGreeting": "何を作りましょうか？",
     "codeNeedFolder": "コーディングを開始するにはプロジェクトフォルダーを選択してください",
     "roundtable": {
       "chip": "円卓会議",
-      "chipAria": "最初のメッセージの円卓モードを切り替え",
       "chipHint": "必要なら hip が複数ラウンドの議論を進行し決定します",
       "disabledHint": "スキルまたはスラッシュコマンド使用中は利用できません",
       "modeSelect": "モード選択",
@@ -109,7 +100,6 @@ export const ja = {
       "controlPermissionDesc": "マシン全体を操作（高リスク）",
       "controlPermission": "操作権限",
       "controlPermissionHint": "高リスク権限：有効にするとエージェントは現在のフォルダーに限らず、マシン全体を操作できます",
-      "helper": "簡単な質問は通常の会話のまま。複雑な議題では顧問が複数ラウンドで議論し、hip がラウンド数・段階結論・最終決定を担います。",
       "badge": "円卓",
       "metaRounds": "ラウンド {{ran}}/{{planned}}",
       "metaAdvisors": "顧問発言 {{count}} 回",
@@ -125,45 +115,8 @@ export const ja = {
         "done": "円卓 · 完了"
       }
     },
-    "greeting": {
-      "default": "何を作りますか？",
-      "wave": "こんにちは！",
-      "swim": "泳いでいます",
-      "jump": "ジャンプ！",
-      "puff": "パワーアップ中！",
-      "dance": "踊っています！",
-      "happy": "とても嬉しい！",
-      "think": "うーん…",
-      "stretch": "大きな伸び！",
-      "splash": "バシャン！",
-      "point": "見て！",
-      "surprise": "わあっ！！",
-      "sleepy": "眠い…",
-      "angry": "ぐるる！",
-      "clap": "ブラボー！",
-      "peekaboo": "いないいないばあ！",
-      "spin": "くるくる！",
-      "tumble": "でんぐり返し！"
-    },
     "greetingSub": {
       "default": "コードを書いてチャットするAIアシスタント",
-      "wave": "今日はどうされましたか？",
-      "swim": "コードの海を泳いでいます",
-      "jump": "どんなバグも止められない",
-      "puff": "準備万端です",
-      "dance": "今日は絶好調",
-      "happy": "良い日ですね",
-      "think": "それは面白い質問ですね",
-      "stretch": "行動開始です",
-      "splash": "バシャバシャ",
-      "point": "これを見てください",
-      "surprise": "びっくりしました！",
-      "sleepy": "zzzZZZ…",
-      "angry": "またバグが出た！",
-      "clap": "よくできました！",
-      "peekaboo": "どこにいるでしょう？",
-      "spin": "360度！",
-      "tumble": "体操の時間です"
     },
     "emptyGreeting": {
       "timeOfDay": {
@@ -294,7 +247,6 @@ export const ja = {
     "regenerate": "再生成",
     "thinking": "考え中…",
     "retry": "再試行",
-    "stopped": "停止しました",
     "thinkingMode": "思考中",
     "thoughtFor": "{{seconds}}秒間思考",
     "delegatedTo": "{{role}}に委任",
@@ -307,15 +259,6 @@ export const ja = {
     "jumpToLatest": "最新へジャンプ",
     "loadEarlier": "以前のメッセージを読み込む",
     "plan": {
-      "chipLabel": "プラン",
-      "chipTitle": "プランモードを強制 — コーディング前に調査と承認を得ます",
-      "whenToUse":
-        "実装方針が曖昧な作業向け（アーキテクチャ、複数ファイルの再設計）。純粋な分析、誤字修正、明確な小修正には不向き。",
-      "busyTitle": "ターン実行中はプランモードを変更できません",
-      "forceOnTitle": "プランモード オン",
-      "forceOnBody": "次のターンは最初にプランを立てます。タスクを送信するか、/plan あなたのタスク を使用してください。",
-      "forceOffTitle": "プランモード オフ",
-      "forceOffBody": "ターンにプランは不要になりました。",
       "respondFailedTitle": "プラン応答に失敗しました",
       "respondFailedBody": "プラン応答を適用できませんでした（{{reason}}）。承認状態を復元しました。"
     },
@@ -391,17 +334,6 @@ export const ja = {
         "default": "プロバイダデフォルト"
       }
     },
-    "style": "スタイル",
-    "styleNone": "なし",
-    "styleCustom": "カスタム",
-    "styleHint": "会話ごとの指示",
-    "styleManage": "スタイルを管理…",
-    "styleDialogTitle": "会話スタイル",
-    "styleName": "名前",
-    "styleInstructions": "指示",
-    "styleNew": "新しいスタイル",
-    "styleDelete": "スタイルを削除",
-    "styleEmpty": "保存されたスタイルはまだありません。以下で作成してください。",
     "agentRestarted": "外部エージェントが再起動されました — 以前のコンテキストは引き継がれませんでした。",
     "acpCliff": {
       "title": "外部エージェントモード",
@@ -495,8 +427,6 @@ export const ja = {
       "step2CodeBody": "Code セッションでは、ツールがファイルを読み書きできるフォルダが必要です。",
       "step3Title": "最初のメッセージを送る",
       "step3Body": "Enter で開始。モデルと権限はいつでも変更できます。",
-      "folderTitle": "プロジェクトフォルダを選ぶ",
-      "folderSubtitle": "Code セッションでは、ツールがファイルを読み書きできるフォルダが必要です。",
       "folderCta": "フォルダを選択"
     },
     "activity": {
@@ -579,17 +509,13 @@ export const ja = {
     "runtimeStop": "停止",
     "outline": "アウトライン",
     "outlineEmpty": "送信したメッセージがジャンプリストとしてここに表示されます",
-    "outlineCount": "{{count}} ターン",
-    "outlineCount_one": "{{count}} ターン",
     "sources": "ソース",
     "sourcesEmpty": "ウェブソースはまだありません",
     "sourcesEmptyHint": "組み込みまたは MCP ツールでウェブ検索・取得すると、リンクがここに表示されます",
     "sourcesCount": "{{count}}件のソース",
-    "sourcesCount_one": "{{count}}件のソース",
     "sourcesQuery": "「{{query}}」",
     "terminal": "ターミナル",
     "closePanel": "パネルを閉じる",
-    "moreTabs": "その他のタブ",
     "noArtifacts": "生成されたドキュメントや画像がここに表示されます",
     "copyArtifact": "コピー",
     "panelSlot": {
@@ -610,12 +536,7 @@ export const ja = {
       "noCwdDesc": "Filesタブでプロジェクトフォルダをバインドしてください",
       "clean": "ワーキングツリーはクリーンです",
       "cleanDesc": "未コミットの変更がここに表示されます",
-      "error": "変更を読み取れませんでした",
-      "retry": "再試行",
-      "changedFiles": "{{count}}個の変更ファイル",
-      "changedFiles_one": "{{count}}個の変更ファイル",
       "moreFiles": "さらに{{count}}個のファイルは表示されていません — 変更範囲を絞るか、ターミナルでgitを使ってすべてを参照してください",
-      "moreFiles_one": "さらに{{count}}個のファイルは表示されていません — 変更範囲を絞るか、ターミナルでgitを使ってすべてを参照してください",
       "binary": "バイナリファイルが変更されました",
       "statusAdded": "追加",
       "statusModified": "変更",
@@ -657,16 +578,11 @@ export const ja = {
       "switchCheckedOut": "このブランチは別のワークスペースでチェックアウト済みです：{{path}}"
     },
     "changesView": {
-      "uncommitted": "未コミットの変更",
-      "commitLog": "コミット",
-      "noCommits": "コミットはまだありません",
-      "commitLogError": "コミットログを読み取れませんでした",
       "toolbarMenu": "変更ツールバーメニュー",
       "recentCommits": "最近のコミット",
       "collapseAll": "すべて折りたたむ",
       "expandAll": "すべて展開",
       "refresh": "更新",
-      "resizeCommits": "コミットリストの高さを調整",
       "baseLabel": "比較ベース",
       "noSessionStart": "セッション開始スナップショットがまだありません",
       "ignoreWhitespace": "空白の変更を無視",
@@ -687,8 +603,6 @@ export const ja = {
       "explainInjected": "説明リクエストを入力欄に追加しました",
       "groupByStatus": "ステータスでグループ化",
       "panelTooNarrow": "パネルが狭く分割表示できません",
-      "backToUncommitted": "未コミットに戻る",
-      "commitDiffError": "コミットの差分を読み込めませんでした",
       "discardSuccess": "{{path}} を HEAD に復元しました（コピーはゴミ箱に保存）",
       "discardFailed": "{{path}} を破棄できませんでした：{{error}}",
       "review": "レビュー",
@@ -739,14 +653,11 @@ export const ja = {
       "worker": "ワーカー",
       "subagent": "サブエージェント"
     },
-    "toolsCount": "{{count}}個のツール",
-    "delegatedBy": "委任元",
     "arguments": "引数",
     "output": "出力",
     "failed": "失敗",
     "truncated": "省略",
     "noTools": "ツール呼び出しなし",
-    "tokens": "{{count}}トークン",
     "selectFolder": "プロジェクトフォルダを選択",
     "selectFolderDesc": "エージェントが読み書きするフォルダを選び、ここで参照できます",
     "terminalView": {
@@ -791,7 +702,6 @@ export const ja = {
     "sandboxPending": "最初のメッセージを送信すると、サンドボックスワークスペースが作成されます",
     "needsSessionScope": "プレビューするにはセッションスコープが必要です",
     "turnOutputs": "このターンの出力: {{count}}",
-    "turnOutputs_one": "このターンの出力: {{count}}"
   },
 
   "settings": {
@@ -871,7 +781,6 @@ export const ja = {
     "trashRetention": "ゴミ箱の保持期間",
     "trashRetentionDesc": "論理削除されたセッションは、この日数（1～365日）経過後に完全に削除されます。",
     "trashRetentionUnit": "日",
-    "windowSection": "ウィンドウとバックグラウンド",
     "closeAction": "ウィンドウを閉じるとき",
     "closeActionDesc": "トレイに隠すと agent・ターミナル・sidecar は動作を続けます。完全に終了するにはトレイメニューまたは「hip を終了」を使います。",
     "closeActions": {
@@ -881,7 +790,6 @@ export const ja = {
     },
     "trayEnabled": "システムトレイアイコン",
     "trayEnabledDesc": "トレイからウィンドウを再表示したり終了したりできます。オンにすると「ウィンドウを閉じるとき」が「システムトレイに隠す」になります。隠す／毎回確認を選ぶとトレイも自動で有効になります。",
-    "closeActionsAskNote": "ウィンドウを閉じるたびに確認します。",
     "launchAtLogin": "ログイン時に起動",
     "launchAtLoginDesc": "サインイン時に hip を起動します。ログイン項目からの起動時はトレイに隠れた状態で開始します。",
     "notifyOnAgentComplete": "エージェント完了時に通知",
@@ -949,7 +857,6 @@ export const ja = {
       "kinds": {
         "message": "メッセージ",
         "codeBlock": "コードブロック",
-        "sessionTab": "セッションタブ",
         "sessionHistory": "履歴",
         "fileEntry": "ファイルツリー",
         "filePreview": "ファイルプレビュー",
@@ -973,14 +880,6 @@ export const ja = {
         "trashEntry": "ごみ箱"
       }
     },
-    "apiKey": "DeepSeek APIキー",
-    "apiKeyDesc": "このデバイスにローカル保存されます。エージェントランタイムで使用されます。",
-    "apiKeyConfigured": "設定済み",
-    "apiKeyNotConfigured": "未設定",
-    "apiKeyPlaceholder": "sk-...",
-    "apiKeySave": "保存",
-    "apiKeyClear": "クリア",
-    "apiKeyError": "APIキーの更新に失敗しました。もう一度お試しください。",
     "model": "モデル設定",
     "modelConfig": {
       "currentModel": "現在のモデル",
@@ -1109,7 +1008,6 @@ export const ja = {
       "delete": "削除",
       "cancel": "キャンセル",
       "save": "保存",
-      "menuMore": "その他",
       "error": "操作に失敗しました。もう一度お試しください。",
       "deleteConfirmTitle": "「{{name}}」を削除しますか？",
       "deleteConfirmBody": "この MCP 設定が削除されます。後で再度追加できます。",
@@ -1117,7 +1015,6 @@ export const ja = {
       "statusConnecting": "接続中…",
       "statusDisconnected": "切断済み",
       "statusError": "エラー",
-      "toolCountLabel": "{{count}}個のツール",
       "reconnect": "再接続",
       "pluginSectionTitle": "プラグイン MCPs",
       "pluginSectionHint": "インストール済みプラグインによって提供されます。ここでは編集・削除できません。削除するにはプラグインマーケットでプラグインをアンインストールしてください。プラグインマーケットでプラグインを無効にすると、そのMCPサーバーはオフになります。",
@@ -1132,10 +1029,6 @@ export const ja = {
       "toolDisableAll": "なし",
       "toolNoMatch": "一致するツールがありません",
       "noToolsDiscovered": "まだツールが見つかりません。先にサーバーを保存して有効にしてください。",
-      "statEnabled": "有効",
-      "statConnected": "接続済み",
-      "statErrors": "エラー",
-      "statTools": "利用可能なツール",
       "myServersTitle": "マイサーバー",
       "toolSingular": "ツール",
       "toolPlural": "ツール",
@@ -1202,13 +1095,6 @@ export const ja = {
     "hooksLabel": "Hooks",
     "memoryLabel": "メモリー",
     "productHelp": {
-      "navLabel": "ヘルプ",
-      "title": "プロダクトヘルプ",
-      "intro": "hipの仕組み — サーフェス、設定、メモリー、スキル、ローカルデータ。エージェントがuse_skill(\"hip\")で読み込むのと同じガイドです。",
-      "version": "バージョン {{version}}",
-      "docsRev": "ドキュメント改訂 {{rev}}",
-      "sectionsLabel": "ヘルプトピック",
-      "sourceNote": "ソース：packages/product-content/ (en) および locales/zh-CN|zh-TW|ja|ko。エージェントスキルは英語のままです。ヘルプはUI言語に従います。",
       "sections": {
         "overview": "概要",
         "memory": "メモリー",
@@ -1363,7 +1249,6 @@ export const ja = {
     "skill": {
       "title": "Skills",
       "intro": "Claude形式のスキル（SKILL.mdフォルダ）。hipは有効なスキルをオンデマンドで読み込みます。データディレクトリにフォルダを配置してスキルを追加してください。",
-      "upload": "スキルをアップロード（.zip）",
       "empty": "まだスキルがインストールされていません。",
       "emptyHint": "スキルフォルダを ~/.hip/skills/（または設定したデータディレクトリ）に配置してください。",
       "hasScripts": "スクリプトあり",
@@ -1376,7 +1261,6 @@ export const ja = {
       "deleteConfirmTitle": "スキル「{{name}}」を削除しますか？",
       "deleteConfirmBody": "スキルフォルダがディスクから削除されます。この操作は元に戻せません。",
       "cancel": "キャンセル",
-      "installError": "インストールに失敗しました。.zip ファイルに SKILL.md が含まれていることを確認してください。",
       "loadError": "このスキルファイルを読み込めませんでした。",
       "pluginSkills": "プラグインスキル",
       "pluginSkillsHint": "インストール済みプラグインが所有するスキルです。ここで各スキルの有効/無効を切り替えられます。削除するにはプラグインマーケットでプラグインをアンインストールしてください。プラグインマーケットでプラグインが無効の場合、そのすべてのスキルはオフのままです。",
@@ -1389,8 +1273,6 @@ export const ja = {
     "agents": {
       "title": "エージェント管理",
       "intro": "外部エージェントを登録します。組み込みの hip エージェントが常にデフォルトです。",
-      "add": "エージェントを追加",
-      "empty": "まだ外部エージェントがありません。",
       "name": "名前",
       "command": "コマンド",
       "args": "引数（スペース区切り）",
@@ -1459,21 +1341,10 @@ export const ja = {
     "plugins": {
       "title": "プラグインマーケット",
       "intro": "プラグインは~/.hip/pluginsにインストールされます。機能は.plugin/plugin.json（マーケットプレイス詳細用のオプションPLUGIN.md）から提供されます。パッケージをそのディレクトリに配置してプラグインを追加してください — アプリ内インストールはありません。",
-      "install": "プラグインをインストール",
-      "urlLabel": "GitリポジトリURL",
-      "urlPlaceholder": "https://github.com/owner/repo.git",
       "cancel": "キャンセル",
       "componentCounts": "{{skills}} Skills · {{mcpServers}} MCPs · {{agents}} エージェント · {{hooks}} Hooks",
-      "statusCloning": "クローン中",
-      "statusScanning": "スキャン中",
-      "statusGeneratingManifest": "マニフェスト生成中",
-      "statusRegistering": "登録中",
-      "statusDone": "完了",
-      "statusError": "エラー",
       "installError": "インストールに失敗しました。Git URLとネットワーク接続を確認してください。",
-      "installSuccess": "プラグインが正常にインストールされました。",
       "deleteError": "アンインストールに失敗しました。プラグインがまだ使用中かもしれません。",
-      "retry": "再試行",
       "empty": "インストールされたプラグインはありません",
       "emptyHint": ".plugin/plugin.jsonを含むパッケージを~/.hip/plugins/に配置するか、hip-plugins.jsonにパスを登録してください。",
       "deleteConfirmTitle": "プラグイン「{{name}}」をアンインストールしますか？",
@@ -1542,33 +1413,13 @@ export const ja = {
     },
     "hooks": {
       "title": "Hooks",
-      "intro": "プラグインが宣言するライフサイクルフックと、アタッチ可能なイベントを確認できます。このページは読み取り専用です。フックを変更するにはローカル設定ファイルを編集してください。",
       "introShort": "プラグインが宣言するライフサイクルイベントの読み取り専用概要です（静的スキャンによるもので、ライブセッションのプローブではありません）。ツールフックはメインループ、タスクサブエージェント、ワークフローエージェントノードで実行されます（ゲートや外部ACPセッションは除く）。行を展開するとソースとパスのメモが表示されます。設定を変更するにはプラグインのフックファイルを編集してください。",
       "pluginManagedHint": "プラグインフックはここでは削除できません。削除するにはプラグインマーケットでプラグイン全体をアンインストールしてください。",
-      "editHint": "フックはプラグインがplugin.jsonのhooksフィールドで宣言し、ハンドラーはプラグインディレクトリ内のCJSモジュールに記述します。インストールまたは更新後、宣言された数としてここに表示されます。",
-      "loading": "読み込み中…",
-      "configuredTitle": "宣言されたフック",
-      "configuredDesc": "フックを宣言しているインストール済みプラグイン。リスト内のハイライトされたイベントは、それらのファイルの静的スキャンによるものです（ライブセッションレジストリではありません）。",
       "configuredSummary": "{{sources}}個のプラグイン · {{count}}個のフック",
       "eventsOn": "{{count}}個のイベントが宣言されています",
-      "configuredEmpty": "まだフックが宣言されていません",
       "configuredEmptyHint": "まだフックが宣言されていません。プラグインでフックを宣言すると、リストにハイライト表示されます。",
-      "sourcePlugin": "プラグイン",
       "hookCount": "{{count}}個のフック",
-      "catalogTitle": "ライフサイクルフックイベント",
-      "catalogDesc": "これらのイベントはプラグインフックモジュールから登録できます。",
-      "howToTitle": "設定方法",
-      "howToStep1": "プラグインの .plugin/plugin.json で、\"hooks\": \"./hooks.cjs\" を設定します（パスはプラグインルートからの相対パス）。",
-      "howToStep2": "そのCJSモジュールから配列をエクスポートします。各エントリには event、オプションの matcher、および非同期ハンドラが必要です。",
-      "howToStep3": "プラグインを再インストールまたは更新し、新しいセッションを開始してサイドカーがフックを登録します。このページには宣言された数とスキャンされたイベント名が表示されます。",
       "diagram": {
-        "title": "ライフサイクルイベント",
-        "subtitle": "フックはセッション → ターン → ツール呼び出し → ラップアップの順に発火します。ハイライト行はプラグインによって宣言されたものです（静的スキャン）。",
-        "subtitleFishbone": "ライフサイクルフェーズごとに一覧表示。ハイライト = プラグインによって宣言済み。行を展開するとソースとパスに関するメモが表示されます。",
-        "clickHint": "行をクリックして展開",
-        "ariaLabel": "フックライフサイクル一覧（{{count}}件の宣言済みイベント）",
-        "legendConfigured": "宣言済み",
-        "legendAvailable": "未宣言",
         "configuredBadge": "宣言済み",
         "notConfigured": "未宣言",
         "scanHint": "ハイライト = 静的プラグインスキャン",
@@ -1577,9 +1428,6 @@ export const ja = {
         "pathWorkflow": "ワークフローエージェント",
         "pathExcluded": "Notゲート / 外部ACP",
         "pathWorkflowNote": "ワークフローのターンイベントはノードごとではなく、実行ごとに1回発火します。",
-        "collapse": "折りたたむ",
-        "expandSources": "{{count}}件のプラグインソース",
-        "expandEmpty": "これを宣言しているプラグインはありません",
         "expandEmptyHint": "このイベントを宣言しているプラグインはありません。",
         "expandScanDisclaimer": "以下のプラグインは静的スキャンでこのイベントを宣言していますが、セッションに登録されるかどうかはプラグインのロードとセッションタイプに依存します。",
         "phaseSession": "セッション",
@@ -1587,11 +1435,6 @@ export const ja = {
         "phaseTurnEnd": "ターンラップアップ",
         "phaseActivity": "アクティビティ（並列）",
         "toolLoop": "ツール呼び出しループ（繰り返し可）",
-        "toolRuns": "↓ ツール実行 ↓",
-        "successPath": "成功",
-        "failurePath": "失敗",
-        "toolLoopHint": "モデルの各ツール呼び出しはこのループを1回通過します",
-        "activityHint": "目標/アクティビティ予算のフックはメインターンと並行して発火します"
       },
       "events": {
         "SessionStart": "セッションの最初のチャットメッセージで発火します（現状は通知レベル）。",
@@ -1683,11 +1526,6 @@ export const ja = {
     "memoryTrashNote": "長期記憶のゴミ箱は設定 → メモリにあります（デフォルト30日、別のポリシー）。",
     "openMemorySettings": "メモリ設定を開く"
   },
-  "account": {
-    "menu": "アカウントメニュー",
-    "userLabel": "アカウント",
-    "statusLocal": "ローカル · サインイン済み"
-  },
   "mainToolbar": {
     "newConversation": "新しい会話",
     "aria": "セッションツールバー"
@@ -1699,30 +1537,11 @@ export const ja = {
     "restore": "元のサイズに戻す",
     "close": "閉じる"
   },
-  "login": {
-    "slogan": "サボりなら誰にも負けない",
-    "tagline2": "あなたのマシンに留まるエージェント",
-    "tagline3": "チャットだけじゃなく、実際の仕事を届ける",
-    "brandLabel": "hip workbench",
-    "brandLine1": "稼ぐことに夢中",
-    "brandLine2": "仕事中にサボる",
-    "brandHeadline": "稼ぐことに夢中。仕事中にサボる。",
-    "sticker1": "✦ 出荷しろ",
-    "sticker2": "ローカル限定",
-    "sticker3": "ドラマなし",
-    "title": "hip にログイン",
-    "subtitle": "続行方法を選択",
-    "email": "メールで続行",
-    "github": "GitHub で続行",
-    "google": "Google で続行",
-    "skip": "ログインをスキップ"
-  },
   "nav": {
     "chat": "作業",
     "code": "コーディング",
     "trash": "ゴミ箱",
     "history": "履歴",
-    "automation": "自動化",
     "settings": "設定"
   },
   "placeholder": {
@@ -1732,7 +1551,6 @@ export const ja = {
     "automation": "自動化は近日公開 — ワークフローやスケジュールジョブを設定できます。"
   },
   "terminals": {
-    "title": "ターミナル管理",
     "newLocal": "ローカル端末",
     "newLocalFolder": "フォルダで開く…",
     "newRemote": "新しい接続",
@@ -1743,17 +1561,13 @@ export const ja = {
     "expandGroup": "グループを展開",
     "collapseGroup": "グループを折りたたむ",
     "deleteGroup": "グループを削除",
-    "emptyTitle": "開いている端末がありません",
     "emptyHint": "チャットやコードセッションに依存しないローカルシェルをここで開けます。",
-    "selectOrNew": "端末を選択",
-    "selectOrNewHint": "サイドバーで端末を選ぶか、新しいローカルシェルを開いてください。",
     "sidebarEmpty": "アクティブな端末はありません",
     "quickConnectEmpty": "最近の接続はまだありません",
     "close": "閉じる",
     "connecting": "接続中…",
     "cwdMissing": "ディレクトリが存在しません",
     "hostMissing": "ホストはもう保存されていません",
-    "sshComingSoon": "SSH は近日対応",
     "sessionMissing": "端末が見つかりません",
     "noCwd": "作業ディレクトリがありません",
     "kindLocal": "ローカル",
@@ -1783,16 +1597,11 @@ export const ja = {
       "execTitle": "SSH ターミナルで実行",
       "execHint": "表示中の共有ターミナルに入力されます。",
       "execTimedOut": "コマンドがまだ実行中の可能性があります",
-      "execPartial": "部分的な出力を取得しました。続行前に確認してください",
-      "execRejected": "コマンドは拒否されました。何も書き込まれていません。",
       "execError": "コマンド実行に失敗しました",
-      "execAborted": "待機が中止されました",
-      "userInterleaved": "コマンド実行中に入力があり、結果が混ざっている可能性があります。",
       "handedOff": "ハンドオフ済み · あなたの操作待ち",
       "handoffBanner": "入力中です — 完了したら「ハンドバック」でアシスタントを再開",
       "handoffCta": "ハンドバック",
       "queuedMsgs": "{{count}} 件のメッセージを待機中 — コマンド完了後に自動送信",
-      "queuedMsgs_plural": "{{count}} 件のメッセージを待機中 — コマンド完了後に自動送信",
       "confirmHighRisk": "高リスク",
       "confirmOverwrite": "上書き",
       "confirmTitle": "このコマンドを実行しますか？",
@@ -1809,11 +1618,7 @@ export const ja = {
       "sessionsGroup": "{{title}} のエージェントチャット",
       "deleteTitle": "エージェントチャットを削除しますか？",
       "deleteBody": "この会話を削除します。SSH ターミナルは開いたままです。",
-      "contextChanged": "前回のメッセージ以降にターミナル状態が変わった可能性があります",
       "permissionTitle": "コマンド承認",
-      "approve": "承認",
-      "reject": "拒否",
-      "connectFirst": "先に接続"
     },
     "softCap": "開いているターミナルが多すぎます（最大8個、コードパネル端末を含む）。先に1つ閉じてください。",
         "emptyLibrary": "保存済みの接続はまだありません",
@@ -1853,7 +1658,6 @@ export const ja = {
     },
     "sftp": {
       "panelTitle": "ファイル",
-      "comingSoon": "SFTP は近日対応",
       "loading": "読み込み中…",
       "loadError": "リモートファイルを一覧できませんでした",
       "sessionClosed": "SSH セッションは閉じられています。ファイルを閲覧するには再接続してください。",
@@ -1875,10 +1679,7 @@ export const ja = {
     },
     "navigation": {
       "up": "親ディレクトリへ移動",
-      "back": "戻る",
-      "forward": "進む",
       "pathInput": "パス入力を切り替え",
-      "root": "ルートディレクトリへ移動"
     },
     "breadcrumb": {
       "root": "ルート",
@@ -1946,7 +1747,6 @@ export const ja = {
   },
   "workItems": {
     "title": "ワークアイテム",
-    "inbox": "受信箱",
     "untitled": "無題",
     "searchPlaceholder": "ワークアイテムを検索…",
     "newItem": "新規ワークアイテム",
@@ -1957,11 +1757,6 @@ export const ja = {
     "emptySearchHint": "検索をクリアすると一覧に戻ります。別のキーワードも試せます。",
     "clearSearch": "検索をクリア",
     "showAll": "すべて表示",
-    "viewTodo": "未着手を表示",
-    "detailEmpty": "ワークアイテムを選択",
-    "detailEmptyHint": "リストから選ぶか、新規作成してください。",
-    "backToList": "リストに戻る",
-    "listFilter": "リスト",
     "loading": "読み込み中…",
     "filters": {
       "all": "すべて",
@@ -1989,10 +1784,8 @@ export const ja = {
       "priority": "優先度",
       "startOn": "開始日",
       "endOn": "終了日",
-      "list": "リスト",
       "tags": "タグ",
       "tagsPlaceholder": "タグを追加…",
-      "removeTag": "タグ {{tag}} を削除",
       "notes": "メモ",
       "notesPlaceholder": "メモ…"
     },
@@ -2003,9 +1796,6 @@ export const ja = {
       "archive": "アーカイブ",
       "unarchive": "アーカイブ解除",
       "delete": "削除"
-    },
-    "help": {
-      "cancelVsArchive": "キャンセルは「やらない」決定です（「すべて」で確認）。アーカイブは日常リストから隠します（「アーカイブ」で確認）。"
     },
     "deleteConfirm": "このワークアイテムをゴミ箱に移しますか？後で復元できます。",
     "modal": {
@@ -2040,15 +1830,7 @@ export const ja = {
       "recolor": "ステータス色",
       "recolorAria": "{{status}} の色を変更"
     },
-    "listsSection": "リスト",
-    "listsHeading": "リスト",
-    "smartFilters": "スマートフィルター",
     "filtersAria": "スマートフィルタ",
-    "newList": "新しいリスト",
-    "newListPrompt": "リスト名",
-    "renameListPrompt": "リスト名を変更",
-    "deleteListConfirm": "リスト「{{name}}」を削除しますか？項目は受信箱に移動します。",
-    "listRowHint": "{{name}} · ダブルクリックで名前変更 · 右クリックで削除"
   },
 
   "automation": {
@@ -2075,13 +1857,6 @@ export const ja = {
       "nameDuplicate": "「{{name}}」という名前の自動化は既に存在します",
     },
     },
-  "tabs": {
-    "closeTab": "タブを閉じる",
-    "newSession": "新しいセッション",
-    "tabList": "開いているセッション",
-    "knowledge": "ドキュメント",
-    "closeKnowledge": "ドキュメントを閉じる"
-  },
   "sidebar": {
     "aria": "ナビゲーションとセッション履歴",
     "navAria": "メインナビゲーション",
@@ -2111,13 +1886,7 @@ export const ja = {
       "projects": "プロジェクトセッション",
       "chats": "チャット履歴",
       "terminals": "ターミナル管理",
-      "workItems": "ワークアイテム",
-      "automations": "自動化"
     },
-    "automationsHint": "メインパネルでジョブを有効にすると、ここに表示されます。",
-    "automationsDisabledHint": "無効なジョブが {{count}} 件あります。メインパネルで管理できます。",
-    "automationsDisabledLink": "無効 {{count}} 件 — メインパネルで表示",
-    "viewAllAutomations": "メインパネルですべて表示",
     "quickConnect": "クイック接続",
     "badge": {
       "chat": "チャット",
@@ -2126,18 +1895,12 @@ export const ja = {
     "status": {
       "running": "実行中"
     },
-    "viewAll": "すべて表示",
     "newSpace": "新規作成…",
     "newTask": "新しいタスク",
-    "newWorkItem": "新規ワークアイテム",
-    "newAutomation": "新しい自動化",
-    "newProject": "新しいプロジェクトセッション",
     "newChat": "新しいチャット",
     "newTerminal": "新しい端末",
     "emptySearch": "一致するものがありません",
     "emptySessions": "セッションはまだありません",
-    "emptySpaces": "ドキュメントがまだありません。フォルダまたはドキュメントを作成してください",
-    "emptyAutomations": "有効な自動化はありません",
     "projectGroup": {
       "unbound": "プロジェクトフォルダなし",
       "missingBadge": "利用不可",
@@ -2155,13 +1918,7 @@ export const ja = {
       "collapse": "{{name}} を折りたたむ"
     },
   },
-  "dropdown": {
-    "newChat": "新しいワークチャット",
-    "newCode": "新しいコーディングタスク",
-    "newKnowledge": "新しいドキュメント"
-  },
   "knowledge": {
-    "title": "ドキュメント",
     "browse": {
       "multiSelectCount": "{{count}} 件選択中",
       "multiSelectDelete": "削除",
@@ -2176,47 +1933,14 @@ export const ja = {
       "emptyTitle": "このフォルダは空です",
       "emptyDesc": "ドキュメントを作成して記録を始めましょう。",
       "folderKind": "フォルダ",
-      "docKind": "ドキュメント",
-      "name": "名前",
-      "kind": "種類",
-      "modified": "更新日時"
-    },
-    "empty": {
-      "selectTitle": "フォルダまたはドキュメントを選択",
-      "selectHint": "サイドバーからフォルダまたはドキュメントを選ぶか、新しく作成してください。"
     },
     "home": {
-      "subtitle": "ローカルファースト · フォルダツリー · Markdown",
-      "searchPlaceholder": "タイトル、本文、タグ、パスを検索…",
       "mySpaces": "すべてのドキュメント",
-      "recent": "最近",
-      "docCount_one": "{{count}} ドキュメント",
-      "docCount_other": "{{count}} ドキュメント",
-      "docCount": "{{count}} ドキュメント",
-      "docCountPending": "…",
-      "emptyTitle": "ドキュメントがまだありません",
-      "emptyHint": "フォルダまたはドキュメントを作成して整理を始めましょう。",
-      "createSpace": "新しいフォルダ",
-      "searchResults": "検索結果",
-      "searchEmpty": "検索に一致するドキュメントはありません。",
-      "searchIndexing": "検索インデックスを構築中…",
-      "searchIndexingProgress": "検索インデックスを構築中… {{done}}/{{total}}",
-      "searchIndexingProgressSpace": "検索インデックスを構築中… {{done}}/{{total}} · {{space}}",
-      "filterTags": "タグ",
-      "filterStatus": "ステータス",
-      "filterClear": "フィルターをクリア"
     },
     "space": {
-      "nameLabel": "名前",
-      "namePlaceholder": "例：製品ドキュメント",
       "nameEmpty": "スペース名を入力してください",
       "nameDuplicate": "「{{name}}」という名前のスペースは既に存在します",
-      "deleteTitle": "「{{name}}」を削除しますか？",
-      "deleteBody": "この操作はスペースとそのすべてのドキュメントを完全に削除します。元に戻すことはできません。",
       "menu": "スペースメニュー",
-      "iconLabel": "アイコン",
-      "iconNone": "アイコンなし",
-      "iconCustomPlaceholder": "絵文字または貼り付け…"
     },
           "blockRef": {
         "linkCopied": "ブロックリンクをコピーしました",
@@ -2250,7 +1974,6 @@ export const ja = {
 "tree": {
       "newDoc": "ドキュメント",
       "newTable": "テーブル",
-      "newBoard": "ホワイトボード",
       "newFolder": "フォルダ",
       "rename": "名前変更",
       "delete": "削除",
@@ -2259,96 +1982,27 @@ export const ja = {
       "deleteDocBody": "この操作はドキュメントを完全に削除します。元に戻すことはできません。",
       "deleteBoardBody": "この操作はホワイトボードを完全に削除します。元に戻すことはできません。",
       "deleteFolderBody": "この操作はフォルダとその中身をすべて完全に削除します。元に戻すことはできません。",
-      "empty": "ドキュメント、ホワイトボード、またはフォルダを作成して開始してください",
       "filterPlaceholder": "ツリーをフィルタ…",
-      "filterEmpty": "一致する項目がありません",
       "reveal": "Finderで表示",
       "copyPath": "パスをコピー",
       "pathCopied": "パスをコピーしました",
-      "sectionLabel": "ページ",
-      "backHome": "スペースに戻る",
-      "dragHandle": "ドラッグして並べ替え",
       "renameUpdateLinks": "古いタイトルを参照するWikiリンクも更新する",
       "renameLinksDone": "{{count}}件のドキュメントのWikiリンクを更新しました"
     },
-    "board": {
-      "untitled": "無題のホワイトボード",
-      "titleLabel": "ホワイトボードのタイトル",
-      "loading": "ホワイトボードを読み込み中…",
-      "loadFailed": "ホワイトボードを開けませんでした",
-      "pendingImageDropped": "画像の取り込みが完了前で保存されませんでした。必要なら再度貼り付けてください。",
-      "hydratePartial": "一部のホワイトボード画像を読み込めませんでした",
-      "legacyImported": "ホワイトボードを新しい形式にアップグレードしました",
-      "legacyPartial": "ホワイトボードをアップグレードしました。サポート外の図形 {{count}} 件をスキップし、新形式では利用できません。",
-      "legacyUnsupported": "このホワイトボードには変換できない図形があります。編集すると空のボードが開き、保存時の確認後に旧ファイルを置き換えます。",
-      "legacyUpgradeFailed": "アップグレード後の保存に失敗しました。以前のファイルを保持しています。次回の保存で再試行します。",
-      "legacyReplaceTitle": "レガシーホワイトボードを置き換えますか？",
-      "legacyReplaceConfirm": "このボードは完全に変換できません。置き換えると旧ファイルは削除され、現在の（空または編集済みの）新形式ボードが残ります。",
-      "legacyReplaceAction": "置き換え",
-      "legacyWriteBlocked": "保存はブロックされています。レガシーボードの置き換えを確認してください。",
-      "panelTitle": "キャンバス",
-      "sectionStructure": "要素",
-      "sectionSelection": "選択",
-      "sectionSelectionIdle": "選択",
-      "sectionCanvas": "キャンバス",
-      "sectionBoard": "キャンバス",
-      "structureEmpty": "要素がありません — キャンバスに描画してください",
-      "selectionEmpty": "キャンバス上の図形を選択して編集",
-      "selectionCount": "{{count}} 件選択中",
-      "selectionCount_one": "{{count}} 件選択中",
-      "structureTruncated": "{{shown}} / {{total}} を表示",
-      "stats": "{{elements}} 要素 · {{images}} 画像",
-      "metaTitle": "タイトル",
-      "metaElements": "要素",
-      "metaImages": "画像",
-      "metaUpdated": "更新日時",
-      "locked": "ロック済み",
-      "styleFill": "塗り",
-      "styleStroke": "線",
-      "styleStrokeWidth": "線の太さ",
-      "styleFontSize": "フォントサイズ",
-      "styleText": "テキスト",
-      "styleMixed": "混在",
-      "elementType": {
-        "rect": "矩形",
-        "ellipse": "楕円",
-        "line": "直線",
-        "arrow": "矢印",
-        "text": "テキスト",
-        "image": "画像"
-      }
-    },
     "export": {
       "doc": "ドキュメントをエクスポート…",
-      "boardJson": "ホワイトボードをエクスポート（JSON）…",
-      "boardPng": "ホワイトボードをエクスポート（PNG）…",
-      "boardJsonDone": "ホワイトボード JSON をエクスポートしました",
-      "boardPngDone": "ホワイトボード PNG をエクスポートしました",
-      "spaceZip": "スペースをZIPでエクスポート…",
       "docDone": "ドキュメントをエクスポートしました",
       "htmlDone": "HTMLをエクスポートしました（ブラウザで開き、必要に応じて印刷→PDFを使用）",
-      "spaceDone": "スペースをエクスポートしました（アセット付きのポータブルレイアウト）"
-    },
-    "import": {
-      "folder": "フォルダをインポート…",
-      "done": "{{count}}件のドキュメントをインポートしました"
     },
     "asset": {
-      "attach": "画像またはPDFを添付",
       "loading": "画像を読み込み中…",
       "reveal": "Finderで表示",
-      "copyPath": "パスをコピー",
-      "pathCopied": "パスをコピーしました",
       "tooLargePaste": "画像が大きすぎて貼り付けできません。ファイルを保存して添付してください（最大25 MB）。",
       "tooLargeDisk": "ファイルが25 MBの添付制限を超えています。",
       "unsupported": "サポートされていないファイル形式です。PNG、JPEG、GIF、WebP、またはPDFを使用してください。",
       "importFailed": "ファイルを添付できませんでした",
-      "placeholder": "画像を表示できません",
       "preview": "画像プレビュー",
       "previewOpen": "画像を拡大表示"
-    },
-    "folder": {
-      "untitled": "新規フォルダ"
     },
     "toolbar": {
       "label": "Markdown書式",
@@ -2365,39 +2019,13 @@ export const ja = {
       "quote": "引用",
       "fence": "コードブロック"
     },
-    "bubble": {
-      "label": "書式",
-      "turnInto": "変換",
-      "paragraph": "本文",
-      "linkApply": "適用",
-      "linkRemove": "リンクを削除",
-      "linkHref": "URL",
-      "clearMarks": "書式をクリア",
-      "linkSearch": "ドキュメントを検索…"
-    },
-    "block": {
-      "grip": "ドラッグまたはブロックメニュー",
-      "delete": "削除",
-      "duplicate": "複製",
-      "insertAbove": "上に挿入",
-      "insertBelow": "下に挿入",
-      "turnInto": "変換"
-    },
-    "blockHandle": {
-      "add": "下にブロックを追加"
-    },
     "tableInfo": {
       "title": "テーブル情報",
       "rowsCols": "{{rows}} 行 · {{cols}} 列",
-      "column": "列",
       "width": "{{width}}px",
       "empty": "空のテーブル：下の「＋ 行を追加」から開始"
     },
     "table": {
-      "addRow": "行を追加",
-      "addCol": "列を追加",
-      "delRow": "行を削除",
-      "delCol": "列を削除",
       "untitled": "無題のテーブル",
       "loadFailed": "テーブルを開けませんでした",
 
@@ -2414,8 +2042,6 @@ export const ja = {
         title: "フィルター",
         addCondition: "条件を追加",
         clear: "クリア",
-        column: "列",
-        operator: "演算子",
         value: "値",
         opContains: "含む",
         opEquals: "等しい",
@@ -2425,7 +2051,6 @@ export const ja = {
       },
       columnMenu: {
 
-        rename: "名前を変更",
         type: "タイプ",
         insertLeft: "左に列を挿入",
         insertRight: "右に列を挿入",
@@ -2454,7 +2079,6 @@ export const ja = {
       grid: {
         addRow: "行を追加",
         addColumn: "列を追加",
-        emptyHint: "セルをダブルクリックして入力",
         firstCellHint: "ダブルクリックで入力",
       },
       edit: {
@@ -2463,10 +2087,8 @@ export const ja = {
       toolbar: {
         undo: "元に戻す",
         redo: "やり直す",
-        sort: "並べ替え",
         filter: "フィルター",
         stats: "統計",
-        importCsv: "CSV インポート",
         exportCsv: "CSV エクスポート",
         more: "その他",
         resetView: "表示をリセット",
@@ -2477,9 +2099,7 @@ export const ja = {
         "visibleRows": "表示中 {{n}}/{{total}} 行",
         "selectionCount": "{{n}} セルを選択中",
         rowsCols: "{{rows}} 行 · {{cols}} 列",
-        saved: "保存済み",
         saving: "保存中…",
-        ready: "準備完了",
       },
       toasts: {
         columnDeleted: "列を削除しました（元に戻せます）",
@@ -2489,10 +2109,6 @@ export const ja = {
         rowAddedFiltered: "行を追加しました（現在のフィルターで非表示の可能性があります）",
       },
       dragDisabledHint: "並べ替え・フィルター中はドラッグできません",
-    },
-    "image": {
-      "alt": "代替テキスト",
-      "delete": "削除"
     },
     "slash": {
       "listLabel": "ブロックを挿入",
@@ -2545,8 +2161,6 @@ export const ja = {
       "untitled": "無題の見出し",
       "noDoc": "ドキュメントを選択するとアウトラインが表示されます",
         "noBoard": "ホワイトボードにアウトラインはありません",
-      "count": "{{count}} 見出し",
-      "count_one": "{{count}} 見出し",
       "sectionOutline": "アウトライン",
       "loading": "読み込み中…",
     },
@@ -2560,7 +2174,6 @@ export const ja = {
     },
     "graph": {
       "title": "ナレッジグラフ",
-      "open": "グラフ",
       "neighborhood": "近傍",
       "full": "全グラフ",
       "fullConfirm": "このスペースには {{count}} 個のドキュメントがあります（上限 {{threshold}} 超過）。全グラフを表示しますか？",
@@ -2590,49 +2203,11 @@ export const ja = {
       "caution": "注意",
       "important": "重要"
     },
-    "props": {
-      "none": "ステータスなし",
-      "status": "ステータス",
-      "tags": "タグ",
-      "aliases": "エイリアス",
-      "priority": "優先度",
-      "priorityNone": "優先度なし",
-      "date": "日付",
-      "addTag": "タグを追加…",
-      "removeTag": "{{tag}}を削除",
-      "tagsMax": "最大{{count}}個のタグ",
-      "options": {
-        "draft": "下書き",
-        "active": "アクティブ",
-        "done": "完了",
-        "low": "低",
-        "medium": "中",
-        "high": "高"
-      }
-    },
-    "views": {
-      "docs": "ドキュメント",
-      "colTitle": "タイトル",
-      "empty": "このビューに一致するドキュメントはありません。",
-      "emptyCol": "(空)",
-      "layoutTable": "テーブル",
-      "layoutBoard": "ボード",
-      "defaultAll": "すべて",
-      "defaultBoard": "ボード"
-    },
     "doc": {
       "edit": "編集",
-      "source": "ソース",
-      "live": "ライブ",
-      "preview": "プレビュー",
-      "modeLabel": "ドキュメントモード",
       "titleLabel": "ドキュメントタイトル",
-      "done": "完了",
       "placeholder": "書き始めてください…",
       "placeholderSlash": "文字を入力、または / でコマンド",
-      "emptySlashHint": "「/」でコマンドを入力",
-      "viewSource": "ソースを表示",
-      "viewLive": "ビジュアル編集",
       "untitled": "無題",
       "metaUpdated": "更新 {{time}}",
       "metaCreated": "作成 {{time}}",
@@ -2641,14 +2216,10 @@ export const ja = {
       "saveFailed": "ドキュメントを保存できませんでした",
       "loadFailed": "ドキュメントを読み込めませんでした",
       "saving": "保存中…",
-      "saved": "保存しました",
       "liveLoading": "ライブエディタを読み込み中…",
-      "liveParseFailed": "ライブエディタでこのドキュメントを開けませんでした。ソースモードに切り替えました。",
       "compatView": "互換ビューに入りました：ドキュメントが大きいかライブ描画に失敗したため、プレーンテキストで編集します。内容は引き続き完全に編集可能です。",
       "compatViewClose": "了解",
-      "largeDocForceSource": "ドキュメントが大きすぎてライブ編集できません。ソースモードに切り替えました。",
       "saveRetry": "再試行",
-      "largeDocHint": "ドキュメントが大きいため、パフォーマンスのためにソースモードで編集します。全文の編集は可能です。",
       "findPlaceholder": "ドキュメント内を検索",
       "findPrev": "前へ",
       "findNext": "次へ",
@@ -2661,11 +2232,8 @@ export const ja = {
         "lineCol": "{{line}} 行, {{col}} 列",
         "fmTitle": "YAML フロントマターを含むドキュメント"
       },
-      "backlinkCount": "バックリンク {{count}} 件",
       "dialectLoss": "一部の特殊ブロックはライブ編集後に簡略化される場合があります",
       "dialectLossHint": "簡略化されました。ソースモードで原文を確認できます。",
-      "clearFormat": "書式をクリア",
-      "multiSelectHint": "Shift+クリックでブロックを複数選択",
       "copyBlockLink": "ブロックへのリンクをコピー",
       "multiSelectAdd": "選択に追加",
       "multiSelectClear": "選択から外す",
@@ -2694,8 +2262,6 @@ export const ja = {
       "brokenHint": "リンク切れ: 「{{title}}」 — クリックして作成",
       "openHint": "「{{title}}」を開く",
       "noMatches": "一致するドキュメントがありません",
-      "propertyStatus": "ステータス",
-      "propertyTags": "タグ"
     },
     "template": {
       "pickTitle": "テンプレートを選択",
@@ -2729,9 +2295,6 @@ export const ja = {
       "groupToday": "今日",
       "groupEarlier": "以前"
     },
-    "error": {
-      "generic": "問題が発生しました"
-    }
   },
   "common": {
     "clear": "クリア",
@@ -2739,9 +2302,6 @@ export const ja = {
     "close": "閉じる",
     "confirm": "OK",
     "back": "戻る",
-    "logout": "ログアウト",
-    "logoutConfirmTitle": "ログアウトしますか？",
-    "logoutConfirmDesc": "続行するには再度ログインする必要があります。"
   },
   "dialog": {
     "closeWindowTitle": "ウィンドウを閉じるとき",
@@ -2787,15 +2347,6 @@ export const ja = {
     "session": {
       "exportDebugBundle": "デバッグファイルをエクスポート"
     },
-    "copyFailed": "クリップボードにコピーできませんでした",
-    "sessionTab": {
-      "rename": "名前を変更…",
-      "copyId": "セッションIDをコピー",
-      "revealInHistory": "履歴で開く",
-      "deleteOthers": "その他を削除…",
-      "deleteToRight": "右側をすべて削除…",
-      "deleteAllOpen": "開いているすべてを削除…"
-    },
     "sessionHistory": {
       "open": "開く",
       "rename": "名前を変更…"
@@ -2806,15 +2357,9 @@ export const ja = {
       "label": "タイトル",
       "save": "保存"
     },
-    "confirmDeleteSessions": {
-      "title": "{{count}}件の会話を完全に削除しますか？",
-      "body": "開いている{{count}}件の会話が完全に削除されます。この操作は元に戻せません。",
-      "action": "完全に削除"
-    },
     "file": {
       "open": "開く",
       "copyPath": "パスをコピー",
-      "pathCopied": "パスをコピーしました",
       "copyRelativePath": "相対パスをコピー",
       "copyName": "名前をコピー",
       "openContainingFolder": "フォルダを開く",
@@ -2825,7 +2370,6 @@ export const ja = {
     },
     "diffFile": {
       "copyPath": "パスをコピー",
-      "pathCopied": "パスをコピーしました",
       "copyAbsolutePath": "絶対パスをコピー",
       "openInFiles": "ファイルで開く",
       "collapse": "折りたたむ",
@@ -2882,14 +2426,12 @@ export const ja = {
     },
     "termFs": {
       "copyPath": "パスをコピー",
-      "pathCopied": "パスをコピーしました",
       "copyName": "名前をコピー",
       "refresh": "更新",
       "openContainingFolder": "親フォルダを開く"
     },
     "filePreview": {
       "copyPath": "パスをコピー",
-      "pathCopied": "パスをコピーしました",
       "copyContent": "内容をコピー",
       "contentNotText": "内容がテキストではありません",
       "openContainingFolder": "親フォルダを開く",
@@ -2938,17 +2480,7 @@ export const ja = {
       "skills": "Skills",
       "favorites": "お気に入り",
       "recent": "最近",
-      "docs": "ドキュメント",
-      "recentDocs": "最近",
-      "count": "{{group}}（{{count}}）",
-      "knowledge": "ドキュメント"
     },
-    "navKnowledge": "ドキュメント",
-    "knowledgeHome": "ドキュメントホーム",
-    "knowledgeNewDoc": "新しいドキュメント",
-    "knowledgeNewBoard": "新しいホワイトボード",
-    "knowledgeIndexing": "検索インデックスを構築中…",
-    "knowledgeNeedSpace": "先にナレッジスペースを開いてください",
     "actions": {
       "newConversation": "新しい会話",
       "keyboardShortcuts": "キーボードショートカット",
@@ -2959,9 +2491,6 @@ export const ja = {
     "openTerminals": "端末管理を開く",
     "newLocalTerminal": "新しいローカル端末",
     "quickConnect": "クイック接続",
-    "openWorkItems": "ワークアイテムを開く",
-    "newWorkItem": "新規ワークアイテム",
-    "openAutomations": "オートメーションを開く",
     "settings": {
       "general": "設定：一般",
       "updates": "設定：アップデート確認",
@@ -2974,7 +2503,6 @@ export const ja = {
       "plugins": "設定：プラグインマーケット",
       "hooks": "設定：Hooks",
       "memory": "設定：メモリー",
-      "help": "設定：製品ヘルプ"
     },
     "context": {
       "diff": "ワークスペースの変更を表示",

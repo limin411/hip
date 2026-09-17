@@ -9,11 +9,7 @@
 export const zhTW = {
   translation: {
   "chat": {
-    "title": "對話",
     "loading": "載入中…",
-    "newChat": "新對話",
-    "newChatDesc": "開始一段新的對話…",
-    "sendMessage": "發送一條消息開始對話",
     "inputPlaceholder": "給 hip 發消息…（Enter 發送，Shift+Enter 換行）",
     "resizeInput": "拖曳調整輸入框高度",
     "goal": {
@@ -51,7 +47,6 @@ export const zhTW = {
       "listLabel": "檔案引用",
       "hint": "輸入以搜尋專案中的檔案",
       "noMatch": "沒有相符的檔案",
-      "noRoot": "請先開啟專案資料夾，才能用 @ 引用檔案",
       "loading": "搜尋中…",
       "dirSuffix": "資料夾",
       "typeNotAttachable": "「{{name}}」無法作為附件；路徑已保留為文字",
@@ -82,7 +77,6 @@ export const zhTW = {
       "incognitoOff": "已退出隱身"
     },
     "send": "傳送",
-    "user": "使用者",
     "you": "你",
     "togglePanel": "切換產物面板",
     "connectionConnected": "已連線",
@@ -102,14 +96,11 @@ export const zhTW = {
     "projectGuidanceLoaded": "專案說明 {{name}} 已注入智慧體上下文",
     "projectGuidanceHint": "這些規則會自動應用於當前資料夾。",
     "projectGuidanceLoading": "預覽載入中…",
-    "projectGuidanceShowPreview": "顯示預覽",
-    "projectGuidancePreviewFallback": "（預覽不可用）",
     "newConversationGreeting": "我們來做點什麼？",
     "codeGreeting": "我們來寫點什麼？",
     "codeNeedFolder": "選擇一個專案資料夾以開始編碼",
     "roundtable": {
       "chip": "圓桌會議",
-      "chipAria": "開關首則訊息的圓桌會議模式",
       "chipHint": "議題需要時，hip 主持多輪討論並拍板",
       "disabledHint": "使用技能或斜線命令時不可用",
       "modeSelect": "模式選擇",
@@ -117,7 +108,6 @@ export const zhTW = {
       "controlPermissionDesc": "操作整個本機（高危）",
       "controlPermission": "控制權限",
       "controlPermissionHint": "高危權限：開啟後智慧體可操作整個本機，不再限於當前資料夾",
-      "helper": "簡單問題仍以普通對話回答。複雜議題：顧問多輪交鋒；hip 決定討論回合數、給出階段性結論並拍板終案。",
       "badge": "圓桌",
       "metaRounds": "回合 {{ran}}/{{planned}}",
       "metaAdvisors": "顧問發言 {{count}} 次",
@@ -133,45 +123,8 @@ export const zhTW = {
         "done": "圓桌 · 已結束"
       }
     },
-    "greeting": {
-      "default": "我們來做點什麼？",
-      "wave": "你好呀！",
-      "swim": "遊啊遊",
-      "jump": "一躍而起！",
-      "puff": "鼓足幹勁！",
-      "dance": "跳起來！",
-      "happy": "好開心！",
-      "think": "讓我想想…",
-      "stretch": "伸個懶腰",
-      "splash": "嘩啦啦",
-      "point": "看那邊！",
-      "surprise": "哇！！",
-      "sleepy": "好睏…",
-      "angry": "生氣！",
-      "clap": "太棒了！",
-      "peekaboo": "躲貓貓",
-      "spin": "轉圈圈！",
-      "tumble": "翻滾吧！"
-    },
     "greetingSub": {
       "default": "一個會寫程式碼、能聊天的 AI 助手",
-      "wave": "有什麼我可以幫你的嗎",
-      "swim": "在程式碼的海洋裡自由穿梭",
-      "jump": "沒有什麼 bug 能攔住我",
-      "puff": "讓我鼓足幹勁開始工作",
-      "dance": "今天狀態超級好",
-      "happy": "今天運氣真好",
-      "think": "這個問題有意思",
-      "stretch": "準備好大幹一場",
-      "splash": "在水裡撲騰撲騰",
-      "point": "快看那邊",
-      "surprise": "嚇我一跳！",
-      "sleepy": "zzzZZZ…",
-      "angry": "bug 又出現了！",
-      "clap": "幹得漂亮！",
-      "peekaboo": "猜猜我在哪",
-      "spin": "360 度無死角",
-      "tumble": "體操選手上線"
     },
     "emptyGreeting": {
       "timeOfDay": {
@@ -302,7 +255,6 @@ export const zhTW = {
     "regenerate": "重新生成",
     "thinking": "思考中…",
     "retry": "重試",
-    "stopped": "已停止",
     "thinkingMode": "思考",
     "thoughtFor": "已思考 {{seconds}} 秒",
     "delegatedTo": "委派給 {{role}}",
@@ -315,14 +267,6 @@ export const zhTW = {
     "jumpToLatest": "回到最新",
     "loadEarlier": "載入更早訊息",
     "plan": {
-      "chipLabel": "規劃",
-      "chipTitle": "強制規劃模式 — 先調研並獲批後再改程式碼",
-      "whenToUse": "適合有實作歧義的任務（架構選型、多檔案重構）。不適合純分析、錯別字或路徑明確的小改動。",
-      "busyTitle": "回合進行中，暫不能切換規劃模式",
-      "forceOnTitle": "已開啟規劃模式",
-      "forceOnBody": "後續回合會先規劃。直接傳送任務，或使用 /plan 你的任務。",
-      "forceOffTitle": "已關閉規劃模式",
-      "forceOffBody": "回合不再強制先規劃。",
       "respondFailedTitle": "計劃響應失敗",
       "respondFailedBody": "無法套用計劃響應（{{reason}}）。已恢復審批狀態。"
     },
@@ -398,17 +342,6 @@ export const zhTW = {
         "default": "使用服務商預設"
       }
     },
-    "style": "風格",
-    "styleNone": "無",
-    "styleCustom": "自定義",
-    "styleHint": "本對話的附加指令",
-    "styleManage": "管理風格…",
-    "styleDialogTitle": "對話風格",
-    "styleName": "名稱",
-    "styleInstructions": "指令",
-    "styleNew": "新建風格",
-    "styleDelete": "刪除風格",
-    "styleEmpty": "還沒有儲存的風格，請在下方新建。",
     "agentRestarted": "外部智慧體已重啟 —— 之前的上下文未保留。",
     "acpCliff": {
       "title": "外部智慧體模式",
@@ -502,8 +435,6 @@ export const zhTW = {
       "step2CodeBody": "Code 工作階段需要專案目錄，以便工具讀寫檔案。",
       "step3Title": "傳送第一則訊息",
       "step3Body": "按 Enter 開始。可隨時切換模型與權限。",
-      "folderTitle": "選擇專案資料夾",
-      "folderSubtitle": "Code 工作階段需要專案目錄，以便工具讀寫檔案。",
       "folderCta": "選擇資料夾"
     },
     "activity": {
@@ -586,17 +517,13 @@ export const zhTW = {
     "runtimeStop": "停止",
     "outline": "對話目錄",
     "outlineEmpty": "你發出的訊息會按目錄列在這裡，點選可跳轉",
-    "outlineCount": "{{count}} 條",
-    "outlineCount_one": "{{count}} 條",
     "sources": "搜尋來源",
     "sourcesEmpty": "尚無網路搜尋來源",
     "sourcesEmptyHint": "智慧體用內建或 MCP 工具做網頁搜尋/抓取後，連結會出現在這裡",
     "sourcesCount": "{{count}} 個來源",
-    "sourcesCount_one": "{{count}} 個來源",
     "sourcesQuery": "「{{query}}」",
     "terminal": "終端",
     "closePanel": "關閉面板",
-    "moreTabs": "更多分頁",
     "noArtifacts": "智慧體生成的文件與圖片會顯示在這裡",
     "copyArtifact": "複製",
     "downloadArtifact": "下載",
@@ -617,12 +544,7 @@ export const zhTW = {
       "noCwdDesc": "請先在\"檔案\"頁繫結專案資料夾",
       "clean": "工作區乾淨",
       "cleanDesc": "未提交的改動將顯示在這裡",
-      "error": "無法讀取改動",
-      "retry": "重試",
-      "changedFiles": "{{count}} 個檔案有改動",
-      "changedFiles_one": "{{count}} 個檔案有改動",
       "moreFiles": "還有 {{count}} 個檔案未顯示——請收窄改動範圍，或在終端用 git 檢視全部",
-      "moreFiles_one": "還有 {{count}} 個檔案未顯示——請收窄改動範圍，或在終端用 git 檢視全部",
       "binary": "二進位制檔案已改動",
       "statusAdded": "新增",
       "statusModified": "修改",
@@ -664,16 +586,11 @@ export const zhTW = {
       "switchCheckedOut": "該分支已在另一個工作區檢出：{{path}}"
     },
     "changesView": {
-      "uncommitted": "未提交的改動",
-      "commitLog": "提交記錄",
-      "noCommits": "暫無提交",
-      "commitLogError": "無法讀取提交記錄",
       "toolbarMenu": "更改工具列選單",
       "recentCommits": "最近提交",
       "collapseAll": "全部摺疊",
       "expandAll": "全部展開",
       "refresh": "重新整理",
-      "resizeCommits": "調整提交清單高度",
       "baseLabel": "對比基線",
       "noSessionStart": "尚無工作階段起點快照",
       "ignoreWhitespace": "忽略空白",
@@ -694,8 +611,6 @@ export const zhTW = {
       "explainInjected": "解釋請求已填入輸入框",
       "groupByStatus": "按狀態分組",
       "panelTooNarrow": "面板過窄，無法並排顯示",
-      "backToUncommitted": "返回未提交",
-      "commitDiffError": "無法載入提交改動",
       "discardSuccess": "已將 {{path}} 恢復到 HEAD（副本已放入資源回收筒）",
       "discardFailed": "丟棄 {{path}} 失敗：{{error}}",
       "review": "審查",
@@ -746,14 +661,11 @@ export const zhTW = {
       "worker": "工作員",
       "subagent": "子智慧體"
     },
-    "toolsCount": "{{count}} 次工具呼叫",
-    "delegatedBy": "委派自",
     "arguments": "引數",
     "output": "輸出",
     "failed": "失敗",
     "truncated": "已截斷",
     "noTools": "暫無工具呼叫",
-    "tokens": "{{count}} tok",
     "selectFolder": "選擇專案資料夾",
     "selectFolderDesc": "選擇一個資料夾，供智慧體讀寫，並在此瀏覽",
     "terminalView": {
@@ -798,7 +710,6 @@ export const zhTW = {
     "sandboxPending": "傳送第一條訊息後將建立沙箱工作區",
     "needsSessionScope": "需要會話作用域才能預覽",
     "turnOutputs": "本輪產物 ({{count}})",
-    "turnOutputs_one": "本輪產物 ({{count}})"
   },
 
   "settings": {
@@ -878,7 +789,6 @@ export const zhTW = {
     "trashRetention": "回收站保留天數",
     "trashRetentionDesc": "移入回收站的會話將在此天數後自動永久刪除（1–365）。",
     "trashRetentionUnit": "天",
-    "windowSection": "視窗與背景",
     "closeAction": "關閉視窗時",
     "closeActionDesc": "隱藏到系統匣後 agent、終端與 sidecar 會繼續執行。真正退出請使用系統匣選單或「結束 hip」。",
     "closeActions": {
@@ -888,7 +798,6 @@ export const zhTW = {
     },
     "trayEnabled": "系統匣圖示",
     "trayEnabledDesc": "透過系統匣圖示還原視窗或結束。開啟時會將「關閉視窗時」設為「隱藏到系統匣」；選擇隱藏/每次詢問時也會自動開啟系統匣。",
-    "closeActionsAskNote": "每次關閉視窗時詢問。",
     "launchAtLogin": "開機時啟動 hip",
     "launchAtLoginDesc": "登入系統時啟動 hip。從登入項目啟動時預設隱藏到系統匣。",
     "notifyOnAgentComplete": "任務完成時通知",
@@ -955,7 +864,6 @@ export const zhTW = {
       "kinds": {
         "message": "訊息",
         "codeBlock": "程式碼塊",
-        "sessionTab": "會話標籤",
         "sessionHistory": "歷史記錄",
         "fileEntry": "檔案樹",
         "filePreview": "檔案預覽",
@@ -979,14 +887,6 @@ export const zhTW = {
         "trashEntry": "回收站"
       }
     },
-    "apiKey": "DeepSeek API Key",
-    "apiKeyDesc": "本地儲存於此裝置，供智慧體執行時使用。",
-    "apiKeyConfigured": "已配置",
-    "apiKeyNotConfigured": "未配置",
-    "apiKeyPlaceholder": "sk-...",
-    "apiKeySave": "儲存",
-    "apiKeyClear": "清除",
-    "apiKeyError": "更新 API Key 失敗，請重試。",
     "model": "模型配置",
     "modelConfig": {
       "currentModel": "當前模型",
@@ -1115,7 +1015,6 @@ export const zhTW = {
       "delete": "刪除",
       "cancel": "取消",
       "save": "儲存",
-      "menuMore": "更多",
       "error": "操作失敗,請重試。",
       "deleteConfirmTitle": "刪除「{{name}}」?",
       "deleteConfirmBody": "這會移除該 MCP 配置。之後可以重新新增。",
@@ -1123,7 +1022,6 @@ export const zhTW = {
       "statusConnecting": "連線中…",
       "statusDisconnected": "未連線",
       "statusError": "錯誤",
-      "toolCountLabel": "{{count}} 個工具",
       "reconnect": "重新連線",
       "pluginSectionTitle": "外掛 MCPs",
       "pluginSectionHint": "由已安裝外掛提供。此處不可編輯或刪除；要移除請在「外掛市場」解除安裝整個外掛。在市場中禁用外掛會同步關閉其 MCP。",
@@ -1138,10 +1036,6 @@ export const zhTW = {
       "toolDisableAll": "全不選",
       "toolNoMatch": "無匹配工具",
       "noToolsDiscovered": "尚未發現工具。請先儲存並啟用該伺服器。",
-      "statEnabled": "已啟用",
-      "statConnected": "已連線",
-      "statErrors": "錯誤",
-      "statTools": "可用工具",
       "myServersTitle": "我的伺服器",
       "toolSingular": "個工具",
       "toolPlural": "個工具",
@@ -1208,13 +1102,6 @@ export const zhTW = {
     "hooksLabel": "Hooks",
     "memoryLabel": "記憶",
     "productHelp": {
-      "navLabel": "說明",
-      "title": "產品說明",
-      "intro": "hip 如何運作：介面、設定、記憶、技能與本機資料。與智能體 use_skill(\"hip\") 使用同一套文件。",
-      "version": "版本 {{version}}",
-      "docsRev": "文件修訂 {{rev}}",
-      "sectionsLabel": "說明主題",
-      "sourceNote": "來源：packages/product-content/（英文 agent skill）與 locales/zh-CN|zh-TW|ja|ko。說明頁跟隨介面語言。",
       "sections": {
         "overview": "概覽",
         "memory": "記憶",
@@ -1369,7 +1256,6 @@ export const zhTW = {
     "skill": {
       "title": "Skills",
       "intro": "Claude 格式的技能（SKILL.md 資料夾）。hip 會按需載入已啟用的技能。請透過資料目錄新增技能。",
-      "upload": "上傳技能（.zip）",
       "empty": "尚未安裝任何技能。",
       "emptyHint": "將技能資料夾放到 ~/.hip/skills/（或你配置的資料目錄）中。",
       "hasScripts": "含指令碼",
@@ -1382,7 +1268,6 @@ export const zhTW = {
       "deleteConfirmTitle": "刪除技能「{{name}}」？",
       "deleteConfirmBody": "將從磁碟移除該技能資料夾，此操作不可撤銷。",
       "cancel": "取消",
-      "installError": "安裝失敗。請確認 .zip 內含 SKILL.md。",
       "loadError": "無法讀取該技能檔案。",
       "pluginSkills": "外掛技能",
       "pluginSkillsHint": "由已安裝外掛提供。可在此開關啟用；刪除只能透過在「外掛市場」解除安裝整個外掛。外掛在市場中禁用時，其全部技能一併關閉。",
@@ -1395,8 +1280,6 @@ export const zhTW = {
     "agents": {
       "title": "智慧體管理",
       "intro": "接入外部智慧體",
-      "add": "新增智慧體",
-      "empty": "暫無外部智慧體。",
       "name": "名稱",
       "command": "命令",
       "args": "引數（空格分隔）",
@@ -1465,21 +1348,10 @@ export const zhTW = {
     "plugins": {
       "title": "外掛市場",
       "intro": "展示 ~/.hip/plugins 下已安裝的外掛。能力由 .plugin/plugin.json 決定（可選 PLUGIN.md 補充市場資訊）。請將外掛包放入該目錄完成安裝，應用內不提供安裝入口。",
-      "install": "安裝外掛",
-      "urlLabel": "Git 倉庫地址",
-      "urlPlaceholder": "https://github.com/owner/repo.git",
       "cancel": "取消",
       "componentCounts": "{{skills}} 個 Skills · {{mcpServers}} 個 MCPs · {{agents}} 個智慧體 · {{hooks}} 個 Hooks",
-      "statusCloning": "正在克隆",
-      "statusScanning": "正在掃描",
-      "statusGeneratingManifest": "正在生成清單",
-      "statusRegistering": "正在註冊",
-      "statusDone": "完成",
-      "statusError": "錯誤",
       "installError": "安裝失敗，請檢查 Git 地址或網路連線。",
-      "installSuccess": "外掛安裝成功。",
       "deleteError": "解除安裝失敗，外掛可能仍在使用中。",
-      "retry": "重試",
       "empty": "尚未安裝外掛",
       "emptyHint": "將含 .plugin/plugin.json 的包放到 ~/.hip/plugins/（或在 hip-plugins.json 中註冊路徑）。",
       "deleteConfirmTitle": "解除安裝外掛「{{name}}」？",
@@ -1547,33 +1419,13 @@ export const zhTW = {
     },
     "hooks": {
       "title": "Hooks",
-      "intro": "檢視外掛宣告的生命週期掛鉤與可掛接事件。本頁只讀，修改請編輯本地配置檔案。",
       "introShort": "只讀概覽：展示外掛宣告的生命週期事件（靜態掃描，非當前會話探針）。工具類掛鉤生效於主迴圈、task 子智慧體與工作流 agent 節點；不含 gate 與外部 ACP 會話。展開行檢視來源與路徑說明；修改請編輯外掛 hooks 檔案。",
       "pluginManagedHint": "外掛掛鉤無法在此刪除。要移除請在「外掛市場」解除安裝整個外掛。",
-      "editHint": "掛鉤透過外掛清單（plugin.json 的 hooks 欄位）宣告，handler 寫在外掛目錄下的 CJS 模組中。安裝或更新外掛後，在此重新整理可見。",
-      "loading": "正在載入…",
-      "configuredTitle": "已宣告的掛鉤",
-      "configuredDesc": "當前已安裝外掛中宣告瞭掛鉤的來源；列表中高亮的事件來自對這些檔案的靜態掃描（非當前會話 live 登錄檔）。",
       "configuredSummary": "{{sources}} 個外掛 · {{count}} 條",
       "eventsOn": "{{count}} 個事件已宣告",
-      "configuredEmpty": "尚未宣告任何掛鉤",
       "configuredEmptyHint": "尚未宣告掛鉤。在外掛中宣告 hooks 後會出現在列表中。",
-      "sourcePlugin": "外掛",
       "hookCount": "{{count}} 個掛鉤",
-      "catalogTitle": "生命週期掛鉤事件",
-      "catalogDesc": "下列事件可在外掛 hooks 模組中註冊 handler。",
-      "howToTitle": "如何配置",
-      "howToStep1": "在外掛目錄的 .plugin/plugin.json 中設定 \"hooks\": \"./hooks.cjs\"（路徑相對外掛根目錄）。",
-      "howToStep2": "在對應 CJS 模組中匯出陣列：每項含 event、可選 matcher、以及 async handler。",
-      "howToStep3": "重新安裝或重新整理外掛後重啟會話，掛鉤會在 sidecar 中註冊；本頁只展示宣告計數與掃描到的事件名。",
       "diagram": {
-        "title": "生命週期事件",
-        "subtitle": "掛鉤按會話 → 輪次 → 工具呼叫 → 收尾的順序觸發；高亮表示已在外掛中宣告（靜態掃描）。",
-        "subtitleFishbone": "按生命週期階段列表展示。高亮 = 外掛宣告。展開行檢視來源與路徑說明。",
-        "clickHint": "點選行展開",
-        "ariaLabel": "掛鉤生命週期列表，其中 {{count}} 個事件已宣告",
-        "legendConfigured": "已宣告",
-        "legendAvailable": "未宣告",
         "configuredBadge": "已宣告",
         "notConfigured": "未宣告",
         "scanHint": "高亮 = 靜態掃描",
@@ -1582,9 +1434,6 @@ export const zhTW = {
         "pathWorkflow": "工作流 agent",
         "pathExcluded": "不含 gate / 外部 ACP",
         "pathWorkflowNote": "工作流回合事件按整次 run 觸發，非每個 agent 節點。",
-        "collapse": "收起",
-        "expandSources": "{{count}} 個外掛來源",
-        "expandEmpty": "暫無外掛宣告",
         "expandEmptyHint": "未有外掛宣告此事件。",
         "expandScanDisclaimer": "下列外掛透過靜態掃描宣告瞭此事件；是否在本會話註冊取決於外掛載入與會話型別。",
         "phaseSession": "會話",
@@ -1592,11 +1441,6 @@ export const zhTW = {
         "phaseTurnEnd": "輪次收尾",
         "phaseActivity": "Activity（並行）",
         "toolLoop": "工具呼叫環（可多次）",
-        "toolRuns": "↓ 工具實際執行 ↓",
-        "successPath": "成功",
-        "failurePath": "失敗",
-        "toolLoopHint": "模型每呼叫一個工具都會走一遍此環",
-        "activityHint": "目標 / Activity 預算相關掛鉤，與主輪次並行觸發"
       },
       "events": {
         "SessionStart": "會話首條聊天訊息時觸發（當前實現為通知級）。",
@@ -1688,11 +1532,6 @@ export const zhTW = {
     "memoryTrashNote": "長期記憶回收站在 設定 → 記憶（預設 30 天，獨立策略）。",
     "openMemorySettings": "開啟記憶設定"
   },
-  "account": {
-    "menu": "賬戶選單",
-    "userLabel": "賬戶",
-    "statusLocal": "本地 · 已登入"
-  },
   "mainToolbar": {
     "newConversation": "新對話",
     "aria": "工作階段工具列"
@@ -1704,30 +1543,11 @@ export const zhTW = {
     "restore": "還原",
     "close": "關閉"
   },
-  "login": {
-    "slogan": "沒有人比我更懂摸魚",
-    "tagline2": "智能體，始終在你這邊",
-    "tagline3": "交付真實工作，而不只是對話",
-    "brandLabel": "hip 工作台",
-    "brandLine1": "沉迷賺錢",
-    "brandLine2": "上班摸魚",
-    "brandHeadline": "沉迷賺錢，上班摸魚",
-    "sticker1": "✦ 開搞",
-    "sticker2": "本地優先",
-    "sticker3": "摸魚合法",
-    "title": "登錄到 hip",
-    "subtitle": "選擇一種方式繼續",
-    "email": "使用郵箱登錄",
-    "github": "使用 GitHub 登錄",
-    "google": "使用 Google 登錄",
-    "skip": "跳過登錄"
-  },
   "nav": {
     "chat": "辦公",
     "code": "編碼",
     "trash": "回收站",
     "history": "歷史會話",
-    "automation": "自動化",
     "settings": "設定"
   },
   "placeholder": {
@@ -1737,7 +1557,6 @@ export const zhTW = {
     "automation": "自動化即將上線，用於設定工作流與定時任務。"
   },
   "terminals": {
-    "title": "終端管理",
     "newLocal": "本機終端",
     "newLocalFolder": "開啟資料夾…",
     "newRemote": "新建連線",
@@ -1748,17 +1567,13 @@ export const zhTW = {
     "expandGroup": "展開分組",
     "collapseGroup": "收起分組",
     "deleteGroup": "刪除分組",
-    "emptyTitle": "還沒有開啟的終端",
     "emptyHint": "在此開啟獨立本機 shell，不綁定對話或編碼會話。",
-    "selectOrNew": "選擇終端",
-    "selectOrNewHint": "在側邊欄選擇一個活動終端，或新建本機終端。",
     "sidebarEmpty": "暫無活動終端",
     "quickConnectEmpty": "暫無最近連線",
     "close": "關閉",
     "connecting": "正在連線…",
     "cwdMissing": "目錄不存在",
     "hostMissing": "主機已不存在",
-    "sshComingSoon": "SSH 即將就緒",
     "sessionMissing": "終端不存在",
     "noCwd": "無工作目錄",
     "kindLocal": "本機",
@@ -1788,16 +1603,11 @@ export const zhTW = {
       "execTitle": "在 SSH 終端中執行",
       "execHint": "指令會輸入到你可見的共享終端。",
       "execTimedOut": "指令可能仍在執行",
-      "execPartial": "已擷取部分輸出，請先確認再繼續",
-      "execRejected": "指令已遭拒絕，未寫入終端。",
       "execError": "指令執行失敗",
-      "execAborted": "等待已中止",
-      "userInterleaved": "指令執行期間你輸入了內容，結果可能混雜。",
       "handedOff": "已交還 · 等待你操作",
       "handoffBanner": "你正在輸入 — 完成後點「交還」讓助手繼續",
       "handoffCta": "交還",
       "queuedMsgs": "{{count}} 條訊息排隊 — 指令結束後自動發送",
-      "queuedMsgs_plural": "{{count}} 條訊息排隊 — 指令結束後自動發送",
       "confirmHighRisk": "高危",
       "confirmOverwrite": "覆蓋",
       "confirmTitle": "執行此指令？",
@@ -1814,11 +1624,7 @@ export const zhTW = {
       "sessionsGroup": "{{title}} 的智能體對話",
       "deleteTitle": "刪除智能體對話？",
       "deleteBody": "將刪除該對話。SSH 終端保持開啟。",
-      "contextChanged": "終端狀態可能自上次訊息以來發生變化",
       "permissionTitle": "指令審批",
-      "approve": "核准",
-      "reject": "拒絕",
-      "connectFirst": "請先連接"
     },
     "softCap": "開啟的終端過多（最多 8 個，含程式碼面板終端）。請先關閉一個。",
         "emptyLibrary": "還沒有儲存的連線",
@@ -1858,7 +1664,6 @@ export const zhTW = {
     },
     "sftp": {
       "panelTitle": "檔案",
-      "comingSoon": "SFTP 即將就緒",
       "loading": "載入中…",
       "loadError": "無法列出遠端檔案",
       "sessionClosed": "SSH 工作階段已關閉。請重新連線後再瀏覽檔案。",
@@ -1880,10 +1685,7 @@ export const zhTW = {
     },
     "navigation": {
       "up": "返回上一層目錄",
-      "back": "後退",
-      "forward": "前進",
       "pathInput": "切換路徑輸入框",
-      "root": "返回根目錄"
     },
     "breadcrumb": {
       "root": "根目錄",
@@ -1951,7 +1753,6 @@ export const zhTW = {
   },
   "workItems": {
     "title": "事項",
-    "inbox": "收集箱",
     "untitled": "未命名事項",
     "searchPlaceholder": "搜尋事項…",
     "newItem": "新增事項",
@@ -1962,11 +1763,6 @@ export const zhTW = {
     "emptySearchHint": "清除搜尋即可恢復列表，或嘗試其他關鍵詞。",
     "clearSearch": "清除搜尋",
     "showAll": "顯示全部",
-    "viewTodo": "檢視待處理",
-    "detailEmpty": "選擇一條事項",
-    "detailEmptyHint": "從列表中選擇，或新增一條。",
-    "backToList": "返回列表",
-    "listFilter": "清單",
     "loading": "載入中…",
     "filtersAria": "智慧篩選",
     "filters": {
@@ -1995,10 +1791,8 @@ export const zhTW = {
       "priority": "優先級",
       "startOn": "開始時間",
       "endOn": "結束時間",
-      "list": "清單",
       "tags": "標籤",
       "tagsPlaceholder": "新增標籤…",
-      "removeTag": "移除標籤 {{tag}}",
       "notes": "備註",
       "notesPlaceholder": "備註…"
     },
@@ -2009,9 +1803,6 @@ export const zhTW = {
       "archive": "封存",
       "unarchive": "取消封存",
       "delete": "刪除"
-    },
-    "help": {
-      "cancelVsArchive": "取消表示決定不做了（可在「全部」中找回）。封存會從日常列表隱藏（可在「已封存」中找回）。"
     },
     "deleteConfirm": "將此事項移入回收站？可在回收站中恢復。",
     "modal": {
@@ -2046,14 +1837,6 @@ export const zhTW = {
       "recolor": "狀態顏色",
       "recolorAria": "變更{{status}}顏色"
     },
-    "listsSection": "清單",
-    "listsHeading": "清單",
-    "smartFilters": "智慧篩選",
-    "newList": "新建清單",
-    "newListPrompt": "清單名稱",
-    "renameListPrompt": "重新命名清單",
-    "deleteListConfirm": "刪除清單「{{name}}」？其中事項將移至收集箱。",
-    "listRowHint": "{{name}} · 雙擊重新命名 · 右鍵刪除"
   },
   "automation": {
     "skipReasons": {
@@ -2079,13 +1862,6 @@ export const zhTW = {
       "nameDuplicate": "已存在同名自動化「{{name}}」",
     },
     },
-  "tabs": {
-    "closeTab": "關閉標籤頁",
-    "newSession": "新增工作階段",
-    "tabList": "開啟的工作階段",
-    "knowledge": "文件管理",
-    "closeKnowledge": "關閉文件管理"
-  },
   "sidebar": {
     "aria": "導航與歷史會話",
     "navAria": "主導航",
@@ -2115,13 +1891,7 @@ export const zhTW = {
       "projects": "專案會話",
       "chats": "對話歷史",
       "terminals": "終端管理",
-      "workItems": "事項",
-      "automations": "自動化"
     },
-    "automationsHint": "在主面板中啟用任務後，會顯示在此處。",
-    "automationsDisabledHint": "有 {{count}} 個已停用任務，可在主面板管理。",
-    "automationsDisabledLink": "{{count}} 個已停用 — 在主面板查看",
-    "viewAllAutomations": "在主面板查看全部",
     "quickConnect": "快捷連線",
     "badge": {
       "chat": "對話",
@@ -2130,18 +1900,12 @@ export const zhTW = {
     "status": {
       "running": "執行中"
     },
-    "viewAll": "檢視全部",
     "newSpace": "新建…",
     "newTask": "新增任務",
-    "newWorkItem": "新建事項",
-    "newAutomation": "新建自動化",
-    "newProject": "新增專案會話",
     "newChat": "新增對話",
     "newTerminal": "新建終端",
     "emptySearch": "無符合項目",
     "emptySessions": "尚無會話",
-    "emptySpaces": "尚無文件，新建一個資料夾或文件",
-    "emptyAutomations": "尚無已啟用的自動化",
     "projectGroup": {
       "unbound": "未綁定專案路徑",
       "missingBadge": "不可用",
@@ -2159,13 +1923,7 @@ export const zhTW = {
       "collapse": "收起 {{name}}"
     }
   },
-  "dropdown": {
-    "newChat": "新增辦公對話",
-    "newCode": "新增編碼任務",
-    "newKnowledge": "新建文件"
-  },
   "knowledge": {
-    "title": "文件管理",
     "browse": {
       "multiSelectCount": "已選 {{count}} 篇",
       "multiSelectDelete": "刪除",
@@ -2180,47 +1938,14 @@ export const zhTW = {
       "emptyTitle": "此資料夾為空",
       "emptyDesc": "建立一篇文件，開始記錄。",
       "folderKind": "資料夾",
-      "docKind": "文件",
-      "name": "名稱",
-      "kind": "類型",
-      "modified": "修改時間"
-    },
-    "empty": {
-      "selectTitle": "選擇資料夾或文件",
-      "selectHint": "在左側邊欄選擇資料夾或文件，或新建一個。"
     },
     "home": {
-      "subtitle": "本地優先 · 目錄樹 + Markdown",
-      "searchPlaceholder": "搜尋標題、正文、標籤與路徑…",
       "mySpaces": "全部文件",
-      "recent": "最近開啟",
-      "docCount_one": "{{count}} 篇",
-      "docCount_other": "{{count}} 篇",
-      "docCount": "{{count}} 篇",
-      "docCountPending": "…",
-      "emptyTitle": "尚無文件",
-      "emptyHint": "新建一個資料夾或文件，開始整理。",
-      "createSpace": "新建資料夾",
-      "searchResults": "搜尋結果",
-      "searchEmpty": "沒有符合的文件。",
-      "searchIndexing": "正在建立搜尋索引…",
-      "searchIndexingProgress": "正在建立搜尋索引… {{done}}/{{total}}",
-      "searchIndexingProgressSpace": "正在建立搜尋索引… {{done}}/{{total}} · {{space}}",
-      "filterTags": "標籤",
-      "filterStatus": "狀態",
-      "filterClear": "清除篩選"
     },
     "space": {
-      "nameLabel": "名稱",
-      "namePlaceholder": "例如：產品文件",
       "nameEmpty": "請輸入名稱",
       "nameDuplicate": "已存在同名「{{name}}」",
-      "deleteTitle": "刪除「{{name}}」？",
-      "deleteBody": "將永久刪除此空間及其全部文件，此操作無法復原。",
       "menu": "空間選單",
-      "iconLabel": "圖示",
-      "iconNone": "無圖示",
-      "iconCustomPlaceholder": "輸入或貼上 emoji…"
     },
           "blockRef": {
         "linkCopied": "區塊連結已複製",
@@ -2254,7 +1979,6 @@ export const zhTW = {
 "tree": {
       "newDoc": "文件",
       "newTable": "表格",
-      "newBoard": "畫板",
       "newFolder": "資料夾",
       "rename": "重新命名",
       "delete": "刪除",
@@ -2263,96 +1987,27 @@ export const zhTW = {
       "deleteDocBody": "將永久刪除此文件，此操作無法復原。",
       "deleteBoardBody": "將永久刪除此畫板，此操作無法復原。",
       "deleteFolderBody": "將永久刪除此資料夾及其全部內容，此操作無法復原。",
-      "empty": "新增文件、畫板或資料夾以開始",
       "filterPlaceholder": "過濾目錄…",
-      "filterEmpty": "無符合項目",
       "reveal": "在 Finder 中顯示",
       "copyPath": "複製路徑",
       "pathCopied": "路徑已複製",
-      "sectionLabel": "頁面",
-      "backHome": "返回空間列表",
-      "dragHandle": "拖曳以排序",
       "renameUpdateLinks": "同時更新指向舊標題的 wiki 連結",
       "renameLinksDone": "已在 {{count}} 篇文件中更新 wiki 連結"
     },
-    "board": {
-      "untitled": "未命名畫板",
-      "titleLabel": "畫板標題",
-      "loading": "正在載入畫板…",
-      "loadFailed": "無法開啟畫板",
-      "pendingImageDropped": "有圖片仍在匯入，未儲存。如需請重新貼上。",
-      "hydratePartial": "部分畫板圖片無法載入",
-      "legacyImported": "畫板已升級為新格式",
-      "legacyPartial": "畫板已升級。已跳過 {{count}} 個不支援的圖形，新格式中不可用。",
-      "legacyUnsupported": "此畫板包含無法轉換的圖形。編輯會開啟空白畫板；儲存時確認後才會取代舊檔案。",
-      "legacyUpgradeFailed": "升級後的畫板未能儲存，已保留舊檔案。下次儲存時將重試。",
-      "legacyReplaceTitle": "取代舊畫板？",
-      "legacyReplaceConfirm": "此畫板無法完整轉換。取代將刪除舊檔案，並保留目前（空白或已編輯）的新格式畫板。",
-      "legacyReplaceAction": "取代",
-      "legacyWriteBlocked": "儲存已阻止，請先確認取代舊畫板。",
-      "panelTitle": "畫布",
-      "sectionStructure": "元素",
-      "sectionSelection": "選取",
-      "sectionSelectionIdle": "選取",
-      "sectionCanvas": "畫布",
-      "sectionBoard": "畫布",
-      "structureEmpty": "尚無元素 — 在畫布上繪製",
-      "selectionEmpty": "在畫布上選取圖形以編輯",
-      "selectionCount": "已選 {{count}} 個",
-      "selectionCount_one": "已選 {{count}} 個",
-      "structureTruncated": "顯示 {{shown}} / {{total}}",
-      "stats": "{{elements}} 個元素 · {{images}} 張圖片",
-      "metaTitle": "標題",
-      "metaElements": "元素",
-      "metaImages": "圖片",
-      "metaUpdated": "更新時間",
-      "locked": "已鎖定",
-      "styleFill": "填色",
-      "styleStroke": "描邊",
-      "styleStrokeWidth": "描邊寬度",
-      "styleFontSize": "字級",
-      "styleText": "文字",
-      "styleMixed": "混合",
-      "elementType": {
-        "rect": "矩形",
-        "ellipse": "橢圓",
-        "line": "直線",
-        "arrow": "箭頭",
-        "text": "文字",
-        "image": "圖片"
-      }
-    },
     "export": {
       "doc": "匯出文件…",
-      "boardJson": "匯出畫板（JSON）…",
-      "boardPng": "匯出畫板（PNG）…",
-      "boardJsonDone": "畫板已匯出",
-      "boardPngDone": "畫板 PNG 已匯出",
-      "spaceZip": "匯出空間為 ZIP…",
       "docDone": "文件已匯出",
       "htmlDone": "已匯出 HTML（可用瀏覽器開啟；列印 → PDF）",
-      "spaceDone": "空間已匯出（可攜佈局，含附件）"
-    },
-    "import": {
-      "folder": "匯入資料夾…",
-      "done": "已匯入 {{count}} 篇文件"
     },
     "asset": {
-      "attach": "插入圖片或 PDF",
       "loading": "圖片載入中…",
       "reveal": "在 Finder 中顯示",
-      "copyPath": "複製路徑",
-      "pathCopied": "路徑已複製",
       "tooLargePaste": "圖片過大，無法貼上；請先存成檔案再用「插入」（最大 25 MB）。",
       "tooLargeDisk": "檔案超過 25 MB 附件上限。",
       "unsupported": "不支援的檔案類型。請使用 PNG、JPEG、GIF、WebP 或 PDF。",
       "importFailed": "無法新增附件",
-      "placeholder": "圖片不可用",
       "preview": "圖片預覽",
       "previewOpen": "放大檢視圖片"
-    },
-    "folder": {
-      "untitled": "新增資料夾"
     },
     "toolbar": {
       "label": "Markdown 格式",
@@ -2369,39 +2024,13 @@ export const zhTW = {
       "quote": "引用",
       "fence": "程式碼區塊"
     },
-    "bubble": {
-      "label": "格式",
-      "turnInto": "轉換為",
-      "paragraph": "正文",
-      "linkApply": "套用",
-      "linkRemove": "移除連結",
-      "linkHref": "連結網址",
-      "clearMarks": "清除格式",
-      "linkSearch": "搜尋文件…"
-    },
-    "block": {
-      "grip": "拖曳或開啟區塊選單",
-      "delete": "刪除",
-      "duplicate": "複製",
-      "insertAbove": "在上方插入",
-      "insertBelow": "在下方插入",
-      "turnInto": "轉換為"
-    },
-    "blockHandle": {
-      "add": "在下方新增區塊"
-    },
     "tableInfo": {
       "title": "表格資訊",
       "rowsCols": "{{rows}} 行 · {{cols}} 列",
-      "column": "欄",
       "width": "{{width}}px",
       "empty": "空表格：點擊下方「＋ 新增列」開始"
     },
     "table": {
-      "addRow": "新增列",
-      "addCol": "新增欄",
-      "delRow": "刪除列",
-      "delCol": "刪除欄",
       "untitled": "未命名表格",
       "loadFailed": "無法開啟表格",
 
@@ -2418,8 +2047,6 @@ export const zhTW = {
         title: "篩選",
         addCondition: "新增條件",
         clear: "清除",
-        column: "欄",
-        operator: "運算子",
         value: "值",
         opContains: "包含",
         opEquals: "等於",
@@ -2429,7 +2056,6 @@ export const zhTW = {
       },
       columnMenu: {
 
-        rename: "重新命名",
         type: "類型",
         insertLeft: "左側插入欄",
         insertRight: "右側插入欄",
@@ -2458,7 +2084,6 @@ export const zhTW = {
       grid: {
         addRow: "新增列",
         addColumn: "新增欄",
-        emptyHint: "雙擊儲存格開始輸入",
         firstCellHint: "雙擊輸入",
       },
       edit: {
@@ -2467,10 +2092,8 @@ export const zhTW = {
       toolbar: {
         undo: "復原",
         redo: "重做",
-        sort: "排序",
         filter: "篩選",
         stats: "統計",
-        importCsv: "匯入 CSV",
         exportCsv: "匯出 CSV",
         more: "更多操作",
         resetView: "重設檢視",
@@ -2481,9 +2104,7 @@ export const zhTW = {
         "visibleRows": "可見 {{n}}/{{total}} 列",
         "selectionCount": "已選 {{n}} 格",
         rowsCols: "{{rows}} 列 · {{cols}} 欄",
-        saved: "已儲存",
         saving: "儲存中…",
-        ready: "就緒",
       },
       toasts: {
         columnDeleted: "已刪除欄（可復原）",
@@ -2493,10 +2114,6 @@ export const zhTW = {
         rowAddedFiltered: "已新增列（可能被目前篩選隱藏）",
       },
       dragDisabledHint: "排序/篩選下不可拖曳",
-    },
-    "image": {
-      "alt": "替代文字",
-      "delete": "刪除"
     },
     "slash": {
       "listLabel": "插入區塊",
@@ -2549,8 +2166,6 @@ export const zhTW = {
       "untitled": "未命名標題",
       "noDoc": "選擇文件以查看目錄",
       "noBoard": "畫板沒有大綱",
-      "count": "{{count}} 個標題",
-      "count_one": "{{count}} 個標題",
       "sectionOutline": "大綱",
       "loading": "載入中…",
     },
@@ -2564,7 +2179,6 @@ export const zhTW = {
     },
     "graph": {
       "title": "知識圖譜",
-      "open": "圖譜",
       "neighborhood": "鄰域",
       "full": "全圖",
       "fullConfirm": "目前空間有 {{count}} 篇文件（超過 {{threshold}}）。仍要渲染全圖嗎？",
@@ -2594,49 +2208,11 @@ export const zhTW = {
       "caution": "注意",
       "important": "重要"
     },
-    "props": {
-      "none": "無狀態",
-      "status": "狀態",
-      "tags": "標籤",
-      "aliases": "別名",
-      "priority": "優先級",
-      "priorityNone": "無優先級",
-      "date": "日期",
-      "addTag": "新增標籤…",
-      "removeTag": "移除 {{tag}}",
-      "tagsMax": "最多 {{count}} 個標籤",
-      "options": {
-        "draft": "草稿",
-        "active": "進行中",
-        "done": "已完成",
-        "low": "低",
-        "medium": "中",
-        "high": "高"
-      }
-    },
-    "views": {
-      "docs": "文件",
-      "colTitle": "標題",
-      "empty": "沒有符合此檢視的文件。",
-      "emptyCol": "（空）",
-      "layoutTable": "表格",
-      "layoutBoard": "看板",
-      "defaultAll": "全部",
-      "defaultBoard": "看板"
-    },
     "doc": {
       "edit": "編輯",
-      "source": "原始碼",
-      "live": "即時",
-      "preview": "預覽",
-      "modeLabel": "文件模式",
       "titleLabel": "文件標題",
-      "done": "完成",
       "placeholder": "開始寫作…",
       "placeholderSlash": "輸入文字，或 / 喚起命令",
-      "emptySlashHint": "輸入 / 開啟命令",
-      "viewSource": "檢視原始碼",
-      "viewLive": "視覺化編輯",
       "untitled": "未命名",
       "metaUpdated": "更新於 {{time}}",
       "metaCreated": "建立於 {{time}}",
@@ -2645,14 +2221,10 @@ export const zhTW = {
       "saveFailed": "儲存失敗",
       "loadFailed": "無法載入文件",
       "saving": "儲存中…",
-      "saved": "已儲存",
       "saveRetry": "重試",
       "liveLoading": "正在載入即時編輯器…",
-      "liveParseFailed": "即時編輯器無法開啟此文件，已切換到原始碼模式。",
       "compatView": "已進入相容檢視：文件較大或即時渲染失敗，目前以純文字方式編輯，內容仍完整可編輯。",
       "compatViewClose": "知道了",
-      "largeDocForceSource": "文件過大，即時編輯不可用，已切換到原始碼模式。",
-      "largeDocHint": "文件較大，為效能考慮目前使用原始碼模式編輯。你仍可完整編輯全文。",
       "findPlaceholder": "在文件中查詢",
       "findPrev": "上一個",
       "findNext": "下一個",
@@ -2665,11 +2237,8 @@ export const zhTW = {
         "lineCol": "行 {{line}}, 列 {{col}}",
         "fmTitle": "文件包含 YAML 中繼資料"
       },
-      "backlinkCount": "{{count}} 條反向連結",
       "dialectLoss": "部分特殊塊在實時編輯後可能被簡化",
       "dialectLossHint": "已簡化，可在原始碼模式查看原文。",
-      "clearFormat": "清除格式",
-      "multiSelectHint": "按住 Shift 點擊可多選區塊",
       "copyBlockLink": "複製連結到區塊",
       "multiSelectAdd": "加入多選",
       "multiSelectClear": "移出多選",
@@ -2698,8 +2267,6 @@ export const zhTW = {
       "brokenHint": "失效連結：「{{title}}」— 點擊建立",
       "openHint": "開啟「{{title}}」",
       "noMatches": "無符合文件",
-      "propertyStatus": "狀態",
-      "propertyTags": "標籤"
     },
     "template": {
       "pickTitle": "選擇範本",
@@ -2733,9 +2300,6 @@ export const zhTW = {
       "groupToday": "今天",
       "groupEarlier": "更早"
     },
-    "error": {
-      "generic": "出了點問題"
-    }
   },
   "common": {
     "clear": "清除",
@@ -2743,9 +2307,6 @@ export const zhTW = {
     "close": "關閉",
     "confirm": "確定",
     "back": "返回",
-    "logout": "登出",
-    "logoutConfirmTitle": "登出？",
-    "logoutConfirmDesc": "登出後需要重新登入才能繼續。"
   },
   "dialog": {
     "closeWindowTitle": "關閉視窗時",
@@ -2791,15 +2352,6 @@ export const zhTW = {
     "session": {
       "exportDebugBundle": "匯出偵錯檔案"
     },
-    "copyFailed": "無法複製到剪貼簿",
-    "sessionTab": {
-      "rename": "重新命名…",
-      "copyId": "複製工作階段 ID",
-      "revealInHistory": "在歷史中開啟",
-      "deleteOthers": "刪除其他…",
-      "deleteToRight": "刪除右側…",
-      "deleteAllOpen": "刪除全部開啟的…"
-    },
     "sessionHistory": {
       "open": "開啟",
       "rename": "重新命名…"
@@ -2810,15 +2362,9 @@ export const zhTW = {
       "label": "標題",
       "save": "儲存"
     },
-    "confirmDeleteSessions": {
-      "title": "永久刪除 {{count}} 個工作階段？",
-      "body": "將永久刪除 {{count}} 個已開啟的工作階段。此操作無法復原。",
-      "action": "永久刪除"
-    },
     "file": {
       "open": "開啟",
       "copyPath": "複製路徑",
-      "pathCopied": "路徑已複製",
       "copyRelativePath": "複製相對路徑",
       "copyName": "複製名稱",
       "openContainingFolder": "開啟所在資料夾",
@@ -2829,7 +2375,6 @@ export const zhTW = {
     },
     "diffFile": {
       "copyPath": "複製路徑",
-      "pathCopied": "路徑已複製",
       "copyAbsolutePath": "複製絕對路徑",
       "openInFiles": "在檔案中開啟",
       "collapse": "摺疊",
@@ -2886,14 +2431,12 @@ export const zhTW = {
     },
     "termFs": {
       "copyPath": "複製路徑",
-      "pathCopied": "路徑已複製",
       "copyName": "複製名稱",
       "refresh": "重新整理",
       "openContainingFolder": "開啟所在資料夾"
     },
     "filePreview": {
       "copyPath": "複製路徑",
-      "pathCopied": "路徑已複製",
       "copyContent": "複製內容",
       "contentNotText": "內容不是文字",
       "openContainingFolder": "開啟所在資料夾",
@@ -2942,17 +2485,7 @@ export const zhTW = {
       "skills": "Skills",
       "favorites": "收藏",
       "recent": "最近使用",
-      "docs": "文檔",
-      "recentDocs": "最近",
-      "count": "{{group}}（{{count}}）",
-      "knowledge": "文件管理"
     },
-    "navKnowledge": "文件管理",
-    "knowledgeHome": "文件管理首頁",
-    "knowledgeNewDoc": "新增文件",
-    "knowledgeNewBoard": "新增畫板",
-    "knowledgeIndexing": "搜尋索引建立中…",
-    "knowledgeNeedSpace": "請先開啟一個知識空間",
     "actions": {
       "newConversation": "新增對話",
       "keyboardShortcuts": "鍵盤快捷鍵",
@@ -2963,9 +2496,6 @@ export const zhTW = {
     "openTerminals": "開啟終端管理",
     "newLocalTerminal": "新建本機終端",
     "quickConnect": "快捷連線",
-    "openWorkItems": "開啟事項追蹤",
-    "newWorkItem": "新建事項",
-    "openAutomations": "開啟自動化",
     "settings": {
       "general": "設定：一般",
       "updates": "設定：更新檢查",
@@ -2978,7 +2508,6 @@ export const zhTW = {
       "plugins": "設定：外掛市集",
       "hooks": "設定：Hooks",
       "memory": "設定：記憶",
-      "help": "設定：產品說明"
     },
     "context": {
       "diff": "檢視工作區變更",

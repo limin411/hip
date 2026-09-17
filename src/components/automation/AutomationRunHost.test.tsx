@@ -46,7 +46,7 @@ vi.mock('@/domain/sessionStore', () => ({
 
 import {
   AutomationRunHost,
-  AUTOMATION_TICK_MS,
+  WEBVIEW_FALLBACK_TICK_MS,
   __resetAutomationRunHostForTests,
 } from './AutomationRunHost'
 
@@ -61,6 +61,17 @@ function daily(id: string, nextRunAt: number): Automation {
     updatedAt: 1,
     nextRunAt,
   }
+}
+
+/** Collect tick subscribers so tests can fire them without sleeping 30s. */
+function tickSpy() {
+  const handlers: Array<() => void> = []
+  const unsubscribe = vi.fn()
+  const subscribeTicks = async (handler: () => void) => {
+    handlers.push(handler)
+    return unsubscribe
+  }
+  return { handlers, unsubscribe, subscribeTicks }
 }
 
 describe('AutomationRunHost', () => {
@@ -82,20 +93,17 @@ describe('AutomationRunHost', () => {
     vi.useRealTimers()
   })
 
-  it('exports 30s default tick interval', () => {
-    expect(AUTOMATION_TICK_MS).toBe(30_000)
+  it('keeps the failsafe interval at 30s', () => {
+    expect(WEBVIEW_FALLBACK_TICK_MS).toBe(30_000)
   })
 
   it('loads catalog on mount when not loaded', async () => {
     loaded = false
+    const spy = tickSpy()
     render(
       <AutomationRunHost
         fireOnMount={false}
-        clock={{
-          setInterval: () => 1,
-          clearInterval: () => undefined,
-          nowMs: () => 0,
-        }}
+        clock={{ subscribeTicks: spy.subscribeTicks, nowMs: () => 0 }}
       />,
     )
     await waitFor(() => expect(load).toHaveBeenCalled())
@@ -105,16 +113,10 @@ describe('AutomationRunHost', () => {
     const next = 1_000_000
     automations = [daily('auto_due', next)]
     const nowMs = vi.fn(() => next)
+    const spy = tickSpy()
 
     render(
-      <AutomationRunHost
-        fireOnMount
-        clock={{
-          nowMs,
-          setInterval: () => 1,
-          clearInterval: () => undefined,
-        }}
-      />,
+      <AutomationRunHost fireOnMount clock={{ nowMs, subscribeTicks: spy.subscribeTicks }} />,
     )
 
     await waitFor(() =>
@@ -126,36 +128,25 @@ describe('AutomationRunHost', () => {
     )
   })
 
-  it('uses injectable setInterval with tickMs (no real 30s sleep)', async () => {
-    const handlers: Array<() => void> = []
-    const setIntervalFn = vi.fn((handler: () => void, ms: number) => {
-      handlers.push(handler)
-      expect(ms).toBe(100)
-      return 42
-    })
-    const clearIntervalFn = vi.fn()
+  it('ticks when the native ticker fires (no webview timer involved)', async () => {
+    const spy = tickSpy()
     let clock = 1_000_000
     automations = [daily('auto_tick', clock + 50)]
 
     render(
       <AutomationRunHost
-        tickMs={100}
         fireOnMount={false}
-        clock={{
-          nowMs: () => clock,
-          setInterval: setIntervalFn as AutomationRunHostClockSetInterval,
-          clearInterval: clearIntervalFn,
-        }}
+        clock={{ nowMs: () => clock, subscribeTicks: spy.subscribeTicks }}
       />,
     )
 
-    await waitFor(() => expect(setIntervalFn).toHaveBeenCalled())
+    await waitFor(() => expect(spy.handlers.length).toBe(1))
     expect(runNow).not.toHaveBeenCalled()
 
-    // Advance past nextRunAt and fire the injected interval callback.
+    // Advance past nextRunAt and let the native tick arrive.
     clock = 1_000_100
     act(() => {
-      handlers[0]?.()
+      spy.handlers[0]?.()
     })
 
     await waitFor(() =>
@@ -167,7 +158,24 @@ describe('AutomationRunHost', () => {
     )
 
     cleanup()
-    expect(clearIntervalFn).toHaveBeenCalledWith(42)
+    expect(spy.unsubscribe).toHaveBeenCalled()
+  })
+
+  it('falls back to a webview timer when the native ticker cannot subscribe', async () => {
+    const setIntervalFn = vi.spyOn(window, 'setInterval')
+    const subscribeTicks = () => Promise.reject(new Error('no IPC'))
+
+    render(
+      <AutomationRunHost fireOnMount={false} clock={{ nowMs: () => 0, subscribeTicks }} />,
+    )
+
+    await waitFor(() =>
+      expect(setIntervalFn).toHaveBeenCalledWith(
+        expect.any(Function),
+        WEBVIEW_FALLBACK_TICK_MS,
+      ),
+    )
+    setIntervalFn.mockRestore()
   })
 
   it('first tick coldStart → app_was_quit for lag≥6h; second uses missed_over_6h', async () => {
@@ -175,19 +183,12 @@ describe('AutomationRunHost', () => {
     const far = next + MISS_WINDOW_MS + 1
     automations = [daily('auto_cs', next)]
     let now = far
-    const handlers: Array<() => void> = []
+    const spy = tickSpy()
 
     render(
       <AutomationRunHost
         fireOnMount
-        clock={{
-          nowMs: () => now,
-          setInterval: ((h: () => void) => {
-            handlers.push(h)
-            return 1
-          }) as AutomationRunHostClockSetInterval,
-          clearInterval: () => undefined,
-        }}
+        clock={{ nowMs: () => now, subscribeTicks: spy.subscribeTicks }}
       />,
     )
 
@@ -200,13 +201,12 @@ describe('AutomationRunHost', () => {
       }),
     )
 
-    // Second evaluation (interval): coldStart already consumed.
-    // Reset nextRunAt still past miss window for the same auto.
+    // Second evaluation (native tick): coldStart already consumed.
     recordSkip.mockClear()
     automations = [daily('auto_cs', next)]
     now = far + 1
     act(() => {
-      handlers[0]?.()
+      spy.handlers[0]?.()
     })
     await waitFor(() =>
       expect(recordSkip).toHaveBeenCalledWith('auto_cs', {
@@ -221,15 +221,12 @@ describe('AutomationRunHost', () => {
   it('installs window.__hipE2E.automationTick for forced due', async () => {
     const next = 5_000_000
     automations = [daily('auto_e2e', next)]
+    const spy = tickSpy()
 
     render(
       <AutomationRunHost
         fireOnMount={false}
-        clock={{
-          nowMs: () => 0,
-          setInterval: () => 1,
-          clearInterval: () => undefined,
-        }}
+        clock={{ nowMs: () => 0, subscribeTicks: spy.subscribeTicks }}
       />,
     )
 
@@ -261,15 +258,12 @@ describe('AutomationRunHost', () => {
     const next = 9_000_000
     automations = [daily('auto_focus', next)]
     const nowMs = vi.fn(() => next - 1000)
+    const spy = tickSpy()
 
     render(
       <AutomationRunHost
         fireOnMount={false}
-        clock={{
-          nowMs,
-          setInterval: () => 1,
-          clearInterval: () => undefined,
-        }}
+        clock={{ nowMs, subscribeTicks: spy.subscribeTicks }}
       />,
     )
 
@@ -294,6 +288,7 @@ describe('AutomationRunHost', () => {
     const far = next + MISS_WINDOW_MS + 1
     automations = [daily('auto_race', next)]
     loaded = false
+    const spy = tickSpy()
 
     let resolveLoad!: () => void
     load.mockImplementation(
@@ -309,11 +304,7 @@ describe('AutomationRunHost', () => {
     render(
       <AutomationRunHost
         fireOnMount
-        clock={{
-          nowMs: () => far,
-          setInterval: () => 1,
-          clearInterval: () => undefined,
-        }}
+        clock={{ nowMs: () => far, subscribeTicks: spy.subscribeTicks }}
       />,
     )
 
@@ -343,9 +334,3 @@ describe('AutomationRunHost', () => {
     expect(recordSkip).toHaveBeenCalledTimes(1)
   })
 })
-
-/** Local helper type — keep test file free of exporting host clock type noise. */
-type AutomationRunHostClockSetInterval = (
-  handler: () => void,
-  ms: number,
-) => number

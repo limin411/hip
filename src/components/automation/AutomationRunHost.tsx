@@ -1,23 +1,27 @@
 import { useCallback, useEffect, useRef } from 'react'
+import type { UnlistenFn } from '@tauri-apps/api/event'
 import { useAutomationStore } from '@/store/automationStore'
+import { listenAutomationTick } from '@/ipc/automations'
 import { automationHostTick } from './automationScheduleTick'
 
-/** Default host poll interval (design: ±30s schedule precision). */
-export const AUTOMATION_TICK_MS = 30_000
+/**
+ * Failsafe cadence, used **only** when the native ticker cannot be subscribed
+ * (no Tauri IPC — e.g. these shell assets opened in a plain browser).
+ */
+export const WEBVIEW_FALLBACK_TICK_MS = 30_000
 
 export type AutomationRunHostClock = {
   /** Injectable wall clock (tests). Default `Date.now`. */
   nowMs: () => number
-  /** Injectable interval. Default `window.setInterval`. */
-  setInterval: (handler: () => void, ms: number) => number
-  /** Injectable clear. Default `window.clearInterval`. */
-  clearInterval: (id: number) => void
+  /**
+   * Subscribe to schedule ticks; returns an unsubscribe function.
+   * Default: the native `automation://tick` event owned by the Rust runtime.
+   */
+  subscribeTicks: (handler: () => void) => Promise<UnlistenFn>
 }
 
 export type AutomationRunHostProps = {
-  /** Override default 30s tick period (tests may use shorter). */
-  tickMs?: number
-  /** Injectable clock + timers so unit tests never sleep 30s. */
+  /** Injectable clock + tick source so unit tests never sleep 30s. */
   clock?: Partial<AutomationRunHostClock>
   /**
    * When false, skip the immediate post-load tick (tests that drive
@@ -38,13 +42,12 @@ export function __resetAutomationRunHostForTests(): void {
 function defaultClock(): AutomationRunHostClock {
   return {
     nowMs: () => Date.now(),
-    setInterval: (handler, ms) => window.setInterval(handler, ms) as unknown as number,
-    clearInterval: (id) => window.clearInterval(id),
+    subscribeTicks: listenAutomationTick,
   }
 }
 
 /**
- * Invisible app-lifetime host: 30s schedule tick + focus/visibility recheck,
+ * Invisible app-lifetime host: native schedule tick + focus/visibility recheck,
  * catalog load on mount, session-watch sampling, and DEV e2e `automationTick`.
  *
  * Mounted unconditionally under AppLayout (alongside WindowLifecycleHost) —
@@ -53,7 +56,6 @@ function defaultClock(): AutomationRunHostClock {
  * Do not gate it on `AUTOMATION_PAGE`. Renders null.
  */
 export function AutomationRunHost({
-  tickMs = AUTOMATION_TICK_MS,
   clock: clockPartial,
   fireOnMount = true,
 }: AutomationRunHostProps = {}) {
@@ -81,17 +83,11 @@ export function AutomationRunHost({
     }
   }, [])
 
-  // Interval + focus / visibility immediate check (webview timer throttle mitigation).
+  // Native tick source + focus / visibility immediate check.
   useEffect(() => {
     let cancelled = false
-    let intervalId: number | null = null
-
-    const schedule = () => {
-      if (cancelled) return
-      intervalId = clockRef.current.setInterval(() => {
-        tick()
-      }, tickMs)
-    }
+    let unlisten: UnlistenFn | null = null
+    let fallbackId: number | null = null
 
     const onFocus = () => tick()
     const onVisibility = () => {
@@ -112,16 +108,29 @@ export function AutomationRunHost({
       }
       if (cancelled) return
       if (fireOnMount) tick()
-      schedule()
+
+      try {
+        const stop = await clockRef.current.subscribeTicks(() => tick())
+        if (cancelled) stop()
+        else unlisten = stop
+      } catch {
+        // No native ticker (not running under the Tauri shell). Fall back to a
+        // webview timer so the schedule still advances — throttled while the
+        // window is hidden, which is why the native ticker owns this in prod.
+        if (!cancelled) {
+          fallbackId = window.setInterval(() => tick(), WEBVIEW_FALLBACK_TICK_MS)
+        }
+      }
     })()
 
     return () => {
       cancelled = true
-      if (intervalId != null) clockRef.current.clearInterval(intervalId)
+      unlisten?.()
+      if (fallbackId != null) window.clearInterval(fallbackId)
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [tick, tickMs, fireOnMount])
+  }, [tick, fireOnMount])
 
   // DEV e2e: force a tick without waiting 30s (PR7 may drive due via this hook).
   useEffect(() => {

@@ -1,11 +1,24 @@
 // src/ipc/automations.ts
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
   Automation,
   AutomationsCatalogV1,
   AutomationRunsLogV1,
 } from '@/domain/automations/types'
 import { normalizeAutomation, normalizeCatalog, normalizeRunsLog } from '@/domain/automations/normalize'
+
+/**
+ * Subscribe to the native schedule tick (`automation://tick`, every 30s).
+ *
+ * The tick is emitted by the Rust runtime on purpose: WebView2 throttles the
+ * webview's own `setInterval` while the main window is hidden to tray or
+ * minimized, which used to silently disable every scheduled automation.
+ * Rejects when there is no IPC host (plain browser, no Tauri shell).
+ */
+export function listenAutomationTick(handler: () => void): Promise<UnlistenFn> {
+  return listen<null>('automation://tick', () => handler())
+}
 
 /**
  * Load the automations catalog from `~/.hip/automations/catalog.json`.

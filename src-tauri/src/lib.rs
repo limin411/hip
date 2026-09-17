@@ -878,6 +878,9 @@ pub fn run() {
             // 24h auto-check loop (Settings → General → Version & updates).
             // Sole owner of periodic checks; opts in via hip.toml [updates].autoCheck.
             updates::spawn_wake_loop(app.handle().clone());
+            // Automation schedule ticks must come from the native runtime: the webview
+            // timer is throttled while the main window is hidden to the tray.
+            automations::spawn_schedule_ticker(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

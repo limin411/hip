@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
+use tauri::Emitter;
 
 const NAME_MAX: usize = 200;
 /// Prompt max size in UTF-8 **bytes** (256 KiB). Matches domain `AUTOMATION_PROMPT_MAX`.
@@ -403,6 +404,35 @@ pub fn automation_runs_save(app: AppHandle, log: AutomationRunsLog) -> Result<()
     let path = crate::paths::automations_runs_path(&app)
         .ok_or_else(|| "no automations dir".to_string())?;
     save_runs_log(&path, &log)
+}
+
+// ── Schedule ticker ──────────────────────────────────────────────────────────
+
+/// Event the native ticker emits so the frontend re-evaluates due automations.
+pub const SCHEDULE_TICK_EVENT: &str = "automation://tick";
+
+/// Tick cadence in seconds — schedule precision is ± this window.
+pub const SCHEDULE_TICK_SECS: u64 = 30;
+
+/// Own the automation schedule tick from the **native** runtime rather than the
+/// webview.
+///
+/// WebView2 throttles (and can effectively stall) `setInterval` while the main
+/// window is hidden to tray or minimized, which silently disabled every
+/// scheduled automation. A tokio timer lives outside the renderer, so it keeps
+/// firing regardless of window visibility. The webview only has to handle the
+/// event, and event delivery is not subject to timer throttling.
+pub fn spawn_schedule_ticker(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(SCHEDULE_TICK_SECS)).await;
+            if app.emit(SCHEDULE_TICK_EVENT, ()).is_err() {
+                // App is shutting down: a handle that can never deliver again
+                // is not worth spinning on.
+                break;
+            }
+        }
+    });
 }
 
 #[cfg(test)]

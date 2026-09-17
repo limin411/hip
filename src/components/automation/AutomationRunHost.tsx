@@ -47,8 +47,10 @@ function defaultClock(): AutomationRunHostClock {
  * Invisible app-lifetime host: 30s schedule tick + focus/visibility recheck,
  * catalog load on mount, session-watch sampling, and DEV e2e `automationTick`.
  *
- * Mount once under AppLayout when `AUTOMATION_PAGE` is on (alongside
- * WindowLifecycleHost). Renders null.
+ * Mounted unconditionally under AppLayout (alongside WindowLifecycleHost) —
+ * this is the *only* thing that fires scheduled automations, and the composer's
+ * scheduled-task UI depends on it even while `AUTOMATION_PAGE` is off.
+ * Do not gate it on `AUTOMATION_PAGE`. Renders null.
  */
 export function AutomationRunHost({
   tickMs = AUTOMATION_TICK_MS,

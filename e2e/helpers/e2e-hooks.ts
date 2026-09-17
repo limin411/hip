@@ -98,7 +98,8 @@ type HipE2E = {
   /**
    * Force an automation schedule tick (DEV). Optional `now` is epoch ms so e2e
    * can advance due slots without waiting the real 30s host interval.
-   * Installed by AutomationRunHost when AUTOMATION_PAGE is on.
+   * Installed by AutomationRunHost (mounted app-lifetime, not gated by
+   * AUTOMATION_PAGE).
    */
   automationTick?: (now?: number) => void
 }

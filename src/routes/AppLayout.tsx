@@ -41,6 +41,10 @@ import { useTerminalHostStore } from '@/store/terminalHostStore'
 import { useFocusStore } from '@/store/focusStore'
 import { seedNavHistoryIfEmpty } from '@/components/layout/navHistory'
 import { WindowLifecycleHost } from '@/components/window/WindowLifecycleHost'
+// App-lifetime scheduler: ticks due automations and samples open run watches.
+// NOT gated by AUTOMATION_PAGE — the composer's scheduled-task UI lives outside
+// that page, and it is the only thing that ever fires an automation.
+import { AutomationRunHost } from '@/components/automation/AutomationRunHost'
 import { widenWindowForRightPanel } from '@/lib/rightPanelWidth'
 import { panelEnterMotion, panelExitMotion } from '@/components/ui/motionClasses'
 
@@ -336,6 +340,7 @@ export function AppLayout() {
     // AppSidebar is solid bg-surface-subtle (light gray chrome); main column stays opaque.
     <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
       <WindowLifecycleHost />
+      <AutomationRunHost />
       {sidebarOpen ? <AppSidebar /> : null}
       {/* Measure the group width via a plain div — PanelGroup's own ref is an
           ImperativePanelGroupHandle, not the DOM node. */}

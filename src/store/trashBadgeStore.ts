@@ -11,11 +11,6 @@ interface TrashBadgeState {
   setSessionCount: (n: number) => void
   setKnowledgeCount: (n: number) => void
   setWorkItemCount: (n: number) => void
-  setFromLists: (
-    sessionCount: number,
-    knowledgeCount: number,
-    workItemCount?: number,
-  ) => void
   adjustSessions: (delta: number) => void
   adjustKnowledge: (delta: number) => void
   adjustWorkItems: (delta: number) => void
@@ -28,13 +23,6 @@ export const useTrashBadgeStore = create<TrashBadgeState>((set) => ({
   setSessionCount: (n) => set({ sessionCount: Math.max(0, n) }),
   setKnowledgeCount: (n) => set({ knowledgeCount: Math.max(0, n) }),
   setWorkItemCount: (n) => set({ workItemCount: Math.max(0, n) }),
-  setFromLists: (sessionCount, knowledgeCount, workItemCount) =>
-    set((s) => ({
-      sessionCount: Math.max(0, sessionCount),
-      knowledgeCount: Math.max(0, knowledgeCount),
-      workItemCount:
-        workItemCount === undefined ? s.workItemCount : Math.max(0, workItemCount),
-    })),
   adjustSessions: (delta) =>
     set((s) => ({ sessionCount: Math.max(0, s.sessionCount + delta) })),
   adjustKnowledge: (delta) =>

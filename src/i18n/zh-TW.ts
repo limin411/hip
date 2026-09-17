@@ -1662,7 +1662,6 @@ export const zhTW = {
   },
   "trash": {
     "title": "回收站",
-    "subtitle": "{{retentionDays}} 天後自動清除",
     "searchPlaceholder": "搜尋回收站…",
     "emptyState": "回收站為空",
     "emptyStateDesc": "刪除的內容會出現在這裡，可在保留期內恢復。",
@@ -1676,15 +1675,6 @@ export const zhTW = {
     "filterAll": "全部",
     "filterChat": "對話",
     "filterCode": "專案",
-    "filterKnowledge": "文件管理",
-    "filterWorkItems": "事項",
-    "kind": {
-      "space": "知識空間",
-      "doc": "文件",
-      "folder": "資料夾",
-      "workItem": "事項"
-    },
-    "parentMissing": "請先恢復父節點或知識空間",
     "restore": "恢復",
     "deleteForever": "永久刪除",
     "deleteForeverTitle": "永久刪除「{{title}}」？",

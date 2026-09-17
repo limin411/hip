@@ -1657,7 +1657,6 @@ export const ja = {
   },
   "trash": {
     "title": "ゴミ箱",
-    "subtitle": "{{retentionDays}}日後に自動削除",
     "searchPlaceholder": "ゴミ箱を検索…",
     "emptyState": "ゴミ箱は空です",
     "emptyStateDesc": "削除した項目はここに表示され、保持期間内に復元できます。",
@@ -1671,15 +1670,6 @@ export const ja = {
     "filterAll": "すべて",
     "filterChat": "チャット",
     "filterCode": "プロジェクト",
-    "filterKnowledge": "ドキュメント",
-    "filterWorkItems": "ワークアイテム",
-    "kind": {
-      "space": "スペース",
-      "doc": "ドキュメント",
-      "folder": "フォルダー",
-      "workItem": "ワークアイテム"
-    },
-    "parentMissing": "先に親ノードまたはスペースを復元してください",
     "restore": "復元",
     "deleteForever": "完全に削除",
     "deleteForeverTitle": "「{{title}}」を完全に削除しますか？",

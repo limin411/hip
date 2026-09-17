@@ -1719,7 +1719,6 @@ export const en = {
     },
     trash: {
       title: 'Recycle bin',
-      subtitle: 'Auto-purge after {{retentionDays}} days',
       searchPlaceholder: 'Search recycle bin…',
       emptyState: 'Recycle bin is empty',
       emptyStateDesc: 'Deleted items will appear here and can be restored within the retention window.',
@@ -1733,15 +1732,6 @@ export const en = {
       filterAll: 'All',
       filterChat: 'Chat',
       filterCode: 'Projects',
-      filterKnowledge: 'Documents',
-      filterWorkItems: 'Work items',
-      kind: {
-        space: 'Space',
-        doc: 'Document',
-        folder: 'Folder',
-        workItem: 'Work item',
-      },
-      parentMissing: 'Restore the parent node first',
       restore: 'Restore',
       deleteForever: 'Delete forever',
       deleteForeverTitle: 'Permanently delete "{{title}}"?',

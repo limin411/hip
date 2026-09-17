@@ -1677,7 +1677,6 @@ export const zhCN = {
     },
     trash: {
       title: '回收站',
-      subtitle: '{{retentionDays}} 天后自动清除',
       searchPlaceholder: '搜索回收站…',
       emptyState: '回收站为空',
       emptyStateDesc: '删除的内容会出现在这里，可在保留期内恢复。',
@@ -1691,15 +1690,6 @@ export const zhCN = {
       filterAll: '全部',
       filterChat: '对话',
       filterCode: '项目',
-      filterKnowledge: '文档管理',
-      filterWorkItems: '事项',
-      kind: {
-        space: '空间',
-        doc: '文档',
-        folder: '文件夹',
-        workItem: '事项',
-      },
-      parentMissing: '请先恢复父节点',
       restore: '恢复',
       deleteForever: '永久删除',
       deleteForeverTitle: '永久删除「{{title}}」？',

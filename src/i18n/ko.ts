@@ -1657,7 +1657,6 @@ export const ko = {
   },
   "trash": {
     "title": "휴지통",
-    "subtitle": "{{retentionDays}}일 후 자동 삭제",
     "searchPlaceholder": "휴지통 검색…",
     "emptyState": "휴지통이 비어 있습니다",
     "emptyStateDesc": "삭제된 항목이 여기에 표시되며 보관 기간 안에 복원할 수 있습니다.",
@@ -1671,15 +1670,6 @@ export const ko = {
     "filterAll": "전체",
     "filterChat": "채팅",
     "filterCode": "프로젝트",
-    "filterKnowledge": "문서",
-    "filterWorkItems": "작업 항목",
-    "kind": {
-      "space": "공간",
-      "doc": "문서",
-      "folder": "폴더",
-      "workItem": "작업 항목"
-    },
-    "parentMissing": "먼저 상위 노드나 공간을 복원하세요",
     "restore": "복원",
     "deleteForever": "영구 삭제",
     "deleteForeverTitle": "\"{{title}}\"을(를) 영구 삭제하시겠습니까?",

@@ -9,6 +9,7 @@
 | `~/.hip/config/memory.json` | 메모리 기능 플래그 / 파이프라인 설정값 |
 | `~/.hip/config/network.json` | 선택적 네트워크 정책 |
 | `~/.hip/config/hip-plugins.json` | 설치된 플러그인 레지스트리 |
+| `~/.hip/config/terminal-hosts.json` | SSH / 터미널 호스트 라이브러리 (모드 0600) |
 | `~/.hip/db/hip.db` | SQLite 세션, 메시지, 메모리 항목, 이벤트 |
 | `~/.hip/data/tool-output/` | 대용량 도구 출력 (DB 외부 보관) |
 | `~/.hip/logs/` | 사이드카 / 셸 로그 |
@@ -17,13 +18,13 @@
 | `~/.hip/memories/` | 메모리 마크다운 미러 |
 | `~/.hip/builtin-skills/` | 내장 점진적 제품 스킬 (예: 이 `hip` 스킬) |
 | `~/.hip/scratch/`, 작업 트리 | 임시 / 병렬 작업 트리 도우미 |
-| `~/.hip/trash/` | 제품 휴지통 (지식 FS 격리, 세션은 SQLite를 통해 소프트 삭제) |
+| `~/.hip/trash/` | 제품 휴지통 격리 (자동화 행은 `trash/automations/`, 세션은 SQLite `deleted_at`로 소프트 삭제) |
 
 ### 휴지통 및 소프트 삭제
 
 | 동작 | 참고 |
 |----------|--------|
-| UI 삭제 (채팅 / 코드 / 지식) | 소프트 삭제 → 사이드바 **휴지통** (기록 위) |
+| UI 삭제 (채팅 / 코드 대화) | 소프트 삭제 → 사이드바 **휴지통** (기록 위). 휴지통에는 대화만 표시됩니다. |
 | 보관 기간 | 기본 **7**일, **설정 → 일반** 또는 `hip.toml` `[trash] retentionDays` (1–365) |
 | CLI `hip session delete --yes` | **영구** 하드 삭제 (휴지통 미사용) |
 | 메모리 휴지통 | 여전히 **설정 → 메모리** (별도 보관 기간, 기본 30일) |

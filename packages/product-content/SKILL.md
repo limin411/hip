@@ -18,11 +18,11 @@ If a product detail is not documented here, say so rather than inventing UI labe
 
 | Surface | Intent |
 |---------|--------|
-| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
-| **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (`page.html`, `notes.md`, SVG, etc.) into the workspace for the artifacts panel |
-| **Knowledge** | Notes / knowledge-space assistant: grounded answers in the user's notes workspace; not a coding agent for a software project |
+| **Code** | Project workbench (sidebar **Projects**): file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
+| **Chat** | Lighter conversation surface (sidebar **Chats**): shorter prompt, no git-commit guidance, prefer writing previewable deliverables (`page.html`, `notes.md`, SVG, etc.) into the workspace for the artifacts panel |
+| **Terminals** | Managed terminal / SSH host surface (sidebar **Terminals**): interactive shells on local or remote hosts; the terminal rail has **Files** and **Agent** tabs |
 
-Surface is chosen in the UI; the system prompt already reflects the active surface.
+There is no notes / Documents surface. Surface is chosen in the UI; the system prompt already reflects the active surface.
 
 ## Permission modes
 
@@ -38,21 +38,26 @@ Path convention in edit/chat: project-root form starting with `/` (e.g. `/src/in
 
 Typical destinations (wording may vary slightly in the UI):
 
-- **Providers / API keys** — stored as plaintext under `~/.hip/config/auth.json` (mode 0600 by design)
+- **Model Configuration** / **Key Management** — provider list, model picker, and API keys; keys are stored as plaintext under `~/.hip/config/auth.json` (mode 0600 by design)
 - **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see `references/memory.md`)
 - **Skills** — enable/disable installed skills (`hip.toml` + skill folders)
-- **Plugins** — install/enable plugins (skills, agents, MCP, hooks); Plugin Market under Settings
-- **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
-- **Network policy** — optional allow/deny for outbound tools
+- **Plugin Market** — install/enable plugins (skills, agents, MCP, hooks) and browse the official markets
+- **Agent Management** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
+- **MCPs**, **Hooks**, **General**, **Window** — remaining pages
+- **Network policy** — file-only (`~/.hip/config/network.json`); there is **no** Settings page for it
 
-## Right panel: Agents + Runtime
+## Session right rail
 
-Each session’s right panel combines:
+On **Code**, the right rail tabs are **Files / Outline / Changes / Terminal** (Changes requires a git repo; Terminal requires an active session). Sub-agents and running background work are **not** in a separate panel:
 
-- **Agents** — roster, active sub-agents, delegation status
-- **Runtime** — background shell jobs, monitors, and schedules (TaskRuntime). Still-running work shows a chip; open the panel to inspect output and stop tasks.
+- Sub-agent and tool process render inline in the message trail.
+- Background shell jobs, monitors and schedules surface in the runtime strip above the composer; open it to inspect output or stop a task.
 
 Long shell, log watches, and recurring checks should use TaskRuntime tools (see `references/agents-and-plugins.md` and the `hip-coding` skill for policy). Do not sleep-poll in the main turn.
+
+## Scheduled tasks
+
+Recurring prompts are **per conversation**: create them from the clock button in the composer (Chat and Code). The run happens **inside the conversation that owns the task** — hip does not open a new conversation for each fire, and deleting that conversation deletes its scheduled tasks. Agent-side tools are `scheduler_create` / `scheduler_list` / `scheduler_delete` (minimum interval 60s).
 
 ## Skills, plugins, MCP
 

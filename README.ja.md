@@ -17,53 +17,18 @@
 
 各UIタブは独立したセッションです。製品デフォルトは **Supervisor ReAct** ループです。エージェントはツールを使用し、`task` / `dispatch_agent` / `task_batch` を介して委譲するタイミングを決定します。通常のターンでは **Planner → Coder → Reviewer** パイプラインは強制されません。
 
-## スクリーンショット
-
-<p align="center">
-  <img src="./docs/images/chat-surface.webp" alt="hip Chat の新規会話" width="920" />
-</p>
-
-<p align="center"><sub>Chat — 新規会話。各タブは独立したセッションです。</sub></p>
-
-<table>
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-surface.webp" alt="hip Code サーフェス" />
-      <br />
-      <sub>Code — プロジェクトフォルダを選んでタスクを送信</sub>
-    </td>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-session.webp" alt="hip Code セッション（ツールとファイルレール）" />
-      <br />
-      <sub>Code セッション — Supervisor のツールとファイルレール</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" valign="top">
-      <img src="./docs/images/settings-models.webp" alt="hip 設定 · モデル構成" />
-      <br />
-      <sub>Settings → Model Configuration — プロバイダと API キー</sub>
-    </td>
-    <td align="center" valign="top">
-      <img src="./docs/images/knowledge-home.webp" alt="hip ドキュメント" />
-      <br />
-      <sub>Documents — ローカルのノート、ページ、テーブル</sub>
-    </td>
-  </tr>
-</table>
-
 ## 使ってみる
 
 1. **プロバイダキーを追加** — **Settings → Model Configuration**。キーは `~/.hip/config/auth.json`（mode `0600`）に保存されます。
 2. **Chat または Code を開始** — Chat は軽量な会話。Code では先に **Choose project folder**（既定権限 **edit**、プロジェクトサンドボックス）。
 3. **タスクを送信** — Supervisor がツールを使い、`task` / `dispatch_agent` / `task_batch` で委譲できます。ファイルレールと **Changes** タブを確認してください。
-4. **近くにメモを残す** — **Documents** は同じワークスペース横のローカル知識ベース（ページとテーブル）です。
+4. **定期タスクを設定** — コンポーザーの時計ボタンで**会話単位のスケジュールタスク**を作成できます。所有する会話の中で実行されます。
 
 ## ハイライト
 
 | 領域 | 説明 |
 |------|----------------|
-| **サーフェス** | **Code** — 完全なプロジェクトワークベンチ（ファイル、gitガイダンス、MCP、ツール）。**Chat** — より軽量な会話。成果物をプレビュー可能な形でワークスペースに書き込み、アーティファクトパネルに表示します。 |
+| **サーフェス** | **Code** — 完全なプロジェクトワークベンチ（ファイル、gitガイダンス、MCP、ツール）。**Chat** — より軽量な会話。成果物をプレビュー可能な形でワークスペースに書き込み、アーティファクトパネルに表示します。**Terminals** — マネージド端末と SSH ホスト。 |
 | **権限** | **edit**（デフォルト、プロジェクトサンドボックス）、**chat**（読み取り専用）、**full**（ユーザーが許可した全ファイルシステム）。 |
 | **エージェント** | Supervisor とロスターエージェント（**explore** / **plan** / **coder**）。エージェント駆動の分離と、`task_batch` による真の並列処理。 |
 | **拡張性** | スキル（`SKILL.md`）、プラグイン、MCPサーバー、フック — グローバルは `~/.hip/`、プロジェクトは `.hip/` 配下。 |
@@ -160,11 +125,11 @@ fsReadMaxBytes = 2000000 # fs/read_text_file あたりの最大バイト数（�
 | `~/.hip/logs/` | サイドカー / Tauri ログ |
 | `~/.hip/skills/`、`plugins/`、`scratch/` | スキル、プラグイン、インストールスクラッチ |
 | `~/.hip/memories/` | メモリ有効時のMarkdownエクスポートミラー |
-| `~/.hip/trash/` | 製品のごみ箱隔離（Knowledge FSペイロード。セッションはSQLiteの `deleted_at` を使用） |
+| `~/.hip/trash/` | 製品のごみ箱隔離（自動化の行は `trash/automations/`。セッションは SQLite の `deleted_at` を使用） |
 
 ### ごみ箱（ソフトデリート）
 
-**デスクトップUI**で、Chat/CodeセッションやKnowledgeスペース/ドキュメントを削除すると、**ごみ箱**（サイドバー、履歴の上）に移動します。アイテムは復元または完全削除できます。保持期間が経過すると自動的に削除されます。
+**デスクトップUI**で Chat/Code の会話を削除すると、**ごみ箱**（サイドバー、履歴の上）に移動します。アイテムは復元または完全削除できます。保持期間が経過すると自動的に削除されます。ごみ箱に並ぶのは会話のみです。
 
 | 設定 | 場所 |
 |---------|----------|

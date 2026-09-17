@@ -9,6 +9,7 @@
 | `~/.hip/config/memory.json` | 记忆功能开关 / 流水线参数 |
 | `~/.hip/config/network.json` | 可选网络策略 |
 | `~/.hip/config/hip-plugins.json` | 已安装插件注册表 |
+| `~/.hip/config/terminal-hosts.json` | SSH / 终端主机库（0600） |
 | `~/.hip/db/hip.db` | SQLite 会话、消息、记忆、事件 |
 | `~/.hip/data/tool-output/` | 大型工具输出（不进 DB） |
 | `~/.hip/logs/` | Sidecar / 壳日志 |
@@ -16,7 +17,7 @@
 | `~/.hip/plugins/` | 已安装插件 |
 | `~/.hip/memories/` | 记忆 Markdown 镜像 |
 | `~/.hip/builtin-skills/` | 内置渐进产品技能（如 `hip`） |
-| | `~/.hip/scratch/` | 临时区助手 |
+| `~/.hip/scratch/` | 临时区助手 |
 
 项目覆盖常在 `<project>/.hip/`（如 `.hip/skills/`、`.hip/hip.toml`）。
 

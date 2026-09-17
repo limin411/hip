@@ -9,6 +9,7 @@
 | `~/.hip/config/memory.json` | Memory feature flags / pipeline knobs |
 | `~/.hip/config/network.json` | Optional network policy |
 | `~/.hip/config/hip-plugins.json` | Installed plugins registry |
+| `~/.hip/config/terminal-hosts.json` | SSH / terminal host library (mode 0600) |
 | `~/.hip/db/hip.db` | SQLite sessions, messages, memory items, events |
 | `~/.hip/data/tool-output/` | Large tool outputs (kept out of the DB) |
 | `~/.hip/logs/` | Sidecar / shell logs |
@@ -17,13 +18,13 @@
 | `~/.hip/memories/` | Memory markdown mirrors |
 | `~/.hip/builtin-skills/` | Built-in progressive product skills (e.g. this `hip` skill) |
 | `~/.hip/scratch/` | Scratch helpers |
-| `~/.hip/trash/` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
+| `~/.hip/trash/` | Product recycle bin quarantine (automation rows under `trash/automations/`; sessions soft-delete via SQLite `deleted_at`) |
 
 ### Recycle bin & soft-delete
 
 | Behavior | Notes |
 |----------|--------|
-| UI delete (Chat / Code / Knowledge) | Soft-delete → sidebar **Recycle bin** (above History) |
+| UI delete (Chat / Code conversations) | Soft-delete → sidebar **Recycle bin** (above History). The bin lists conversations only. |
 | Retention | Default **7** days; **Settings → General** or `hip.toml` `[trash] retentionDays` (1–365) |
 | CLI `hip session delete --yes` | **Permanent** hard-delete (not the recycle bin) |
 | Memory trash | Still **Settings → Memory** (separate retention, default 30 days) |
@@ -45,9 +46,7 @@ Project overrides often live under `<project>/.hip/` (e.g. `.hip/skills/`, `.hip
 
 ## Auth model (BYOK)
 
-Keys are entered in the app **Settings → Providers** panel and stored in `auth.json`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
-
-Design detail: `docs/design/byok-spec.md`.
+Keys are entered in the app **Settings → Model Configuration** (providers) / **Key Management** and stored in `auth.json`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
 
 ### Resolution order
 

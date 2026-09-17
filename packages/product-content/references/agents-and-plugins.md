@@ -57,9 +57,16 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 Do not claim work ran "in parallel" if only sequential dispatch was used.  
 Do not sleep-poll the main turn for long shell or CI — use TaskRuntime tools above.
 
-### Runtime panel (UI)
+### Runtime visibility (UI)
 
-Session right panel combines **Agents** (roster / sub-agents) and **Runtime** (background shell, monitors, schedules). Still-running work shows a chip; open Runtime to inspect or stop tasks.
+There is **no** separate Agents / Runtime panel:
+
+- Sub-agents and tool process render inline in the message trail (collapsed process fold).
+- Background shell jobs, monitors, and schedules surface in the **runtime strip above the composer**; open it to inspect output or stop a task.
+
+### Scheduled tasks (UI)
+
+Recurring prompts are **per conversation** — create them from the clock button in the composer (Chat and Code). A fire runs **inside the conversation that owns the task** (hip does not open a new conversation per run), and deleting that conversation deletes its scheduled tasks. Minimum interval is 60s.
 
 ## Plugins
 

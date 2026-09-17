@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=252ca33713564480 skillVersion=3 productVersion=2.0.2
+ * contentHash=f94ef85f86bbc5a5 skillVersion=3 productVersion=2.0.2
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -33,15 +33,15 @@ export const HIP_PRODUCT_VERSION = '2.0.2'
 export const PRODUCT_SKILL_VERSION = '3'
 
 /** English defaults (agent-aligned). Prefer getProductHelpPack(lang) in UI. */
-export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
+export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code/Terminals surfaces, permission modes, the session right rail, scheduled tasks, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
 
 /** L0 capability map English (agent + default UI). */
 export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
 - Version: 2.0.2.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
-- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Knowledge (notes spaces).
+- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Terminals (SSH / local shells); no notes/Documents surface.
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
-- Right panel (session): Agents (roster / sub-agents) + Runtime (background shell, monitors, schedules) combined view.
+- Session right rail (Code): Files / Outline / Changes / Terminal; sub-agents and background work show inline, not in a separate panel.
 - API keys: ~/.hip/config/auth.json (0600 plaintext by design).
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`
@@ -71,11 +71,11 @@ If a product detail is not documented here, say so rather than inventing UI labe
 
 | Surface | Intent |
 |---------|--------|
-| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
-| **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
-| **Knowledge** | Notes / knowledge-space assistant: grounded answers in the user's notes workspace; not a coding agent for a software project |
+| **Code** | Project workbench (sidebar **Projects**): file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
+| **Chat** | Lighter conversation surface (sidebar **Chats**): shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
+| **Terminals** | Managed terminal / SSH host surface (sidebar **Terminals**): interactive shells on local or remote hosts; the terminal rail has **Files** and **Agent** tabs |
 
-Surface is chosen in the UI; the system prompt already reflects the active surface.
+There is no notes / Documents surface. Surface is chosen in the UI; the system prompt already reflects the active surface.
 
 ## Permission modes
 
@@ -91,21 +91,26 @@ Path convention in edit/chat: project-root form starting with \`/\` (e.g. \`/src
 
 Typical destinations (wording may vary slightly in the UI):
 
-- **Providers / API keys** — stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
+- **Model Configuration** / **Key Management** — provider list, model picker, and API keys; keys are stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
 - **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see \`references/memory.md\`)
 - **Skills** — enable/disable installed skills (\`hip.toml\` + skill folders)
-- **Plugins** — install/enable plugins (skills, agents, MCP, hooks); Plugin Market under Settings
-- **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
-- **Network policy** — optional allow/deny for outbound tools
+- **Plugin Market** — install/enable plugins (skills, agents, MCP, hooks) and browse the official markets
+- **Agent Management** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
+- **MCPs**, **Hooks**, **General**, **Window** — remaining pages
+- **Network policy** — file-only (\`~/.hip/config/network.json\`); there is **no** Settings page for it
 
-## Right panel: Agents + Runtime
+## Session right rail
 
-Each session’s right panel combines:
+On **Code**, the right rail tabs are **Files / Outline / Changes / Terminal** (Changes requires a git repo; Terminal requires an active session). Sub-agents and running background work are **not** in a separate panel:
 
-- **Agents** — roster, active sub-agents, delegation status
-- **Runtime** — background shell jobs, monitors, and schedules (TaskRuntime). Still-running work shows a chip; open the panel to inspect output and stop tasks.
+- Sub-agent and tool process render inline in the message trail.
+- Background shell jobs, monitors and schedules surface in the runtime strip above the composer; open it to inspect output or stop a task.
 
 Long shell, log watches, and recurring checks should use TaskRuntime tools (see \`references/agents-and-plugins.md\` and the \`hip-coding\` skill for policy). Do not sleep-poll in the main turn.
+
+## Scheduled tasks
+
+Recurring prompts are **per conversation**: create them from the clock button in the composer (Chat and Code). The run happens **inside the conversation that owns the task** — hip does not open a new conversation for each fire, and deleting that conversation deletes its scheduled tasks. Agent-side tools are \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` (minimum interval 60s).
 
 ## Skills, plugins, MCP
 
@@ -202,6 +207,7 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | \`~/.hip/config/memory.json\` | Memory feature flags / pipeline knobs |
 | \`~/.hip/config/network.json\` | Optional network policy |
 | \`~/.hip/config/hip-plugins.json\` | Installed plugins registry |
+| \`~/.hip/config/terminal-hosts.json\` | SSH / terminal host library (mode 0600) |
 | \`~/.hip/db/hip.db\` | SQLite sessions, messages, memory items, events |
 | \`~/.hip/data/tool-output/\` | Large tool outputs (kept out of the DB) |
 | \`~/.hip/logs/\` | Sidecar / shell logs |
@@ -210,13 +216,13 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
 | \`~/.hip/scratch/\` | Scratch helpers |
-| \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
+| \`~/.hip/trash/\` | Product recycle bin quarantine (automation rows under \`trash/automations/\`; sessions soft-delete via SQLite \`deleted_at\`) |
 
 ### Recycle bin & soft-delete
 
 | Behavior | Notes |
 |----------|--------|
-| UI delete (Chat / Code / Knowledge) | Soft-delete → sidebar **Recycle bin** (above History) |
+| UI delete (Chat / Code conversations) | Soft-delete → sidebar **Recycle bin** (above History). The bin lists conversations only. |
 | Retention | Default **7** days; **Settings → General** or \`hip.toml\` \`[trash] retentionDays\` (1–365) |
 | CLI \`hip session delete --yes\` | **Permanent** hard-delete (not the recycle bin) |
 | Memory trash | Still **Settings → Memory** (separate retention, default 30 days) |
@@ -238,9 +244,7 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 
 ## Auth model (BYOK)
 
-Keys are entered in the app **Settings → Providers** panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
-
-Design detail: \`docs/design/byok-spec.md\`.
+Keys are entered in the app **Settings → Model Configuration** (providers) / **Key Management** and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
 
 ### Resolution order
 
@@ -329,7 +333,7 @@ Default remains self-managed ACP (no hip key injection).
 
 ## No API / model calls work
 
-1. Open **Settings → Providers** and confirm a key is saved.
+1. Open **Settings → Key Management** (provider list and model picker live under **Model Configuration**) and confirm a key is saved.
 2. Keys live in \`~/.hip/config/auth.json\` (never print secrets to the user).
 3. Restart the app after changing auth outside the UI.
 4. Check sidecar logs under \`~/.hip/logs/\`.
@@ -344,6 +348,12 @@ The product CLI attaches to a **running** hip desktop app. Start the app first (
 2. Need enough chat turns + API key for extract; try **Learn now**.
 3. Status may show \`no_llm\`, \`rate_limited\`, or empty extract — fix key / quota / wait.
 4. SQLite is source of truth; stale mirrors under \`~/.hip/memories/\` are not the DB.
+
+## Scheduled task did not run
+
+- Tasks are **per conversation** and run inside the conversation that owns them. Switch to that conversation and open the composer clock button to see its tasks.
+- Deleting the owning conversation deletes its scheduled tasks (by design).
+- hip has **no** OS-level scheduler: a task that came due while the app was quit is skipped, not back-filled. Keep the app running.
 
 ## Agent cannot write files
 
@@ -430,9 +440,16 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 Do not claim work ran "in parallel" if only sequential dispatch was used.  
 Do not sleep-poll the main turn for long shell or CI — use TaskRuntime tools above.
 
-### Runtime panel (UI)
+### Runtime visibility (UI)
 
-Session right panel combines **Agents** (roster / sub-agents) and **Runtime** (background shell, monitors, schedules). Still-running work shows a chip; open Runtime to inspect or stop tasks.
+There is **no** separate Agents / Runtime panel:
+
+- Sub-agents and tool process render inline in the message trail (collapsed process fold).
+- Background shell jobs, monitors, and schedules surface in the **runtime strip above the composer**; open it to inspect output or stop a task.
+
+### Scheduled tasks (UI)
+
+Recurring prompts are **per conversation** — create them from the clock button in the composer (Chat and Code). A fire runs **inside the conversation that owns the task** (hip does not open a new conversation per run), and deleting that conversation deletes its scheduled tasks. Minimum interval is 60s.
 
 ## Plugins
 
@@ -553,13 +570,13 @@ To install a plugin:
 /** All UI locales for Settings → Product help. Agent embeds stay English. */
 export const PRODUCT_HELP_LOCALES: Record<ProductHelpLocale, ProductHelpLocalePack> = {
   en: {
-  description: 'Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.',
+  description: 'Product help for the hip desktop agent: Chat/Code/Terminals surfaces, permission modes, the session right rail, scheduled tasks, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.',
   capabilityMap: `Product facts (hip):
 - Version: 2.0.2.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
-- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Knowledge (notes spaces).
+- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Terminals (SSH / local shells); no notes/Documents surface.
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
-- Right panel (session): Agents (roster / sub-agents) + Runtime (background shell, monitors, schedules) combined view.
+- Session right rail (Code): Files / Outline / Changes / Terminal; sub-agents and background work show inline, not in a separate panel.
 - API keys: ~/.hip/config/auth.json (0600 plaintext by design).
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`,
@@ -587,11 +604,11 @@ If a product detail is not documented here, say so rather than inventing UI labe
 
 | Surface | Intent |
 |---------|--------|
-| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
-| **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
-| **Knowledge** | Notes / knowledge-space assistant: grounded answers in the user's notes workspace; not a coding agent for a software project |
+| **Code** | Project workbench (sidebar **Projects**): file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
+| **Chat** | Lighter conversation surface (sidebar **Chats**): shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
+| **Terminals** | Managed terminal / SSH host surface (sidebar **Terminals**): interactive shells on local or remote hosts; the terminal rail has **Files** and **Agent** tabs |
 
-Surface is chosen in the UI; the system prompt already reflects the active surface.
+There is no notes / Documents surface. Surface is chosen in the UI; the system prompt already reflects the active surface.
 
 ## Permission modes
 
@@ -607,21 +624,26 @@ Path convention in edit/chat: project-root form starting with \`/\` (e.g. \`/src
 
 Typical destinations (wording may vary slightly in the UI):
 
-- **Providers / API keys** — stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
+- **Model Configuration** / **Key Management** — provider list, model picker, and API keys; keys are stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
 - **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see \`references/memory.md\`)
 - **Skills** — enable/disable installed skills (\`hip.toml\` + skill folders)
-- **Plugins** — install/enable plugins (skills, agents, MCP, hooks); Plugin Market under Settings
-- **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
-- **Network policy** — optional allow/deny for outbound tools
+- **Plugin Market** — install/enable plugins (skills, agents, MCP, hooks) and browse the official markets
+- **Agent Management** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
+- **MCPs**, **Hooks**, **General**, **Window** — remaining pages
+- **Network policy** — file-only (\`~/.hip/config/network.json\`); there is **no** Settings page for it
 
-## Right panel: Agents + Runtime
+## Session right rail
 
-Each session’s right panel combines:
+On **Code**, the right rail tabs are **Files / Outline / Changes / Terminal** (Changes requires a git repo; Terminal requires an active session). Sub-agents and running background work are **not** in a separate panel:
 
-- **Agents** — roster, active sub-agents, delegation status
-- **Runtime** — background shell jobs, monitors, and schedules (TaskRuntime). Still-running work shows a chip; open the panel to inspect output and stop tasks.
+- Sub-agent and tool process render inline in the message trail.
+- Background shell jobs, monitors and schedules surface in the runtime strip above the composer; open it to inspect output or stop a task.
 
 Long shell, log watches, and recurring checks should use TaskRuntime tools (see \`references/agents-and-plugins.md\` and the \`hip-coding\` skill for policy). Do not sleep-poll in the main turn.
+
+## Scheduled tasks
+
+Recurring prompts are **per conversation**: create them from the clock button in the composer (Chat and Code). The run happens **inside the conversation that owns the task** — hip does not open a new conversation for each fire, and deleting that conversation deletes its scheduled tasks. Agent-side tools are \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` (minimum interval 60s).
 
 ## Skills, plugins, MCP
 
@@ -718,6 +740,7 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | \`~/.hip/config/memory.json\` | Memory feature flags / pipeline knobs |
 | \`~/.hip/config/network.json\` | Optional network policy |
 | \`~/.hip/config/hip-plugins.json\` | Installed plugins registry |
+| \`~/.hip/config/terminal-hosts.json\` | SSH / terminal host library (mode 0600) |
 | \`~/.hip/db/hip.db\` | SQLite sessions, messages, memory items, events |
 | \`~/.hip/data/tool-output/\` | Large tool outputs (kept out of the DB) |
 | \`~/.hip/logs/\` | Sidecar / shell logs |
@@ -726,13 +749,13 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
 | \`~/.hip/scratch/\` | Scratch helpers |
-| \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
+| \`~/.hip/trash/\` | Product recycle bin quarantine (automation rows under \`trash/automations/\`; sessions soft-delete via SQLite \`deleted_at\`) |
 
 ### Recycle bin & soft-delete
 
 | Behavior | Notes |
 |----------|--------|
-| UI delete (Chat / Code / Knowledge) | Soft-delete → sidebar **Recycle bin** (above History) |
+| UI delete (Chat / Code conversations) | Soft-delete → sidebar **Recycle bin** (above History). The bin lists conversations only. |
 | Retention | Default **7** days; **Settings → General** or \`hip.toml\` \`[trash] retentionDays\` (1–365) |
 | CLI \`hip session delete --yes\` | **Permanent** hard-delete (not the recycle bin) |
 | Memory trash | Still **Settings → Memory** (separate retention, default 30 days) |
@@ -754,9 +777,7 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 
 ## Auth model (BYOK)
 
-Keys are entered in the app **Settings → Providers** panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
-
-Design detail: \`docs/design/byok-spec.md\`.
+Keys are entered in the app **Settings → Model Configuration** (providers) / **Key Management** and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
 
 ### Resolution order
 
@@ -845,7 +866,7 @@ Default remains self-managed ACP (no hip key injection).
 
 ## No API / model calls work
 
-1. Open **Settings → Providers** and confirm a key is saved.
+1. Open **Settings → Key Management** (provider list and model picker live under **Model Configuration**) and confirm a key is saved.
 2. Keys live in \`~/.hip/config/auth.json\` (never print secrets to the user).
 3. Restart the app after changing auth outside the UI.
 4. Check sidecar logs under \`~/.hip/logs/\`.
@@ -860,6 +881,12 @@ The product CLI attaches to a **running** hip desktop app. Start the app first (
 2. Need enough chat turns + API key for extract; try **Learn now**.
 3. Status may show \`no_llm\`, \`rate_limited\`, or empty extract — fix key / quota / wait.
 4. SQLite is source of truth; stale mirrors under \`~/.hip/memories/\` are not the DB.
+
+## Scheduled task did not run
+
+- Tasks are **per conversation** and run inside the conversation that owns them. Switch to that conversation and open the composer clock button to see its tasks.
+- Deleting the owning conversation deletes its scheduled tasks (by design).
+- hip has **no** OS-level scheduler: a task that came due while the app was quit is skipped, not back-filled. Keep the app running.
 
 ## Agent cannot write files
 
@@ -946,9 +973,16 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 Do not claim work ran "in parallel" if only sequential dispatch was used.  
 Do not sleep-poll the main turn for long shell or CI — use TaskRuntime tools above.
 
-### Runtime panel (UI)
+### Runtime visibility (UI)
 
-Session right panel combines **Agents** (roster / sub-agents) and **Runtime** (background shell, monitors, schedules). Still-running work shows a chip; open Runtime to inspect or stop tasks.
+There is **no** separate Agents / Runtime panel:
+
+- Sub-agents and tool process render inline in the message trail (collapsed process fold).
+- Background shell jobs, monitors, and schedules surface in the **runtime strip above the composer**; open it to inspect output or stop a task.
+
+### Scheduled tasks (UI)
+
+Recurring prompts are **per conversation** — create them from the clock button in the composer (Chat and Code). A fire runs **inside the conversation that owns the task** (hip does not open a new conversation per run), and deleting that conversation deletes its scheduled tasks. Minimum interval is 60s.
 
 ## Plugins
 
@@ -1067,13 +1101,13 @@ To install a plugin:
   ],
 },
   'zh-CN': {
-  description: 'hip 桌面智能体产品帮助：Chat/Code/Knowledge 界面、权限模式、Agents+Runtime 面板、设置、技能、插件、MCP、记忆、智能体、CLI、故障排查与本地数据布局。当用户询问 hip 如何工作或如何配置时加载。',
+  description: 'hip 桌面智能体产品帮助：Chat/Code/Terminals 界面、权限模式、会话右栏、定时任务、设置、技能、插件、MCP、记忆、智能体、CLI、故障排查与本地数据布局。当用户询问 hip 如何工作或如何配置时加载。',
   capabilityMap: `产品要点（hip）：
 - 版本：2.0.2。
 - 桌面 AI 工作台智能体，在用户项目中使用真实文件工具，并可委派子智能体。
-- 界面：Code（完整工作台）与 Chat（更轻；可预览交付物请 write_file 到工件面板）与 Knowledge（笔记空间）。
+- 界面：Code（完整工作台）与 Chat（更轻；可预览交付物请 write_file 到工件面板）与 Terminals（SSH / 本地终端）；没有笔记 / 文档界面。
 - 仅在 Code 上，工具门禁（UI 标签）：chat = 只读；edit = 项目沙箱（默认）；full = 用户授权的整机文件系统。Chat 界面不是 Code 的「edit 模式」。
-- 会话右侧面板：Agents（花名册 / 子智能体）与 Runtime（后台 shell、monitor、定时任务）合并视图。
+- 会话右栏（Code）：文件 / 大纲 / 更改 / 终端；子智能体与后台任务内联显示，没有独立面板。
 - API 密钥：~/.hip/config/auth.json（按设计为 0600 明文）。
 - 跨会话记忆：默认关闭（设置 → 记忆）。
 - 本地数据：~/.hip/（配置、数据库、技能、插件、日志）。`,
@@ -1101,11 +1135,11 @@ hip 是一款**桌面 AI 工作台**（Tauri 壳 + React UI + Node sidecar），
 
 | 界面 | 用途 |
 |------|------|
-| **Code** | 项目工作台：文件工具、git 指导、MCP 目录、完整智能体工具、异步 TaskRuntime |
-| **Chat** | 更轻的会话面：更短提示、无 git 提交指导；可预览交付物（\`page.html\`、\`notes.md\`、SVG 等）请 \`write_file\` 到工作区以便工件面板展示 |
-| **Knowledge** | 笔记 / 知识空间助手：基于用户笔记作答；不是软件项目的编码智能体 |
+| **Code** | 项目工作台（侧栏「项目」）：文件工具、git 指导、MCP 目录、完整智能体工具、异步 TaskRuntime |
+| **Chat** | 更轻的会话面（侧栏「对话」）：更短提示、无 git 提交指导；可预览交付物（\`page.html\`、\`notes.md\`、SVG 等）请 \`write_file\` 到工作区以便工件面板展示 |
+| **Terminals** | 托管终端 / SSH 主机界面（侧栏「终端」）：在本地或远程主机上开交互式 shell；终端右栏有 **文件** 与 **智能体** 两个标签 |
 
-界面在 UI 中选择；系统提示会反映当前界面。
+没有笔记 / 文档界面。界面在 UI 中选择；系统提示会反映当前界面。
 
 ## 权限模式
 
@@ -1121,21 +1155,26 @@ edit/chat 下的路径约定：以 \`/\` 开头的项目根相对形式（如 \`
 
 常见入口（具体文案可能随 UI 微调）：
 
-- **提供商 / API 密钥** — 明文保存在 \`~/.hip/config/auth.json\`（按设计为 0600）
+- **模型配置** / **密钥管理** — 提供商列表、模型选择与 API 密钥；密钥以明文保存在 \`~/.hip/config/auth.json\`（按设计为 0600）
 - **记忆** — 跨会话记忆**默认关闭**；在 设置 → 记忆 开启（见 \`references/memory.md\`）
 - **技能** — 启用/禁用已安装技能（\`hip.toml\` + 技能目录）
-- **插件** — 安装/启用插件（技能、智能体、MCP、钩子）；设置中有插件市场
-- **智能体** — 固定配置（supervisor / plan / explore / coder）与自定义内部或外部智能体
-- **网络策略** — 可选的出站工具允许/拒绝
+- **插件市场** — 安装/启用插件（技能、智能体、MCP、钩子）并浏览官方市场
+- **智能体管理** — 固定配置（supervisor / plan / explore / coder）与自定义内部或外部智能体
+- **MCP**、**钩子**、**通用**、**窗口** — 其余页面
+- **网络策略** — 仅配置文件（\`~/.hip/config/network.json\`）；**没有**对应的设置页
 
-## 右侧面板：Agents + Runtime
+## 会话右栏
 
-每个会话的右侧面板合并：
+在 **Code** 上，右栏标签是 **文件 / 大纲 / 更改 / 终端**（更改需要 git 仓库；终端需要活跃会话）。子智能体与后台运行中的工作**不在**独立面板里：
 
-- **Agents** — 花名册、活跃子智能体、委派状态
-- **Runtime** — 后台 shell、monitor、定时任务（TaskRuntime）。仍在运行的工作显示 chip；打开面板可查看输出或停止任务
+- 子智能体与工具过程内联显示在消息轨迹中。
+- 后台 shell 任务、monitor 与定时任务显示在输入框上方的运行时条里；打开它可查看输出或停止任务。
 
 长时间 shell、日志监视与周期检查应使用 TaskRuntime 工具（见 \`references/agents-and-plugins.md\` 与 \`hip-coding\` 技能）。不要在主回合里 sleep 轮询。
+
+## 定时任务
+
+周期提示**按会话归属**：在输入框的时钟按钮创建（Chat 与 Code 均可）。到点在**它所属的那个会话内**执行——hip 不会为每次触发新开会话；删除该会话即删除它的定时任务。智能体侧工具为 \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\`（最短间隔 60s）。
 
 ## 技能、插件、MCP
 
@@ -1233,6 +1272,7 @@ SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、�
 | \`~/.hip/config/memory.json\` | 记忆功能开关 / 流水线参数 |
 | \`~/.hip/config/network.json\` | 可选网络策略 |
 | \`~/.hip/config/hip-plugins.json\` | 已安装插件注册表 |
+| \`~/.hip/config/terminal-hosts.json\` | SSH / 终端主机库（0600） |
 | \`~/.hip/db/hip.db\` | SQLite 会话、消息、记忆、事件 |
 | \`~/.hip/data/tool-output/\` | 大型工具输出（不进 DB） |
 | \`~/.hip/logs/\` | Sidecar / 壳日志 |
@@ -1240,7 +1280,7 @@ SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、�
 | \`~/.hip/plugins/\` | 已安装插件 |
 | \`~/.hip/memories/\` | 记忆 Markdown 镜像 |
 | \`~/.hip/builtin-skills/\` | 内置渐进产品技能（如 \`hip\`） |
-| | \`~/.hip/scratch/\` | 临时区助手 |
+| \`~/.hip/scratch/\` | 临时区助手 |
 
 项目覆盖常在 \`<project>/.hip/\`（如 \`.hip/skills/\`、\`.hip/hip.toml\`）。
 
@@ -1269,7 +1309,7 @@ SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、�
 
 ## API / 模型调用失败
 
-1. 打开 **设置 → 提供商**，确认已保存密钥。
+1. 打开 **设置 → 密钥管理**（提供商列表与模型选择在 **模型配置**），确认已保存密钥。
 2. 密钥在 \`~/.hip/config/auth.json\`（切勿向用户打印密钥）。
 3. 在 UI 外改鉴权后请重启应用。
 4. 查看 \`~/.hip/logs/\` 下 sidecar 日志。
@@ -1284,6 +1324,12 @@ SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、�
 2. 需要足够对话轮次 + API 密钥才能抽取；可试 **立即学习**。
 3. 状态可能显示 \`no_llm\`、\`rate_limited\` 或空抽取 — 检查密钥 / 配额 / 等待。
 4. SQLite 是真相源；\`~/.hip/memories/\` 镜像陈旧不等于库空。
+
+## 定时任务没有执行
+
+- 定时任务**按会话归属**，只在其所属会话内执行。切到那个会话，点输入框的时钟按钮即可看到它的任务。
+- 删除所属会话会一并删除它的定时任务（设计如此）。
+- hip **没有** OS 级调度：应用退出期间到点的任务会被跳过，不会补跑。请保持应用运行。
 
 ## 智能体无法写文件
 
@@ -1368,9 +1414,16 @@ hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能�
 若只用顺序 dispatch，不要声称「并行」完成。  
 长 shell / CI 不要在主回合 sleep 轮询——使用上表 TaskRuntime 工具。
 
-### Runtime 面板（UI）
+### 运行时可见性（UI）
 
-会话右侧面板合并 **Agents**（花名册 / 子智能体）与 **Runtime**（后台 shell、monitor、定时任务）。仍在运行的工作显示 chip；打开 Runtime 可查看或停止任务。
+没有独立的 Agents / Runtime 面板：
+
+- 子智能体与工具过程内联显示在消息轨迹里（默认折叠的「过程」折叠区）。
+- 后台 shell 任务、monitor 与定时任务显示在**输入框上方的运行时条**；打开它可查看输出或停止任务。
+
+### 定时任务（UI）
+
+周期提示**按会话归属**——在输入框的时钟按钮创建（Chat 与 Code 均可）。到点在**它所属的那个会话内**执行（不会为每次触发新开会话），删除该会话即删除它的定时任务。最短间隔 60s。
 
 ## 插件
 
@@ -1489,13 +1542,13 @@ UI 标签：**Grok market** · **Claude market** · **Custom plugins**（无官�
   ],
 },
   'zh-TW': {
-  description: 'hip 桌面智能體產品說明：Chat/Code/Knowledge 介面、權限模式、Agents+Runtime 面板、設定、技能、外掛、MCP、記憶、智能體、CLI、故障排除與本機資料配置。當使用者詢問 hip 如何運作或如何設定時載入。',
+  description: 'hip 桌面智能體產品說明：Chat/Code/Terminals 介面、權限模式、工作階段右欄、排程任務、設定、技能、外掛、MCP、記憶、智能體、CLI、故障排除與本機資料配置。當使用者詢問 hip 如何運作或如何設定時載入。',
   capabilityMap: `產品要點（hip）：
 - 版本：2.0.2。
 - 桌面 AI 工作台智能體，在使用者專案中使用真實檔案工具，並可委派子智能體。
-- 介面：Code（完整工作台）與 Chat（較輕；可預覽交付物請 write_file 到工件面板）與 Knowledge（筆記空間）。
+- 介面：Code（完整工作台）與 Chat（較輕；可預覽交付物請 write_file 到工件面板）與 Terminals（SSH / 本機終端）；沒有筆記 / 文件介面。
 - 僅在 Code 上，工具門禁（UI 標籤）：chat = 唯讀；edit = 專案沙箱（預設）；full = 使用者授權的整機檔案系統。Chat 介面不是 Code 的「edit 模式」。
-- 工作階段右側面板：Agents（名冊 / 子智能體）與 Runtime（後台 shell、monitor、排程）合併檢視。
+- 工作階段右欄（Code）：檔案 / 大綱 / 變更 / 終端；子智能體與後台任務內聯顯示，沒有獨立面板。
 - API 金鑰：~/.hip/config/auth.json（依設計為 0600 明文）。
 - 跨工作階段記憶：預設關閉（設定 → 記憶）。
 - 本機資料：~/.hip/（設定、資料庫、技能、外掛、日誌）。`,
@@ -1523,11 +1576,11 @@ hip 是一款**桌面 AI 工作台**（Tauri 殼 + React UI + Node sidecar），
 
 | 介面 | 用途 |
 |------|------|
-| **Code** | 專案工作台：檔案工具、git 指導、MCP 目錄、完整智能體工具、非同步 TaskRuntime |
-| **Chat** | 較輕的對話面：更短提示、無 git 提交指導；可預覽交付物請 \`write_file\` 到工作區以便工件面板展示 |
-| **Knowledge** | 筆記 / 知識空間助手：依使用者筆記作答；不是軟體專案的編碼智能體 |
+| **Code** | 專案工作台（側欄「專案」）：檔案工具、git 指導、MCP 目錄、完整智能體工具、非同步 TaskRuntime |
+| **Chat** | 較輕的對話面（側欄「對話」）：更短提示、無 git 提交指導；可預覽交付物請 \`write_file\` 到工作區以便工件面板展示 |
+| **Terminals** | 託管終端 / SSH 主機介面（側欄「終端」）：在本地或遠端主機上開互動式 shell；終端右欄有 **檔案** 與 **智能體** 兩個標籤 |
 
-介面在 UI 中選擇；系統提示會反映目前介面。
+沒有筆記 / 文件介面。介面在 UI 中選擇；系統提示會反映目前介面。
 
 ## 權限模式
 
@@ -1543,21 +1596,26 @@ edit/chat 下的路徑約定：以 \`/\` 開頭的專案根相對形式。不要
 
 常見入口（具體文案可能隨 UI 微調）：
 
-- **提供者 / API 金鑰** — 明文保存在 \`~/.hip/config/auth.json\`（依設計為 0600）
+- **模型設定** / **金鑰管理** — 供應商清單、模型選擇與 API 金鑰；金鑰以明文保存在 \`~/.hip/config/auth.json\`（依設計為 0600）
 - **記憶** — 跨工作階段記憶**預設關閉**；在 設定 → 記憶 開啟（見 \`references/memory.md\`）
 - **技能** — 啟用/停用已安裝技能
-- **外掛** — 安裝/啟用外掛（技能、智能體、MCP、掛鉤）；設定中有外掛市集
-- **智能體** — 固定設定（supervisor / plan / explore / coder）與自訂內部或外部智能體
-- **網路原則** — 可選的出站工具允許/拒絕
+- **外掛市集** — 安裝/啟用外掛（技能、智能體、MCP、掛鉤）並瀏覽官方市集
+- **智能體管理** — 固定設定（supervisor / plan / explore / coder）與自訂內部或外部智能體
+- **MCP**、**掛鉤**、**一般**、**視窗** — 其餘頁面
+- **網路原則** — 僅設定檔（\`~/.hip/config/network.json\`）；**沒有**對應的設定頁
 
-## 右側面板：Agents + Runtime
+## 工作階段右欄
 
-每個工作階段的右側面板合併：
+在 **Code** 上，右欄標籤是 **檔案 / 大綱 / 變更 / 終端**（變更需要 git 儲存庫；終端需要活躍工作階段）。子智能體與後台執行中的工作**不在**獨立面板裡：
 
-- **Agents** — 名冊、活躍子智能體、委派狀態
-- **Runtime** — 後台 shell、monitor、排程（TaskRuntime）。仍在執行的工作顯示 chip；開啟面板可檢視輸出或停止任務
+- 子智能體與工具過程內聯顯示在訊息軌跡中。
+- 後台 shell 任務、monitor 與排程顯示在輸入框上方的執行時條裡；開啟它可檢視輸出或停止任務。
 
 長時間 shell、日誌監視與週期檢查應使用 TaskRuntime 工具。不要在主回合 sleep 輪詢。
+
+## 排程任務
+
+週期提示**依工作階段歸屬**：在輸入框的時鐘按鈕建立（Chat 與 Code 皆可）。到點在**它所屬的那個工作階段內**執行——hip 不會為每次觸發新開工作階段；刪除該工作階段即刪除它的排程任務。智能體側工具為 \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\`（最短間隔 60s）。
 
 ## 技能、外掛、MCP
 
@@ -1649,6 +1707,7 @@ SQLite（\`memory_items\`）結構化條目：偏好、約定、教訓、工作�
 | \`~/.hip/config/memory.json\` | 記憶功能開關 |
 | \`~/.hip/config/network.json\` | 可選網路原則 |
 | \`~/.hip/config/hip-plugins.json\` | 已安裝外掛登錄 |
+| \`~/.hip/config/terminal-hosts.json\` | SSH / 終端主機庫（0600） |
 | \`~/.hip/db/hip.db\` | SQLite 工作階段、訊息、記憶、事件 |
 | \`~/.hip/data/tool-output/\` | 大型工具輸出 |
 | \`~/.hip/logs/\` | Sidecar / 殼日誌 |
@@ -1671,7 +1730,7 @@ SQLite（\`memory_items\`）結構化條目：偏好、約定、教訓、工作�
 
 ## API / 模型呼叫失敗
 
-1. 開啟 **設定 → 提供者**，確認已儲存金鑰。
+1. 開啟 **設定 → 金鑰管理**（提供者清單與模型選擇在 **模型設定**），確認已儲存金鑰。
 2. 金鑰在 \`~/.hip/config/auth.json\`（切勿向使用者列印金鑰）。
 3. 在 UI 外改鑑權後請重新啟動應用。
 4. 查看 \`~/.hip/logs/\`。
@@ -1683,6 +1742,12 @@ SQLite（\`memory_items\`）結構化條目：偏好、約定、教訓、工作�
 ## 開啟記憶後列表仍空
 
 確認使用/產生開關、對話輪次、API 金鑰；可試 **立即學習**。SQLite 是真相來源。
+
+## 排程任務沒有執行
+
+- 排程任務**依工作階段歸屬**，只在它所屬的工作階段內執行。切到那個工作階段，點輸入框的時鐘按鈕即可看到它的任務。
+- 刪除所屬工作階段會一併刪除它的排程任務（設計如此）。
+- hip **沒有** OS 層級排程：應用程式結束期間到點的任務會被跳過，不會補跑。請保持應用程式執行。
 
 ## 智能體無法寫檔
 
@@ -1754,9 +1819,16 @@ ACP 智能體的認證與模型為**自管**：hip **不會**將自身 provider 
 
 不要在主回合 sleep 輪詢長 shell / CI。
 
-### Runtime 面板（UI）
+### 執行時可見性（UI）
 
-工作階段右側面板合併 **Agents** 與 **Runtime**。仍在執行的工作顯示 chip。
+沒有獨立的 Agents / Runtime 面板：
+
+- 子智能體與工具過程內聯顯示在訊息軌跡裡（預設折疊的「過程」折疊區）。
+- 後台 shell 任務、monitor 與排程顯示在**輸入框上方的執行時條**；開啟它可檢視輸出或停止任務。
+
+### 排程任務（UI）
+
+週期提示**依工作階段歸屬**——在輸入框的時鐘按鈕建立（Chat 與 Code 皆可）。到點在**它所屬的那個工作階段內**執行（不會為每次觸發新開工作階段），刪除該工作階段即刪除它的排程任務。最短間隔 60s。
 
 ## 外掛
 
@@ -1827,13 +1899,13 @@ UI：**Grok market** · **Claude market** · **Custom plugins**。
   ],
 },
   ja: {
-  description: 'hip デスクトップエージェントの製品ヘルプ：Chat/Code/Knowledge サーフェス、権限モード、Agents+Runtime パネル、設定、スキル、プラグイン、MCP、メモリ、エージェント、CLI、トラブルシューティング、ローカルデータ。ユーザーが hip の仕組みや設定方法を尋ねたときに読み込みます。',
+  description: 'hip デスクトップエージェントの製品ヘルプ：Chat/Code/Terminals サーフェス、権限モード、セッション右レール、スケジュールタスク、設定、スキル、プラグイン、MCP、メモリ、エージェント、CLI、トラブルシューティング、ローカルデータ。ユーザーが hip の仕組みや設定方法を尋ねたときに読み込みます。',
   capabilityMap: `製品の要点（hip）：
 - バージョン：2.0.2。
 - ユーザーのプロジェクトで実ファイルツールと任意のサブエージェントを使うデスクトップ作業台エージェント。
-- サーフェス：Code（フル作業台）vs Chat（軽量；プレビュー可能な成果物は write_file でアーティファクト）vs Knowledge（ノート空間）。
+- サーフェス：Code（フル作業台）vs Chat（軽量；プレビュー可能な成果物は write_file でアーティファクト）vs Terminals（SSH / ローカルシェル）。ノート / ドキュメントのサーフェスはありません。
 - Code のみのツールゲート（UI ラベル）：chat = 読み取り専用；edit = プロジェクトサンドボックス（既定）；full = ユーザー許可の全 FS。Chat は Code の「edit モード」ではない。
-- セッション右パネル：Agents（名簿 / サブエージェント）+ Runtime（バックグラウンド shell、monitor、スケジュール）の統合ビュー。
+- セッション右レール（Code）：ファイル / アウトライン / 変更 / ターミナル。サブエージェントとバックグラウンド作業はインライン表示で、独立パネルはありません。
 - API キー：~/.hip/config/auth.json（設計上 0600 平文）。
 - クロスセッション記憶：既定オフ（設定 → メモリ）。
 - ローカルデータ：~/.hip/（設定、DB、スキル、プラグイン、ログ）。`,
@@ -1861,11 +1933,11 @@ hip は**デスクトップ AI 作業台**（Tauri シェル + React UI + Node s
 
 | サーフェス | 用途 |
 |------------|------|
-| **Code** | プロジェクト作業台：ファイルツール、git 指針、MCP カタログ、フルツール、非同期 TaskRuntime |
-| **Chat** | 軽量会話：短いプロンプト、git コミット指針なし；プレビュー可能な成果物は \`write_file\` |
-| **Knowledge** | ノート空間アシスタント；ソフトウェアプロジェクトのコーディングエージェントではない |
+| **Code** | プロジェクト作業台（サイドバー「プロジェクト」）：ファイルツール、git 指針、MCP カタログ、フルツール、非同期 TaskRuntime |
+| **Chat** | 軽量会話（サイドバー「チャット」）：短いプロンプト、git コミット指針なし；プレビュー可能な成果物は \`write_file\` |
+| **Terminals** | マネージド端末 / SSH ホスト（サイドバー「ターミナル」）：ローカルまたはリモートで対話シェルを実行；端末レールに **ファイル** と **エージェント** タブ |
 
-サーフェスは UI で選択；システムプロンプトが反映済み。
+ノート / ドキュメントのサーフェスはありません。サーフェスは UI で選択；システムプロンプトが反映済み。
 
 ## 権限モード
 
@@ -1879,21 +1951,26 @@ edit/chat のパスは \`/\` 始まりのプロジェクト相対。シェルツ
 
 ## 設定（デスクトップ UI）
 
-- **プロバイダ / API キー** — \`~/.hip/config/auth.json\`（0600 平文）
+- **モデル構成** / **キー管理** — プロバイダ一覧、モデル選択、API キー；キーは \`~/.hip/config/auth.json\`（0600 平文）
 - **メモリ** — クロスセッションは**既定オフ**（設定 → メモリ）
 - **スキル** — インストール済みスキルの有効/無効
-- **プラグイン** — インストール/有効化；設定に Plugin Market
-- **エージェント** — supervisor / plan / explore / coder とカスタム
-- **ネットワークポリシー** — 出方向ツールの許可/拒否
+- **プラグインマーケット** — プラグインのインストール/有効化と公式マーケットの閲覧
+- **エージェント管理** — supervisor / plan / explore / coder とカスタム
+- **MCP**、**フック**、**一般**、**ウィンドウ** — その他のページ
+- **ネットワークポリシー** — 設定ファイルのみ（\`~/.hip/config/network.json\`）；対応する設定ページは**ありません**
 
-## 右パネル：Agents + Runtime
+## セッション右レール
 
-セッション右パネルは次を統合：
+**Code** では右レールのタブは **ファイル / アウトライン / 変更 / ターミナル**（変更は git リポジトリが必要、ターミナルはアクティブセッションが必要）。サブエージェントと実行中の作業は**独立パネルではありません**：
 
-- **Agents** — 名簿、サブエージェント、委任状態
-- **Runtime** — バックグラウンド shell、monitor、スケジュール。実行中は chip 表示
+- サブエージェントとツールの過程はメッセージトレイルにインライン表示されます。
+- バックグラウンド shell、monitor、スケジュールはコンポーザー上部のランタイムストリップに表示され、そこから出力確認や停止ができます。
 
 長時間 shell / CI / 定期チェックは TaskRuntime ツールを使う。メインターンで sleep ポールしない。
+
+## スケジュールタスク
+
+定期プロンプトは**会話単位**です：コンポーザーの時計ボタンから作成（Chat / Code どちらも可）。実行は**そのタスクを所有する会話の中**で行われ、hip が毎回新しい会話を開くことはありません。その会話を削除するとスケジュールタスクも削除されます。エージェント側ツールは \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\`（最小間隔 60s）。
 
 ## スキル・プラグイン・MCP
 
@@ -1987,6 +2064,7 @@ SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教�
 | \`~/.hip/config/memory.json\` | メモリ機能フラグ / パイプラインノブ |
 | \`~/.hip/config/network.json\` | オプションのネットワークポリシー |
 | \`~/.hip/config/hip-plugins.json\` | インストール済みプラグインレジストリ |
+| \`~/.hip/config/terminal-hosts.json\` | SSH / ターミナルホストライブラリ (モード 0600) |
 | \`~/.hip/db/hip.db\` | SQLiteセッション、メッセージ、メモリ項目、イベント |
 | \`~/.hip/data/tool-output/\` | 大きなツール出力 (DB外に保持) |
 | \`~/.hip/logs/\` | サイドカー / シェルログ |
@@ -1994,14 +2072,14 @@ SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教�
 | \`~/.hip/plugins/\` | インストール済みプラグイン |
 | \`~/.hip/memories/\` | メモリマークダウンミラー |
 | \`~/.hip/builtin-skills/\` | 組み込みプログレッシブ製品スキル (例: この \`hip\` スキル) |
-| | \`~/.hip/scratch/\` | スクラッチヘルパー |
-| \`~/.hip/trash/\` | 製品ごみ箱 (知識FS隔離; セッションはSQLite経由でソフトデリート) |
+| \`~/.hip/scratch/\` | スクラッチヘルパー |
+| \`~/.hip/trash/\` | 製品ごみ箱の隔離 (自動化の行は \`trash/automations/\`、セッションは SQLite \`deleted_at\` 経由でソフトデリート) |
 
 ### ごみ箱とソフトデリート
 
 | 動作 | 備考 |
 |----------|--------|
-| UI削除 (チャット / コード / 知識) | ソフトデリート → サイドバー **ごみ箱** (履歴の上) |
+| UI削除 (チャット / コードの会話) | ソフトデリート → サイドバー **ごみ箱** (履歴の上)。ごみ箱に並ぶのは会話のみ。 |
 | 保持期間 | デフォルト **7** 日; **設定 → 一般** または \`hip.toml\` \`[trash] retentionDays\` (1–365) |
 | CLI \`hip session delete --yes\` | **完全な** ハードデリート (ごみ箱を経由しない) |
 | メモリごみ箱 | 引き続き **設定 → メモリ** (別の保持期間、デフォルト30日) |
@@ -2034,7 +2112,7 @@ SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教�
 
 ## API / モデル呼び出しが動作しない
 
-1. **設定 → プロバイダー** を開き、キーが保存されていることを確認します。
+1. **設定 → キー管理**（プロバイダ一覧とモデル選択は **モデル構成**）を開き、キーが保存されていることを確認します。
 2. キーは \`~/.hip/config/auth.json\` に保存されています（シークレットをユーザーに表示しないでください）。
 3. UI 外で認証情報を変更した場合は、アプリを再起動します。
 4. \`~/.hip/logs/\` のサイドカーログを確認します。
@@ -2049,6 +2127,12 @@ SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教�
 2. 抽出には十分なチャットターン数と API キーが必要です。「今すぐ学習」を試してください。
 3. ステータスが \`no_llm\`、\`rate_limited\`、または空の抽出結果を示す場合があります — キー/クォータを修正するか、待機してください。
 4. SQLite が信頼できる情報源です。\`~/.hip/memories/\` 配下の古いミラーはデータベースではありません。
+
+## スケジュールタスクが実行されない
+
+- スケジュールタスクは**会話単位**で、所有する会話の中でのみ実行されます。その会話に切り替え、コンポーザーの時計ボタンでタスクを確認してください。
+- 所有する会話を削除すると、そのスケジュールタスクも削除されます（設計どおり）。
+- hip には **OS レベルのスケジューラがありません**：アプリ終了中に到来したタスクはスキップされ、後から補実行されません。アプリを起動したままにしてください。
 
 ## エージェントがファイルを書き込めない
 
@@ -2128,9 +2212,16 @@ ACP の認証とモデルは**自己管理**：hip は provider API キーを AC
 
 メインターンで長時間 shell/CI を sleep ポールしない。
 
-### Runtime パネル（UI）
+### ランタイムの見え方（UI）
 
-セッション右パネルは **Agents** と **Runtime** を統合。実行中は chip 表示。
+独立した Agents / Runtime パネルはありません：
+
+- サブエージェントとツールの過程はメッセージトレイルにインライン表示（既定で折りたたまれた「過程」フォールド）。
+- バックグラウンド shell、monitor、スケジュールは**コンポーザー上部のランタイムストリップ**に表示され、そこから出力確認や停止ができます。
+
+### スケジュールタスク（UI）
+
+定期プロンプトは**会話単位**——コンポーザーの時計ボタンから作成（Chat / Code どちらも可）。実行は**そのタスクを所有する会話の中**で行われ（毎回新しい会話を開きません）、その会話を削除するとスケジュールタスクも削除されます。最小間隔は 60s。
 
 ## プラグイン
 
@@ -2187,13 +2278,13 @@ UI: **Grok market** · **Claude market** · **Custom plugins**。
   ],
 },
   ko: {
-  description: 'hip 데스크톱 에이전트 제품 도움말: Chat/Code/Knowledge 서피스, 권한 모드, Agents+Runtime 패널, 설정, 스킬, 플러그인, MCP, 메모리, 에이전트, CLI, 문제 해결, 로컬 데이터. 사용자가 hip 작동 방식이나 설정 방법을 물을 때 로드합니다.',
+  description: 'hip 데스크톱 에이전트 제품 도움말: Chat/Code/Terminals 서피스, 권한 모드, 세션 오른쪽 레일, 예약 작업, 설정, 스킬, 플러그인, MCP, 메모리, 에이전트, CLI, 문제 해결, 로컬 데이터. 사용자가 hip 작동 방식이나 설정 방법을 물을 때 로드합니다.',
   capabilityMap: `제품 요약（hip）：
 - 버전: 2.0.2.
 - 사용자 프로젝트에서 실제 파일 도구와 선택적 서브에이전트를 쓰는 데스크톱 작업대 에이전트.
-- 서피스: Code(전체 작업대) vs Chat(가벼움; 미리보기 산출물은 write_file로 아티팩트) vs Knowledge(노트 공간).
+- 서피스: Code(전체 작업대) vs Chat(가벼움; 미리보기 산출물은 write_file로 아티팩트) vs Terminals(SSH / 로컬 셸). 노트 / 문서 서피스는 없습니다.
 - Code에서만 도구 게이트(UI 라벨): chat = 읽기 전용; edit = 프로젝트 샌드박스(기본); full = 사용자 허용 전체 FS. Chat 서피스는 Code "edit 모드"가 아님.
-- 세션 오른쪽 패널: Agents(명단/서브에이전트) + Runtime(백그라운드 shell, monitor, 스케줄) 통합 뷰.
+- 세션 오른쪽 레일(Code): 파일 / 개요 / 변경 / 터미널. 서브에이전트와 백그라운드 작업은 인라인으로 표시되며 별도 패널은 없습니다.
 - API 키: ~/.hip/config/auth.json (설계상 0600 평문).
 - 교차 세션 메모리: 기본 꺼짐(설정 → 메모리).
 - 로컬 데이터: ~/.hip/(설정, DB, 스킬, 플러그인, 로그).`,
@@ -2221,11 +2312,11 @@ hip은 **데스크톱 AI 작업대**(Tauri 셸 + React UI + Node sidecar)이며 
 
 | 서피스 | 용도 |
 |--------|------|
-| **Code** | 프로젝트 작업대: 파일 도구, git 가이드, MCP 카탈로그, 전체 도구, 비동기 TaskRuntime |
-| **Chat** | 가벼운 대화: 짧은 프롬프트, git 커밋 가이드 없음; 미리보기 산출물은 \`write_file\` |
-| **Knowledge** | 노트 공간 어시스턴트; 소프트웨어 프로젝트 코딩 에이전트가 아님 |
+| **Code** | 프로젝트 작업대(사이드바 "프로젝트"): 파일 도구, git 가이드, MCP 카탈로그, 전체 도구, 비동기 TaskRuntime |
+| **Chat** | 가벼운 대화(사이드바 "대화"): 짧은 프롬프트, git 커밋 가이드 없음; 미리보기 산출물은 \`write_file\` |
+| **Terminals** | 관리형 터미널 / SSH 호스트(사이드바 "터미널"): 로컬 또는 원격에서 대화형 셸 실행; 터미널 레일에 **파일** 과 **에이전트** 탭 |
 
-서피스는 UI에서 선택되며 시스템 프롬프트에 반영됩니다.
+노트 / 문서 서피스는 없습니다. 서피스는 UI에서 선택되며 시스템 프롬프트에 반영됩니다.
 
 ## 권한 모드
 
@@ -2239,21 +2330,26 @@ edit/chat 경로는 \`/\`로 시작하는 프로젝트 상대 형식. 셸 도구
 
 ## 설정(데스크톱 UI)
 
-- **프로바이더 / API 키** — \`~/.hip/config/auth.json\`(0600 평문)
+- **모델 구성** / **키 관리** — 프로바이더 목록, 모델 선택, API 키; 키는 \`~/.hip/config/auth.json\`(0600 평문)
 - **메모리** — 교차 세션 **기본 꺼짐**(설정 → 메모리)
 - **스킬** — 설치된 스킬 활성/비활성
-- **플러그인** — 설치/활성; 설정에 Plugin Market
-- **에이전트** — supervisor / plan / explore / coder 및 커스텀
-- **네트워크 정책** — 아웃바운드 도구 허용/거부
+- **플러그인 마켓** — 플러그인 설치/활성 및 공식 마켓 탐색
+- **에이전트 관리** — supervisor / plan / explore / coder 및 커스텀
+- **MCP**, **훅**, **일반**, **창** — 나머지 페이지
+- **네트워크 정책** — 설정 파일 전용(\`~/.hip/config/network.json\`); 해당 설정 페이지는 **없습니다**
 
-## 오른쪽 패널: Agents + Runtime
+## 세션 오른쪽 레일
 
-세션 오른쪽 패널은 다음을 합칩니다:
+**Code** 에서 오른쪽 레일 탭은 **파일 / 개요 / 변경 / 터미널** 입니다(변경은 git 저장소 필요, 터미널은 활성 세션 필요). 서브에이전트와 실행 중 작업은 **별도 패널이 아닙니다**:
 
-- **Agents** — 명단, 서브에이전트, 위임 상태
-- **Runtime** — 백그라운드 shell, monitor, 스케줄. 실행 중 작업은 chip 표시
+- 서브에이전트와 도구 과정은 메시지 트레일에 인라인으로 표시됩니다.
+- 백그라운드 shell, monitor, 스케줄은 컴포저 위 런타임 스트립에 표시되며, 여기서 출력 확인과 중지가 가능합니다.
 
 긴 shell / CI / 주기 작업은 TaskRuntime 도구를 쓰세요. 메인 턴에서 sleep 폴링하지 마세요.
+
+## 예약 작업
+
+주기 프롬프트는 **대화 단위** 입니다: 컴포저의 시계 버튼에서 만듭니다(Chat / Code 모두 가능). 실행은 **해당 작업을 소유한 대화 안**에서 이루어지며, hip이 매번 새 대화를 열지 않습니다. 그 대화를 삭제하면 예약 작업도 삭제됩니다. 에이전트 측 도구는 \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\`(최소 간격 60s).
 
 ## 스킬·플러그인·MCP
 
@@ -2347,6 +2443,7 @@ SQLite의 구조화된 항목(\`memory_items\`): 선호도, 규칙, 학습 내�
 | \`~/.hip/config/memory.json\` | 메모리 기능 플래그 / 파이프라인 설정값 |
 | \`~/.hip/config/network.json\` | 선택적 네트워크 정책 |
 | \`~/.hip/config/hip-plugins.json\` | 설치된 플러그인 레지스트리 |
+| \`~/.hip/config/terminal-hosts.json\` | SSH / 터미널 호스트 라이브러리 (모드 0600) |
 | \`~/.hip/db/hip.db\` | SQLite 세션, 메시지, 메모리 항목, 이벤트 |
 | \`~/.hip/data/tool-output/\` | 대용량 도구 출력 (DB 외부 보관) |
 | \`~/.hip/logs/\` | 사이드카 / 셸 로그 |
@@ -2355,13 +2452,13 @@ SQLite의 구조화된 항목(\`memory_items\`): 선호도, 규칙, 학습 내�
 | \`~/.hip/memories/\` | 메모리 마크다운 미러 |
 | \`~/.hip/builtin-skills/\` | 내장 점진적 제품 스킬 (예: 이 \`hip\` 스킬) |
 | \`~/.hip/scratch/\`, 작업 트리 | 임시 / 병렬 작업 트리 도우미 |
-| \`~/.hip/trash/\` | 제품 휴지통 (지식 FS 격리, 세션은 SQLite를 통해 소프트 삭제) |
+| \`~/.hip/trash/\` | 제품 휴지통 격리 (자동화 행은 \`trash/automations/\`, 세션은 SQLite \`deleted_at\`로 소프트 삭제) |
 
 ### 휴지통 및 소프트 삭제
 
 | 동작 | 참고 |
 |----------|--------|
-| UI 삭제 (채팅 / 코드 / 지식) | 소프트 삭제 → 사이드바 **휴지통** (기록 위) |
+| UI 삭제 (채팅 / 코드 대화) | 소프트 삭제 → 사이드바 **휴지통** (기록 위). 휴지통에는 대화만 표시됩니다. |
 | 보관 기간 | 기본 **7**일, **설정 → 일반** 또는 \`hip.toml\` \`[trash] retentionDays\` (1–365) |
 | CLI \`hip session delete --yes\` | **영구** 하드 삭제 (휴지통 미사용) |
 | 메모리 휴지통 | 여전히 **설정 → 메모리** (별도 보관 기간, 기본 30일) |
@@ -2394,7 +2491,7 @@ SQLite의 구조화된 항목(\`memory_items\`): 선호도, 규칙, 학습 내�
 
 ## API / 모델 호출이 작동하지 않음
 
-1. **설정 → 제공자**를 열고 키가 저장되어 있는지 확인하세요.
+1. **설정 → 키 관리**(프로바이더 목록과 모델 선택은 **모델 구성**)를 열고 키가 저장되어 있는지 확인하세요.
 2. 키는 \`~/.hip/config/auth.json\`에 저장됩니다 (사용자에게 비밀을 출력하지 않음).
 3. UI 외부에서 인증을 변경한 후 앱을 다시 시작하세요.
 4. \`~/.hip/logs/\`에서 사이드카 로그를 확인하세요.
@@ -2409,6 +2506,12 @@ SQLite의 구조화된 항목(\`memory_items\`): 선호도, 규칙, 학습 내�
 2. 추출을 위해 충분한 채팅 횟수와 API 키가 필요합니다. **지금 학습**을 시도해보세요.
 3. 상태가 \`no_llm\`, \`rate_limited\` 또는 빈 추출을 표시할 수 있습니다 — 키/할당량을 수정하거나 대기하세요.
 4. SQLite가 진실 공급원이며, \`~/.hip/memories/\` 아래의 오래된 미러는 DB가 아닙니다.
+
+## 예약 작업이 실행되지 않음
+
+- 예약 작업은 **대화 단위** 이며, 소유한 대화 안에서만 실행됩니다. 그 대화로 전환해 컴포저의 시계 버튼에서 작업을 확인하세요.
+- 소유한 대화를 삭제하면 그 예약 작업도 삭제됩니다(설계대로).
+- hip에는 **OS 수준 스케줄러가 없습니다**: 앱이 종료된 동안 도래한 작업은 건너뛰며 나중에 보충 실행되지 않습니다. 앱을 켜 두세요.
 
 ## 에이전트가 파일을 쓸 수 없음
 
@@ -2488,9 +2591,16 @@ ACP 인증·모델은 **자체 관리**: hip은 provider API 키를 ACP 자식 �
 
 메인 턴에서 긴 shell/CI를 sleep 폴링하지 마세요.
 
-### Runtime 패널(UI)
+### 런타임 표시 위치(UI)
 
-세션 오른쪽 패널은 **Agents**와 **Runtime**을 합칩니다. 실행 중 작업은 chip으로 표시됩니다.
+별도의 Agents / Runtime 패널은 없습니다:
+
+- 서브에이전트와 도구 과정은 메시지 트레일에 인라인으로 표시됩니다(기본 접힌 "과정" 폴드).
+- 백그라운드 shell, monitor, 스케줄은 **컴포저 위 런타임 스트립**에 표시되며, 여기서 출력 확인과 중지가 가능합니다.
+
+### 예약 작업(UI)
+
+주기 프롬프트는 **대화 단위** 입니다 — 컴포저의 시계 버튼에서 만듭니다(Chat / Code 모두 가능). 실행은 **해당 작업을 소유한 대화 안**에서 이루어지며(매번 새 대화를 열지 않음), 그 대화를 삭제하면 예약 작업도 삭제됩니다. 최소 간격은 60s.
 
 ## 플러그인
 

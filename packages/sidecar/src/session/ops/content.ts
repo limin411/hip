@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content  (or node scripts/generate-ops-content.mjs)
  * Check:      yarn product:content:check
  *
- * contentHash=c2196260fa9ccad9 skillVersion=2
+ * contentHash=455e0f605f84ac65 skillVersion=2
  */
 
 /** Materialization schema version (from packages/product-content/ops/meta.json). */
@@ -53,7 +53,7 @@ This skill expands the **compact** always-on coding rules in the system prompt. 
 
 ## Async TaskRuntime (shell / monitor / schedule)
 
-Long work must not block the supervisor turn. Use TaskRuntime tools; the session **right panel → Runtime** (combined with Agents) shows running/completed jobs.
+Long work must not block the supervisor turn. Use TaskRuntime tools; running/completed jobs surface in the **runtime strip above the composer** (there is no separate Agents / Runtime panel).
 
 | Tool | When |
 |------|------|

@@ -17,53 +17,18 @@
 
 각 UI 탭은 독립적인 세션입니다. 제품 기본값은 **Supervisor ReAct** 루프입니다 — 에이전트가 도구를 사용하고 `task` / `dispatch_agent` / `task_batch`를 통해 위임 시기를 결정합니다. 일반적인 턴은 Planner → Coder → Reviewer 파이프라인을 **강제하지 않습니다**.
 
-## 스크린샷
-
-<p align="center">
-  <img src="./docs/images/chat-surface.webp" alt="hip Chat 새 대화" width="920" />
-</p>
-
-<p align="center"><sub>Chat — 새 대화. 각 탭은 독립 세션입니다.</sub></p>
-
-<table>
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-surface.webp" alt="hip Code 화면" />
-      <br />
-      <sub>Code — 프로젝트 폴더를 고른 뒤 작업을 보냅니다</sub>
-    </td>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-session.webp" alt="hip Code 세션 — 도구와 파일 레일" />
-      <br />
-      <sub>Code 세션 — Supervisor 도구와 파일 레일</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" valign="top">
-      <img src="./docs/images/settings-models.webp" alt="hip 설정 · 모델 구성" />
-      <br />
-      <sub>Settings → Model Configuration — 제공자와 API 키</sub>
-    </td>
-    <td align="center" valign="top">
-      <img src="./docs/images/knowledge-home.webp" alt="hip 문서" />
-      <br />
-      <sub>Documents — 로컬 노트, 페이지, 테이블</sub>
-    </td>
-  </tr>
-</table>
-
 ## 사용 흐름
 
 1. **제공자 키 추가** — **Settings → Model Configuration**. 키는 `~/.hip/config/auth.json`(mode `0600`)에 저장됩니다.
 2. **Chat 또는 Code 시작** — Chat은 가벼운 대화입니다. Code는 먼저 **Choose project folder**(기본 권한 **edit**, 프로젝트 샌드박스).
 3. **작업 전송** — Supervisor가 도구를 쓰고 `task` / `dispatch_agent` / `task_batch`로 위임할 수 있습니다. 파일 레일과 **Changes** 탭을 확인하세요.
-4. **옆에 메모** — **Documents**는 같은 워크스페이스 옆의 로컬 지식 베이스(페이지와 테이블)입니다.
+4. **주기 작업 예약** — 컴포저의 시계 버튼으로 **대화 단위 예약 작업**을 만들 수 있습니다. 소유한 대화 안에서 실행됩니다.
 
 ## 주요 기능
 
 | 영역 | 설명 |
 |------|----------------|
-| **표면** | **Code** — 전체 프로젝트 워크벤치(파일, git 안내, MCP, 도구). **Chat** — 가벼운 대화; 아티팩트 패널을 위해 작성 가능한 결과물을 워크스페이스에 미리보기로 저장합니다. |
+| **표면** | **Code** — 전체 프로젝트 워크벤치(파일, git 안내, MCP, 도구). **Chat** — 가벼운 대화; 아티팩트 패널을 위해 작성 가능한 결과물을 워크스페이스에 미리보기로 저장합니다. **Terminals** — 관리형 터미널과 SSH 호스트. |
 | **권한** | **edit** (기본값, 프로젝트 샌드박스), **chat** (읽기 전용), **full** (사용자가 허용한 전체 파일 시스템). |
 | **에이전트** | Supervisor 및 로스터 에이전트(**explore** / **plan** / **coder**); 에이전트 주도 격리 및 `task_batch`를 통한 진정한 병렬 작업. |
 | **확장성** | 스킬(`SKILL.md`), 플러그인, MCP 서버, 훅 — 전역 `~/.hip/` 및 프로젝트 `.hip/` 아래. |
@@ -159,11 +124,11 @@ Snake_case 별칭(`fs_bridge`, `forward_mcp`, `fs_read_max_bytes`)도 허용됩�
 | `~/.hip/logs/` | 사이드카 / Tauri 로그 |
 | `~/.hip/skills/`, `plugins/`, `scratch/` | 스킬, 플러그인, 설치 스크래치 |
 | `~/.hip/memories/` | 메모리 활성화 시 마크다운 내보내기 미러 |
-| `~/.hip/trash/` | 제품 휴지통 격리 (지식 FS 페이로드; 세션은 SQLite `deleted_at` 사용) |
+| `~/.hip/trash/` | 제품 휴지통 격리 (자동화 행은 `trash/automations/`; 세션은 SQLite `deleted_at` 사용) |
 
 ### 휴지통 (소프트 삭제)
 
-**데스크톱 UI**에서 채팅/코드 세션 또는 지식 공간/문서를 삭제하면 **휴지통**(사이드바, 기록 위)으로 이동합니다. 항목을 복원하거나 영구 삭제할 수 있습니다; 보존 기간 후 자동으로 제거됩니다.
+**데스크톱 UI**에서 채팅/코드 대화를 삭제하면 **휴지통**(사이드바, 기록 위)으로 이동합니다. 항목을 복원하거나 영구 삭제할 수 있습니다; 보존 기간 후 자동으로 제거됩니다. 휴지통에는 대화만 표시됩니다.
 
 | 설정 | 위치 |
 |---------|----------|

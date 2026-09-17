@@ -9,6 +9,7 @@
 | `~/.hip/config/memory.json` | 記憶功能開關 |
 | `~/.hip/config/network.json` | 可選網路原則 |
 | `~/.hip/config/hip-plugins.json` | 已安裝外掛登錄 |
+| `~/.hip/config/terminal-hosts.json` | SSH / 終端主機庫（0600） |
 | `~/.hip/db/hip.db` | SQLite 工作階段、訊息、記憶、事件 |
 | `~/.hip/data/tool-output/` | 大型工具輸出 |
 | `~/.hip/logs/` | Sidecar / 殼日誌 |

@@ -2,5 +2,5 @@
   "skillId": "hip",
   "skillName": "hip",
   "skillVersion": "3",
-  "description": "Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it."
+  "description": "Product help for the hip desktop agent: Chat/Code/Terminals surfaces, permission modes, the session right rail, scheduled tasks, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it."
 }

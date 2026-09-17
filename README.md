@@ -17,53 +17,18 @@ Each UI tab is an independent session. The product default is a **Supervisor ReA
 Prebuilt installers (when published) appear on **[GitHub Releases](https://github.com/limin411/hip/releases)**.  
 Until a release is attached, build from source (see [Development setup](#development-setup)).
 
-## Screenshots
-
-<p align="center">
-  <img src="./docs/images/chat-surface.webp" alt="hip Chat — new conversation with mascot and composer" width="920" />
-</p>
-
-<p align="center"><sub>Chat — start a conversation. Each tab is its own session.</sub></p>
-
-<table>
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-surface.webp" alt="hip Code surface — pick a project folder" />
-      <br />
-      <sub>Code — bind a project folder, then send a task</sub>
-    </td>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-session.webp" alt="hip Code session — supervisor tools and files rail" />
-      <br />
-      <sub>Code session — supervisor tools plus the files rail</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" valign="top">
-      <img src="./docs/images/settings-models.webp" alt="hip Settings — Model Configuration" />
-      <br />
-      <sub>Settings → Model Configuration — providers and API keys</sub>
-    </td>
-    <td align="center" valign="top">
-      <img src="./docs/images/knowledge-home.webp" alt="hip Documents — local notes and tables" />
-      <br />
-      <sub>Documents — local-first notes, pages, and tables</sub>
-    </td>
-  </tr>
-</table>
-
 ## Quick tour
 
 1. **Add a provider key** — **Settings → Model Configuration**. Keys are stored in `~/.hip/config/auth.json` (mode `0600`).
 2. **Start Chat or Code** — Chat is a lighter conversation. Code asks you to **Choose project folder** (default permission: **edit**, project sandbox).
 3. **Send a task** — the supervisor uses tools and can delegate with `task` / `dispatch_agent` / `task_batch`. Watch the files rail and the **Changes** tab.
-4. **Keep notes nearby** — **Documents** is a local knowledge base (pages and tables) next to the same workspace.
+4. **Schedule recurring work** — the clock button in the composer creates a **per-conversation scheduled task**; it fires inside the conversation that owns it.
 
 ## Highlights
 
 | Area | What you get |
 |------|----------------|
-| **Surfaces** | **Code** — full project workbench (files, git guidance, MCP, tools). **Chat** — lighter conversation; write previewable deliverables into the workspace for the artifacts panel. |
+| **Surfaces** | **Code** — full project workbench (files, git guidance, MCP, tools). **Chat** — lighter conversation; write previewable deliverables into the workspace for the artifacts panel. **Terminals** — managed terminals and SSH hosts. |
 | **Permissions** | **edit** (default, project sandbox), **chat** (read-only), **full** (user-granted whole filesystem). |
 | **Agents** | Supervisor plus roster agents (**explore** / **plan** / **coder**); agent-driven isolation and true parallel work via `task_batch`. |
 | **Extensibility** | Skills (`SKILL.md`), plugins, MCP servers, hooks — global under `~/.hip/` and project under `.hip/`. Conflict resolution via the extension registry (skill precedence: project > user > plugin > builtin; hip.toml MCP id wins). |
@@ -175,14 +140,12 @@ are **not** forwarded — the agent sees the full MCP surface.
 | `~/.hip/logs/` | Sidecar / Tauri logs |
 | `~/.hip/skills/`, `plugins/`, `scratch/` | Skills, plugins, install scratch |
 | `~/.hip/memories/` | Markdown export mirrors when memory is enabled |
-| `~/.hip/work-items/` | Work item catalog (`catalog.json`) + UI prefs |
 | `~/.hip/automations/` | Automations catalog + runs log (`catalog.json`, `runs.json`; mode `0600`) |
-| `~/.hip/knowledge/` | Local-first knowledge base spaces/docs (FS content) |
-| `~/.hip/trash/` | Product recycle bin quarantine (knowledge FS payloads; sessions use SQLite `deleted_at`) |
+| `~/.hip/trash/` | Product recycle bin quarantine (automation rows under `trash/automations/`; sessions use SQLite `deleted_at`) |
 
 ### Recycle bin (soft-delete)
 
-In the **desktop UI**, deleting Chat/Code sessions or Knowledge spaces/docs moves them to **Recycle bin** (sidebar, above History). Items can be restored or permanently deleted; they auto-purge after a retention period.
+In the **desktop UI**, deleting a Chat/Code conversation moves it to **Recycle bin** (sidebar, above History). Items can be restored or permanently deleted; they auto-purge after a retention period. The bin lists conversations.
 
 | Setting | Location |
 |---------|----------|

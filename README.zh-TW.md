@@ -17,53 +17,18 @@
 
 每個 UI 分頁是獨立工作階段。產品預設是 **Supervisor ReAct** 迴路——智能體使用工具，並在需要時透過 `task` / `dispatch_agent` / `task_batch` 委派。一般回合**不會**強制 Planner → Coder → Reviewer 流水線。
 
-## 畫面預覽
-
-<p align="center">
-  <img src="./docs/images/chat-surface.webp" alt="hip Chat 新工作階段" width="920" />
-</p>
-
-<p align="center"><sub>Chat — 新工作階段。每個分頁是獨立工作階段。</sub></p>
-
-<table>
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-surface.webp" alt="hip Code 工作台" />
-      <br />
-      <sub>Code — 選擇專案資料夾後傳送任務</sub>
-    </td>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-session.webp" alt="hip Code 工作階段：工具與檔案欄" />
-      <br />
-      <sub>Code 工作階段 — Supervisor 工具與檔案欄</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" valign="top">
-      <img src="./docs/images/settings-models.webp" alt="hip 設定 · 模型設定" />
-      <br />
-      <sub>設定 → 模型設定 — 供應商與 API Key</sub>
-    </td>
-    <td align="center" valign="top">
-      <img src="./docs/images/knowledge-home.webp" alt="hip 文件管理" />
-      <br />
-      <sub>文件 — 本機筆記、頁面與表格</sub>
-    </td>
-  </tr>
-</table>
-
 ## 操作示例
 
 1. **新增供應商金鑰** — **設定 → 模型設定**。金鑰存在 `~/.hip/config/auth.json`（權限 `0600`）。
 2. **開始 Chat 或 Code** — Chat 是較輕的對話面；Code 需先 **選擇專案資料夾**（預設權限 **edit**，專案沙箱）。
 3. **傳送任務** — Supervisor 會使用工具，並可透過 `task` / `dispatch_agent` / `task_batch` 委派。留意右側檔案欄與 **Changes** 分頁。
-4. **就近做筆記** — **文件** 是同一工作區旁的本機知識庫（頁面與表格）。
+4. **安排週期性任務** — 輸入框上的時鐘按鈕可建立**依工作階段歸屬的排程任務**，到點在它所屬的工作階段內執行。
 
 ## 核心能力
 
 | 領域 | 說明 |
 |------|------|
-| **介面（Surfaces）** | **Code** — 完整專案工作台（檔案、git 指導、MCP、工具）。**Chat** — 較輕的對話面；可預覽交付物寫入工作區供工件面板展示。 |
+| **介面（Surfaces）** | **Code** — 完整專案工作台（檔案、git 指導、MCP、工具）。**Chat** — 較輕的對話面；可預覽交付物寫入工作區供工件面板展示。**Terminals** — 託管終端與 SSH 主機。 |
 | **權限模式** | **edit**（預設，專案根沙箱）、**chat**（唯讀）、**full**（使用者明確授權的全檔案系統）。 |
 | **智能體** | Supervisor 與專用名冊（**explore** / **plan** / **coder**）；透過 `task_batch` 做真正的並行子任務。 |
 | **擴充** | 技能（`SKILL.md`）、外掛、MCP、掛鉤——全域在 `~/.hip/`，專案在 `.hip/`。 |
@@ -145,11 +110,11 @@ yarn tauri dev
 | `~/.hip/logs/` | Sidecar / Tauri 日誌 |
 | `~/.hip/skills/`、`plugins/`、`scratch/` | 技能、外掛、安裝暫存區 |
 | `~/.hip/memories/` | 開啟記憶後的 Markdown 匯出鏡像 |
-| `~/.hip/trash/` | 產品回收站隔離區（知識庫檔案；工作階段用 SQLite `deleted_at`） |
+| `~/.hip/trash/` | 產品回收站隔離區（自動化條目在 `trash/automations/`；工作階段用 SQLite `deleted_at`） |
 
 ### 回收站（軟刪除）
 
-**桌面 UI** 中刪除 Chat/Code 工作階段或知識庫空間/文件時，會先進入側欄 **回收站**（位於歷史會話上方）。可恢復或永久刪除；超過保留期後自動清除。
+**桌面 UI** 中刪除 Chat/Code 工作階段時，會先進入側欄 **回收站**（位於歷史會話上方）。可恢復或永久刪除；超過保留期後自動清除。回收站只列工作階段。
 
 | 設定 | 位置 |
 |------|------|

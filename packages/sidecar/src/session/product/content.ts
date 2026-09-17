@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=252ca33713564480 skillVersion=3 productVersion=2.0.2
+ * contentHash=f94ef85f86bbc5a5 skillVersion=3 productVersion=2.0.2
  */
 
 /** Schema / materialization version for builtin skill files (from packages/product-content/meta.json). */
@@ -16,12 +16,12 @@ export const HIP_PRODUCT_VERSION = '2.0.2'
 export const HIP_SKILL_ID = 'hip'
 export const HIP_SKILL_NAME = 'hip'
 
-export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
+export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code/Terminals surfaces, permission modes, the session right rail, scheduled tasks, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
 
 /** Level-2 body (frontmatter + markdown). */
 export const HIP_SKILL_MD = `---
 name: hip
-description: "Product help for the hip desktop agent: Chat/Code/Knowledge surfaces, permission modes, Agents+Runtime panel, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it."
+description: "Product help for the hip desktop agent: Chat/Code/Terminals surfaces, permission modes, the session right rail, scheduled tasks, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it."
 ---
 
 # hip
@@ -44,11 +44,11 @@ If a product detail is not documented here, say so rather than inventing UI labe
 
 | Surface | Intent |
 |---------|--------|
-| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
-| **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
-| **Knowledge** | Notes / knowledge-space assistant: grounded answers in the user's notes workspace; not a coding agent for a software project |
+| **Code** | Project workbench (sidebar **Projects**): file tools, git guidance, MCP catalog, full agent tools, async TaskRuntime |
+| **Chat** | Lighter conversation surface (sidebar **Chats**): shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
+| **Terminals** | Managed terminal / SSH host surface (sidebar **Terminals**): interactive shells on local or remote hosts; the terminal rail has **Files** and **Agent** tabs |
 
-Surface is chosen in the UI; the system prompt already reflects the active surface.
+There is no notes / Documents surface. Surface is chosen in the UI; the system prompt already reflects the active surface.
 
 ## Permission modes
 
@@ -64,21 +64,26 @@ Path convention in edit/chat: project-root form starting with \`/\` (e.g. \`/src
 
 Typical destinations (wording may vary slightly in the UI):
 
-- **Providers / API keys** — stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
+- **Model Configuration** / **Key Management** — provider list, model picker, and API keys; keys are stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
 - **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see \`references/memory.md\`)
 - **Skills** — enable/disable installed skills (\`hip.toml\` + skill folders)
-- **Plugins** — install/enable plugins (skills, agents, MCP, hooks); Plugin Market under Settings
-- **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
-- **Network policy** — optional allow/deny for outbound tools
+- **Plugin Market** — install/enable plugins (skills, agents, MCP, hooks) and browse the official markets
+- **Agent Management** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
+- **MCPs**, **Hooks**, **General**, **Window** — remaining pages
+- **Network policy** — file-only (\`~/.hip/config/network.json\`); there is **no** Settings page for it
 
-## Right panel: Agents + Runtime
+## Session right rail
 
-Each session’s right panel combines:
+On **Code**, the right rail tabs are **Files / Outline / Changes / Terminal** (Changes requires a git repo; Terminal requires an active session). Sub-agents and running background work are **not** in a separate panel:
 
-- **Agents** — roster, active sub-agents, delegation status
-- **Runtime** — background shell jobs, monitors, and schedules (TaskRuntime). Still-running work shows a chip; open the panel to inspect output and stop tasks.
+- Sub-agent and tool process render inline in the message trail.
+- Background shell jobs, monitors and schedules surface in the runtime strip above the composer; open it to inspect output or stop a task.
 
 Long shell, log watches, and recurring checks should use TaskRuntime tools (see \`references/agents-and-plugins.md\` and the \`hip-coding\` skill for policy). Do not sleep-poll in the main turn.
+
+## Scheduled tasks
+
+Recurring prompts are **per conversation**: create them from the clock button in the composer (Chat and Code). The run happens **inside the conversation that owns the task** — hip does not open a new conversation for each fire, and deleting that conversation deletes its scheduled tasks. Agent-side tools are \`scheduler_create\` / \`scheduler_list\` / \`scheduler_delete\` (minimum interval 60s).
 
 ## Skills, plugins, MCP
 
@@ -169,6 +174,7 @@ export const CONFIG_REFERENCE_MD = `# hip config & local data (Level 3)
 | \`~/.hip/config/memory.json\` | Memory feature flags / pipeline knobs |
 | \`~/.hip/config/network.json\` | Optional network policy |
 | \`~/.hip/config/hip-plugins.json\` | Installed plugins registry |
+| \`~/.hip/config/terminal-hosts.json\` | SSH / terminal host library (mode 0600) |
 | \`~/.hip/db/hip.db\` | SQLite sessions, messages, memory items, events |
 | \`~/.hip/data/tool-output/\` | Large tool outputs (kept out of the DB) |
 | \`~/.hip/logs/\` | Sidecar / shell logs |
@@ -177,13 +183,13 @@ export const CONFIG_REFERENCE_MD = `# hip config & local data (Level 3)
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
 | \`~/.hip/scratch/\` | Scratch helpers |
-| \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
+| \`~/.hip/trash/\` | Product recycle bin quarantine (automation rows under \`trash/automations/\`; sessions soft-delete via SQLite \`deleted_at\`) |
 
 ### Recycle bin & soft-delete
 
 | Behavior | Notes |
 |----------|--------|
-| UI delete (Chat / Code / Knowledge) | Soft-delete → sidebar **Recycle bin** (above History) |
+| UI delete (Chat / Code conversations) | Soft-delete → sidebar **Recycle bin** (above History). The bin lists conversations only. |
 | Retention | Default **7** days; **Settings → General** or \`hip.toml\` \`[trash] retentionDays\` (1–365) |
 | CLI \`hip session delete --yes\` | **Permanent** hard-delete (not the recycle bin) |
 | Memory trash | Still **Settings → Memory** (separate retention, default 30 days) |
@@ -205,9 +211,7 @@ Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \
 
 ## Auth model (BYOK)
 
-Keys are entered in the app **Settings → Providers** panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
-
-Design detail: \`docs/design/byok-spec.md\`.
+Keys are entered in the app **Settings → Model Configuration** (providers) / **Key Management** and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all resolve from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
 
 ### Resolution order
 
@@ -293,7 +297,7 @@ export const TROUBLESHOOTING_REFERENCE_MD = `# hip troubleshooting (Level 3)
 
 ## No API / model calls work
 
-1. Open **Settings → Providers** and confirm a key is saved.
+1. Open **Settings → Key Management** (provider list and model picker live under **Model Configuration**) and confirm a key is saved.
 2. Keys live in \`~/.hip/config/auth.json\` (never print secrets to the user).
 3. Restart the app after changing auth outside the UI.
 4. Check sidecar logs under \`~/.hip/logs/\`.
@@ -308,6 +312,12 @@ The product CLI attaches to a **running** hip desktop app. Start the app first (
 2. Need enough chat turns + API key for extract; try **Learn now**.
 3. Status may show \`no_llm\`, \`rate_limited\`, or empty extract — fix key / quota / wait.
 4. SQLite is source of truth; stale mirrors under \`~/.hip/memories/\` are not the DB.
+
+## Scheduled task did not run
+
+- Tasks are **per conversation** and run inside the conversation that owns them. Switch to that conversation and open the composer clock button to see its tasks.
+- Deleting the owning conversation deletes its scheduled tasks (by design).
+- hip has **no** OS-level scheduler: a task that came due while the app was quit is skipped, not back-filled. Keep the app running.
 
 ## Agent cannot write files
 
@@ -391,9 +401,16 @@ hip can run a **built-in** LangGraph agent, an **ACP agent as the session primar
 Do not claim work ran "in parallel" if only sequential dispatch was used.  
 Do not sleep-poll the main turn for long shell or CI — use TaskRuntime tools above.
 
-### Runtime panel (UI)
+### Runtime visibility (UI)
 
-Session right panel combines **Agents** (roster / sub-agents) and **Runtime** (background shell, monitors, schedules). Still-running work shows a chip; open Runtime to inspect or stop tasks.
+There is **no** separate Agents / Runtime panel:
+
+- Sub-agents and tool process render inline in the message trail (collapsed process fold).
+- Background shell jobs, monitors, and schedules surface in the **runtime strip above the composer**; open it to inspect output or stop a task.
+
+### Scheduled tasks (UI)
+
+Recurring prompts are **per conversation** — create them from the clock button in the composer (Chat and Code). A fire runs **inside the conversation that owns the task** (hip does not open a new conversation per run), and deleting that conversation deletes its scheduled tasks. Minimum interval is 60s.
 
 ## Plugins
 
@@ -513,15 +530,15 @@ To install a plugin:
 export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
 - Version: 2.0.2.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
-- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Knowledge (notes spaces).
+- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts) vs Terminals (SSH / local shells); no notes/Documents surface.
 - On Code only, tool gates (UI labels): chat = read-only; edit = project sandbox (default); full = user-granted whole FS. Chat surface is not Code "edit mode".
-- Right panel (session): Agents (roster / sub-agents) + Runtime (background shell, monitors, schedules) combined view.
+- Session right rail (Code): Files / Outline / Changes / Terminal; sub-agents and background work show inline, not in a separate panel.
 - API keys: ~/.hip/config/auth.json (0600 plaintext by design).
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`
 
 /** L0 help when hip skill is on the session skill list. */
-export const PRODUCT_HELP_GUIDANCE = `When the user asks about hip itself — setup, Settings, Chat vs Code vs Knowledge, permission modes (chat/edit/full), Agents+Runtime panel, background tasks / TaskRuntime, skills, plugins, Plugin Market, MCP, memory, agents, the product CLI, troubleshooting, or local data under ~/.hip — call use_skill({ name: "hip" }) and follow its guide (and references/ for depth). Do not invent product UI labels or config keys; prefer the skill. For ordinary project work, do not load the hip skill.`
+export const PRODUCT_HELP_GUIDANCE = `When the user asks about hip itself — setup, Settings, Chat vs Code vs Terminals, permission modes (chat/edit/full), the session right rail, background tasks / TaskRuntime, scheduled tasks, skills, plugins, Plugin Market, MCP, memory, agents, the product CLI, troubleshooting, or local data under ~/.hip — call use_skill({ name: "hip" }) and follow its guide (and references/ for depth). Do not invent product UI labels or config keys; prefer the skill. For ordinary project work, do not load the hip skill.`
 
 /** L0 help when hip skill is unavailable — never instruct use_skill("hip"). */
 export const PRODUCT_HELP_FALLBACK = `Deeper product documentation skill is not available in this session. Answer from the product facts above; if the user needs full guides, suggest enabling the built-in hip skill (or check Settings / hip.toml skills) rather than inventing config keys.`

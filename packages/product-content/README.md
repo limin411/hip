@@ -8,13 +8,19 @@ Markdown here generates embeds via `yarn product:content`:
 
 | Path | Level | Runtime use |
 |------|-------|-------------|
-| `capability-map.md` | L0 | Always in main system prompt + Settings → Help summary |
+| `capability-map.md` | L0 | Always in main system prompt (agent). UI copy is generated but currently has no consumer — see note below. |
 | `help-guidance.md` / `help-fallback.md` | L0 | Conditional product help pointer (agent, English) |
-| `SKILL.md` | L2 | Agent `use_skill({ name: "hip" })` body (English) + Help overview (locale) |
-| `references/*` | L3 | Agent `read_file` + Help topic tabs |
+| `SKILL.md` | L2 | Agent `use_skill({ name: "hip" })` body (English); localized copies feed the UI pack |
+| `references/*` | L3 | Agent `read_file`; localized copies feed the UI pack |
 | `meta.json` | meta | skill id/name/description + content schema version |
-| `locales/zh-CN/`, `locales/zh-TW/` | UI | Settings Help localized bodies (agent stays English) |
+| `locales/zh-CN/`, `locales/zh-TW/` | UI | Localized bodies for the UI pack (agent stays English) |
 | `ops/` | L2 | Built-in `hip-coding` skill SoT |
+
+> **Note:** `src/domain/product/productDocs.generated.ts` (the UI-side pack) is generated and
+> validated, but nothing imports it right now — there is no Settings → Product help page in the
+> shell, and the `settings.productHelp.sections.*` i18n keys are orphaned. Keep editing the
+> locales (they stay in sync via `product:content:check`); just know they are not user-visible
+> until the Help page is wired back.
 
 ## Index
 
@@ -28,7 +34,7 @@ Markdown here generates embeds via `yarn product:content`:
 | Agents, plugins, TaskRuntime | [references/agents-and-plugins.md](./references/agents-and-plugins.md) | [zh-CN](./locales/zh-CN/references/agents-and-plugins.md) | [zh-TW](./locales/zh-TW/references/agents-and-plugins.md) |
 | Coding ops skill (incl. TaskRuntime policy) | [ops/](./ops/) | — | — |
 
-Also: `locales/ja/`, `locales/ko/` for the same topics (Help UI).
+Also: `locales/ja/`, `locales/ko/` for the same topics (UI pack).
 
 ## Edit workflow
 

@@ -30,7 +30,7 @@ This skill expands the **compact** always-on coding rules in the system prompt. 
 
 ## Async TaskRuntime (shell / monitor / schedule)
 
-Long work must not block the supervisor turn. Use TaskRuntime tools; the session **right panel → Runtime** (combined with Agents) shows running/completed jobs.
+Long work must not block the supervisor turn. Use TaskRuntime tools; running/completed jobs surface in the **runtime strip above the composer** (there is no separate Agents / Runtime panel).
 
 | Tool | When |
 |------|------|

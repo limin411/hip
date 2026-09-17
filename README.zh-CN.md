@@ -17,53 +17,18 @@
 
 每个 UI 标签页是独立会话。产品默认是 **Supervisor ReAct** 回路——智能体使用工具，并在需要时通过 `task` / `dispatch_agent` / `task_batch` 委派。普通轮次**不会**强制 Planner → Coder → Reviewer 流水线。
 
-## 界面预览
-
-<p align="center">
-  <img src="./docs/images/chat-surface.webp" alt="hip Chat 新会话" width="920" />
-</p>
-
-<p align="center"><sub>Chat — 新会话。每个标签页是独立会话。</sub></p>
-
-<table>
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-surface.webp" alt="hip Code 工作台" />
-      <br />
-      <sub>Code — 选择项目文件夹后发送任务</sub>
-    </td>
-    <td align="center" valign="top" width="50%">
-      <img src="./docs/images/code-session.webp" alt="hip Code 会话：工具与文件栏" />
-      <br />
-      <sub>Code 会话 — Supervisor 工具与文件栏</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" valign="top">
-      <img src="./docs/images/settings-models.webp" alt="hip 设置 · 模型配置" />
-      <br />
-      <sub>设置 → 模型配置 — 供应商与 API Key</sub>
-    </td>
-    <td align="center" valign="top">
-      <img src="./docs/images/knowledge-home.webp" alt="hip 文档管理" />
-      <br />
-      <sub>文档 — 本地笔记、页面与表格</sub>
-    </td>
-  </tr>
-</table>
-
 ## 操作示例
 
 1. **添加供应商密钥** — **设置 → 模型配置**。密钥保存在 `~/.hip/config/auth.json`（权限 `0600`）。
 2. **开始 Chat 或 Code** — Chat 是更轻的会话面；Code 需要先 **选择项目文件夹**（默认权限 **edit**，项目沙箱）。
 3. **发送任务** — Supervisor 会使用工具，并可通过 `task` / `dispatch_agent` / `task_batch` 委派。关注右侧文件栏和 **Changes** 标签。
-4. **就近记笔记** — **文档** 是同一工作区旁的本地知识库（页面与表格）。
+4. **安排周期性任务** — 输入框上的时钟按钮可创建**按会话归属的定时任务**，到点在它所属的会话内执行。
 
 ## 核心能力
 
 | 领域 | 说明 |
 |------|------|
-| **界面（Surfaces）** | **Code** — 完整项目工作台（文件、git 指导、MCP、工具）。**Chat** — 更轻的会话面；可预览交付物写入工作区供工件面板展示。 |
+| **界面（Surfaces）** | **Code** — 完整项目工作台（文件、git 指导、MCP、工具）。**Chat** — 更轻的会话面；可预览交付物写入工作区供工件面板展示。**Terminals** — 托管终端与 SSH 主机。 |
 | **权限模式** | **edit**（默认，项目根沙箱）、**chat**（只读）、**full**（用户明确授权的全文件系统）。 |
 | **智能体** | Supervisor 与专用花名册（**explore** / **plan** / **coder**）；通过 `task_batch` 做真正的并行子任务。 |
 | **扩展** | 技能（`SKILL.md`）、插件、MCP、钩子——全局在 `~/.hip/`，项目在 `.hip/`。冲突裁决走扩展注册表（技能优先级：项目 > 用户 > 插件 > 内置；hip.toml 的 MCP id 优先）。 |
@@ -146,14 +111,12 @@ yarn tauri dev
 | `~/.hip/logs/` | Sidecar / Tauri 日志 |
 | `~/.hip/skills/`、`plugins/`、`scratch/` | 技能、插件、安装临时区 |
 | `~/.hip/memories/` | 开启记忆后的 Markdown 导出镜像 |
-| `~/.hip/work-items/` | 事项追踪目录（`catalog.json`）与 UI 偏好 |
 | `~/.hip/automations/` | 自动化目录与运行日志（`catalog.json`、`runs.json`；模式 `0600`） |
-| `~/.hip/knowledge/` | 本地优先知识库空间/文档（文件系统内容） |
-| `~/.hip/trash/` | 产品回收站隔离区（知识库文件；会话用 SQLite `deleted_at`） |
+| `~/.hip/trash/` | 产品回收站隔离区（自动化条目在 `trash/automations/`；会话用 SQLite `deleted_at`） |
 
 ### 回收站（软删除）
 
-**桌面 UI** 中删除 Chat/Code 会话或知识库空间/文档时，会先进入侧栏 **回收站**（位于历史会话上方）。可恢复或永久删除；超过保留期后自动清除。
+**桌面 UI** 中删除 Chat/Code 会话时，会先进入侧栏 **回收站**（位于历史会话上方）。可恢复或永久删除；超过保留期后自动清除。回收站只列会话。
 
 | 设置 | 位置 |
 |------|------|

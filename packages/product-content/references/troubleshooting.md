@@ -2,7 +2,7 @@
 
 ## No API / model calls work
 
-1. Open **Settings → Providers** and confirm a key is saved.
+1. Open **Settings → Key Management** (provider list and model picker live under **Model Configuration**) and confirm a key is saved.
 2. Keys live in `~/.hip/config/auth.json` (never print secrets to the user).
 3. Restart the app after changing auth outside the UI.
 4. Check sidecar logs under `~/.hip/logs/`.
@@ -17,6 +17,12 @@ The product CLI attaches to a **running** hip desktop app. Start the app first (
 2. Need enough chat turns + API key for extract; try **Learn now**.
 3. Status may show `no_llm`, `rate_limited`, or empty extract — fix key / quota / wait.
 4. SQLite is source of truth; stale mirrors under `~/.hip/memories/` are not the DB.
+
+## Scheduled task did not run
+
+- Tasks are **per conversation** and run inside the conversation that owns them. Switch to that conversation and open the composer clock button to see its tasks.
+- Deleting the owning conversation deletes its scheduled tasks (by design).
+- hip has **no** OS-level scheduler: a task that came due while the app was quit is skipped, not back-filled. Keep the app running.
 
 ## Agent cannot write files
 

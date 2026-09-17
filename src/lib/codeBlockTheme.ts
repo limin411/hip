@@ -1,6 +1,6 @@
 /**
  * Code-block color preference (General Settings → code block color).
- * Shared by CodeBlock, file preview, and the knowledge Live NodeView.
+ * Shared by CodeBlock and the file preview.
  *
  * Persisted via hip.toml `[code_block].color_theme` (CodeBlockConfig).
  * `follow` keeps the legacy behavior: GitHub Light/Dark tracks document dark.

@@ -8,19 +8,18 @@ Markdown here generates embeds via `yarn product:content`:
 
 | Path | Level | Runtime use |
 |------|-------|-------------|
-| `capability-map.md` | L0 | Always in main system prompt (agent). UI copy is generated but currently has no consumer — see note below. |
+| `capability-map.md` | L0 | Always in main system prompt (agent, English) |
 | `help-guidance.md` / `help-fallback.md` | L0 | Conditional product help pointer (agent, English) |
-| `SKILL.md` | L2 | Agent `use_skill({ name: "hip" })` body (English); localized copies feed the UI pack |
-| `references/*` | L3 | Agent `read_file`; localized copies feed the UI pack |
+| `SKILL.md` | L2 | Agent `use_skill({ name: "hip" })` body (English) |
+| `references/*` | L3 | Agent `read_file` (English) |
 | `meta.json` | meta | skill id/name/description + content schema version |
-| `locales/zh-CN/`, `locales/zh-TW/` | UI | Localized bodies for the UI pack (agent stays English) |
+| `locales/**` | UI | **Unrendered** — see note below |
 | `ops/` | L2 | Built-in `hip-coding` skill SoT |
 
-> **Note:** `src/domain/product/productDocs.generated.ts` (the UI-side pack) is generated and
-> validated, but nothing imports it right now — there is no Settings → Product help page in the
-> shell, and the `settings.productHelp.sections.*` i18n keys are orphaned. Keep editing the
-> locales (they stay in sync via `product:content:check`); just know they are not user-visible
-> until the Help page is wired back.
+> **Note:** the UI-side pack (`src/domain/product/productDocs.generated.ts`, 5 locales) was removed
+> with Settings → Product help. `yarn product:content` no longer reads `locales/**`, so those
+> translations are neither generated, checked, nor user-visible. They are kept only in case the
+> Help page returns; re-wire the generator and re-check them before trusting their content.
 
 ## Index
 
@@ -34,11 +33,11 @@ Markdown here generates embeds via `yarn product:content`:
 | Agents, plugins, TaskRuntime | [references/agents-and-plugins.md](./references/agents-and-plugins.md) | [zh-CN](./locales/zh-CN/references/agents-and-plugins.md) | [zh-TW](./locales/zh-TW/references/agents-and-plugins.md) |
 | Coding ops skill (incl. TaskRuntime policy) | [ops/](./ops/) | — | — |
 
-Also: `locales/ja/`, `locales/ko/` for the same topics (UI pack).
+Also: `locales/ja/`, `locales/ko/` for the same topics — currently unrendered (see note above).
 
 ## Edit workflow
 
-1. Edit English files under this tree **and** matching files under `locales/zh-CN` / `locales/zh-TW` when UI copy changes.
+1. Edit English files under this tree. `locales/**` is out of the pipeline until the Help page returns.
 2. For coding/delegation policy, edit `ops/`.
 3. Run:
 
@@ -51,7 +50,6 @@ yarn product:content:check
 
 - `packages/sidecar/src/session/product/content.ts` (agent, English)
 - `packages/sidecar/src/session/ops/content.ts` (ops skill)
-- `src/domain/product/productDocs.generated.ts` (UI, all locales)
 
 ## Placeholders
 

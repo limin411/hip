@@ -27,7 +27,6 @@ describe('formatTrashBadge', () => {
     expect(formatTrashBadge(0)).toBe('')
     expect(formatTrashBadge(3)).toBe('3')
     expect(formatTrashBadge(100)).toBe('99+')
-    expect(trashBadgeTotal(2, 3)).toBe(5)
-    expect(trashBadgeTotal(2, 3, 4)).toBe(9)
+    expect(trashBadgeTotal(2)).toBe(2)
   })
 })

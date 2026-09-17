@@ -738,13 +738,6 @@ export const ja = {
       "light": "ライト",
       "dark": "ダーク"
     },
-    "docWidth": "ドキュメント幅",
-    "docWidthDesc": "ドキュメント管理の本文欄の最大幅です。変更はすぐに適用されます。",
-    "docWidths": {
-      "default": "デフォルト",
-      "wide": "広め",
-      "full": "全幅"
-    },
     "density": "密度",
     "densityDesc": "サイドバーとアクティビティ行の間隔を制御します。",
     "densities": {
@@ -873,10 +866,6 @@ export const ja = {
         "skillConfig": "Skills",
         "mcpServer": "MCPサーバー",
         "plugin": "プラグイン",
-        "knowledgeNode": "ナレッジツリー",
-        "knowledgeTree": "ナレッジ空白領域",
-        "workItem": "ワークアイテム",
-        "workItemBlank": "ワークアイテム空白",
         "trashEntry": "ごみ箱"
       }
     },
@@ -1094,15 +1083,6 @@ export const ja = {
     "pluginsLabel": "プラグインマーケット",
     "hooksLabel": "Hooks",
     "memoryLabel": "メモリー",
-    "productHelp": {
-      "sections": {
-        "overview": "概要",
-        "memory": "メモリー",
-        "config": "設定とデータ",
-        "troubleshooting": "トラブルシューティング",
-        "agents": "エージェントとプラグイン"
-      }
-    },
     "memory": {
       "title": "メモリー",
       "intro": "会話をまたいで共有される長期記憶。デフォルトでは無効です。",
@@ -1547,8 +1527,6 @@ export const ja = {
   "placeholder": {
     "comingSoon": "近日公開",
     "terminals": "ターミナル管理は近日公開 — 複数のターミナルセッションを一箇所で管理できます。",
-    "tasks": "事項トラッキングは近日公開 — 作業項目をフォローアップできます。",
-    "automation": "自動化は近日公開 — ワークフローやスケジュールジョブを設定できます。"
   },
   "terminals": {
     "newLocal": "ローカル端末",
@@ -1745,93 +1723,6 @@ export const ja = {
       "errorSecretSave": "ホストは保存されましたが、パスワード/パスフレーズを保存できませんでした。再入力して保存してください。"
     }
   },
-  "workItems": {
-    "title": "ワークアイテム",
-    "untitled": "無題",
-    "searchPlaceholder": "ワークアイテムを検索…",
-    "newItem": "新規ワークアイテム",
-    "emptyTitle": "ワークアイテムはまだありません",
-    "emptyHint": "やることやフォローアップを追跡するアイテムを作成します。",
-    "emptyFilterTitle": "このフィルターに該当する項目がありません",
-    "emptyFilterHint": "別のフィルターを試すか、未着手を表示してください。",
-    "emptySearchHint": "検索をクリアすると一覧に戻ります。別のキーワードも試せます。",
-    "clearSearch": "検索をクリア",
-    "showAll": "すべて表示",
-    "loading": "読み込み中…",
-    "filters": {
-      "all": "すべて",
-      "todo": "未着手",
-      "in_progress": "進行中",
-      "done": "完了",
-      "archived": "アーカイブ"
-    },
-    "status": {
-      "todo": "未着手",
-      "in_progress": "進行中",
-      "done": "完了",
-      "cancelled": "キャンセル"
-    },
-    "priority": {
-      "none": "優先度なし",
-      "low": "低",
-      "medium": "中",
-      "high": "高"
-    },
-    "fields": {
-      "title": "タイトル",
-      "titlePlaceholder": "タイトル",
-      "status": "ステータス",
-      "priority": "優先度",
-      "startOn": "開始日",
-      "endOn": "終了日",
-      "tags": "タグ",
-      "tagsPlaceholder": "タグを追加…",
-      "notes": "メモ",
-      "notesPlaceholder": "メモ…"
-    },
-    "actions": {
-      "complete": "完了にする",
-      "reopen": "再開",
-      "cancel": "キャンセル",
-      "archive": "アーカイブ",
-      "unarchive": "アーカイブ解除",
-      "delete": "削除"
-    },
-    "deleteConfirm": "このワークアイテムをゴミ箱に移しますか？後で復元できます。",
-    "modal": {
-      "createTitle": "新規アイテム",
-      "editTitle": "アイテム",
-      "save": "保存",
-      "titleRequired": "タイトルは必須です"
-    },
-    "view": {
-      "modeAria": "表示モード",
-      "calendar": "カレンダー",
-      "list": "リスト",
-      "calendarHint": "月表示 · 日付必須（既定は今日）",
-      "listHint": "開始日順 · 行をクリックして開く"
-    },
-    "calendar": {
-      "aria": "月カレンダー",
-      "prevMonth": "前月",
-      "nextMonth": "翌月",
-      "today": "今日",
-      "more": "+{{count}} 件",
-      "addOnDay": "{{date}} に作成"
-    },
-    "list": {
-      "count": "{{count}} 件 · 開始日順",
-      "range": "{{start}}–{{end}} 件",
-      "pageInfo": "{{page}} / {{total}} ページ",
-      "previous": "前のページ",
-      "next": "次のページ"
-    },
-    "colors": {
-      "recolor": "ステータス色",
-      "recolorAria": "{{status}} の色を変更"
-    },
-    "filtersAria": "スマートフィルタ",
-  },
 
   "automation": {
     "skipReasons": {
@@ -1871,12 +1762,9 @@ export const ja = {
     "navForward": "進む",
     "navForwardAria": "次の位置に進む",
     "nav": {
-      "knowledge": "ドキュメント",
       "projects": "プロジェクト",
       "chats": "チャット",
       "terminals": "ターミナル",
-      "tasks": "タスク",
-      "automation": "自動化"
     },
     "list": {
       "spaces": "現在のフォルダ",
@@ -1918,390 +1806,13 @@ export const ja = {
       "collapse": "{{name}} を折りたたむ"
     },
   },
-  "knowledge": {
-    "browse": {
-      "multiSelectCount": "{{count}} 件選択中",
-      "multiSelectDelete": "削除",
-      "multiSelectMove": "移動先…",
-      "multiSelectDeleteTitle": "{{count}} 件のドキュメントを削除しますか？",
-      "multiSelectDeleteBody": "選択した {{count}} 件のドキュメントはゴミ箱に移動します。いつでも復元できます。",
-      "moveTitle": "移動先",
-      "moveConfirm": "移動",
-      "viewLabel": "表示切り替え",
-      "viewGrid": "グリッド表示",
-      "viewList": "リスト表示",
-      "emptyTitle": "このフォルダは空です",
-      "emptyDesc": "ドキュメントを作成して記録を始めましょう。",
-      "folderKind": "フォルダ",
-    },
-    "home": {
-      "mySpaces": "すべてのドキュメント",
-    },
-    "space": {
-      "nameEmpty": "スペース名を入力してください",
-      "nameDuplicate": "「{{name}}」という名前のスペースは既に存在します",
-      "menu": "スペースメニュー",
-    },
-          "blockRef": {
-        "linkCopied": "ブロックリンクをコピーしました",
-      "noPreview": "プレビューなし"
-      },
-      "sync": {
-        "pickSource": "ソースブロックを選択…",
-        "unlink": "同期解除（通常の参照リンクになります）",
-        "selfRef": "自身は埋め込めません",
-        "sourceMissing": "ソースブロックが削除されたか読み取れません"
-      },
-      "backlinks": {
-        "inbound": "被参照",
-        "outbound": "参照先",
-        "broken": "壊れたリンク",
-        "emptyInbound": "被参照リンクはありません",
-        "emptyOutbound": "参照先リンクはありません",
-        "outboundUnresolved": "リンク先が見つかりません",
-        "emptyBroken": "壊れたリンクはありません 🎉",
-        "expand": "すべて表示（{{count}}）",
-        "collapse": "折りたたむ",
-        "createDoc": "欠落ドキュメントを作成",
-        "repoint": "再指定",
-        "repaired": "「{{title}}」を作成してリンクしました",
-        "repairFailed": "作成に失敗しました",
-        "repointed": "再指定しました",
-        "repointFailed": "再指定に失敗しました",
-        "repairNoTarget": "リンクからターゲットタイトルを解析できません",
-        "refresh": "リンクパネルを更新",
-      },
-"tree": {
-      "newDoc": "ドキュメント",
-      "newTable": "テーブル",
-      "newFolder": "フォルダ",
-      "rename": "名前変更",
-      "delete": "削除",
-      "nameLabel": "名前",
-      "deleteTitle": "「{{title}}」を削除しますか？",
-      "deleteDocBody": "この操作はドキュメントを完全に削除します。元に戻すことはできません。",
-      "deleteBoardBody": "この操作はホワイトボードを完全に削除します。元に戻すことはできません。",
-      "deleteFolderBody": "この操作はフォルダとその中身をすべて完全に削除します。元に戻すことはできません。",
-      "filterPlaceholder": "ツリーをフィルタ…",
-      "reveal": "Finderで表示",
-      "copyPath": "パスをコピー",
-      "pathCopied": "パスをコピーしました",
-      "renameUpdateLinks": "古いタイトルを参照するWikiリンクも更新する",
-      "renameLinksDone": "{{count}}件のドキュメントのWikiリンクを更新しました"
-    },
-    "export": {
-      "doc": "ドキュメントをエクスポート…",
-      "docDone": "ドキュメントをエクスポートしました",
-      "htmlDone": "HTMLをエクスポートしました（ブラウザで開き、必要に応じて印刷→PDFを使用）",
-    },
-    "asset": {
-      "loading": "画像を読み込み中…",
-      "reveal": "Finderで表示",
-      "tooLargePaste": "画像が大きすぎて貼り付けできません。ファイルを保存して添付してください（最大25 MB）。",
-      "tooLargeDisk": "ファイルが25 MBの添付制限を超えています。",
-      "unsupported": "サポートされていないファイル形式です。PNG、JPEG、GIF、WebP、またはPDFを使用してください。",
-      "importFailed": "ファイルを添付できませんでした",
-      "preview": "画像プレビュー",
-      "previewOpen": "画像を拡大表示"
-    },
-    "toolbar": {
-      "label": "Markdown書式",
-      "h1": "見出し1",
-      "h2": "見出し2",
-      "h3": "見出し3",
-      "bold": "太字",
-      "italic": "斜体",
-      "strike": "取り消し線",
-      "code": "インラインコード",
-      "link": "リンク",
-      "bullet": "箇条書き",
-      "ordered": "番号付きリスト",
-      "quote": "引用",
-      "fence": "コードブロック"
-    },
-    "tableInfo": {
-      "title": "テーブル情報",
-      "rowsCols": "{{rows}} 行 · {{cols}} 列",
-      "width": "{{width}}px",
-      "empty": "空のテーブル：下の「＋ 行を追加」から開始"
-    },
-    "table": {
-      "untitled": "無題のテーブル",
-      "loadFailed": "テーブルを開けませんでした",
-
-      columnLabel: "列 {{n}}",
-      types: {
-        text: "テキスト",
-        number: "数値",
-        checkbox: "チェック",
-        date: "日付",
-        select: "選択",
-        selectNewOption: "新しい選択肢…",
-      },
-      filter: {
-        title: "フィルター",
-        addCondition: "条件を追加",
-        clear: "クリア",
-        value: "値",
-        opContains: "含む",
-        opEquals: "等しい",
-        opNotEmpty: "空でない",
-        opGt: ">",
-        opLt: "<",
-      },
-      columnMenu: {
-
-        type: "タイプ",
-        insertLeft: "左に列を挿入",
-        insertRight: "右に列を挿入",
-        deleteColumn: "列を削除",
-        sortAsc: "昇順で並べ替え",
-        sortDesc: "降順で並べ替え",
-        sortClear: "並べ替えをクリア",
-        more: "列の操作",
-        statsShow: "統計を表示",
-        statsSum: "合計",
-        statsAvg: "平均",
-        statsCount: "件数",
-        statsOff: "オフ",
-      },
-      rowMenu: {
-        insertAbove: "上に行を挿入",
-        insertBelow: "下に行を挿入",
-        duplicate: "行を複製",
-        deleteRow: "行を削除",
-      },
-      ctx: {
-        copy: "コピー",
-        paste: "貼り付け",
-        clear: "クリア",
-      },
-      grid: {
-        addRow: "行を追加",
-        addColumn: "列を追加",
-        firstCellHint: "ダブルクリックで入力",
-      },
-      edit: {
-        invalidValue: "{{type}}列に無効な入力のため保存しません",
-      },
-      toolbar: {
-        undo: "元に戻す",
-        redo: "やり直す",
-        filter: "フィルター",
-        stats: "統計",
-        exportCsv: "CSV エクスポート",
-        more: "その他",
-        resetView: "表示をリセット",
-        exportFullNote: "全データをエクスポートしました（現在のフィルターは適用されません）",
-        freezeHeader: "先頭行を固定",
-      },
-      status: {
-        "visibleRows": "表示中 {{n}}/{{total}} 行",
-        "selectionCount": "{{n}} セルを選択中",
-        rowsCols: "{{rows}} 行 · {{cols}} 列",
-        saving: "保存中…",
-      },
-      toasts: {
-        columnDeleted: "列を削除しました（元に戻せます）",
-        rowDeleted: "行を削除しました（元に戻せます）",
-        clipboardUnavailable: "クリップボードが利用できません",
-        pasteTooLarge: "貼り付け内容が大きすぎます（上限 {{rows}} 行 × {{cols}} 列）",
-        rowAddedFiltered: "行を追加しました（現在のフィルターで非表示の可能性があります）",
-      },
-      dragDisabledHint: "並べ替え・フィルター中はドラッグできません",
-    },
-    "slash": {
-      "listLabel": "ブロックを挿入",
-      "noMatch": "一致する挿入項目がありません",
-      "group": {
-        "basic": "基本",
-        "list": "リスト",
-        "media": "メディア",
-        "advanced": "高度",
-      },
-      "h1": "見出し1",
-      "h2": "見出し2",
-      "h3": "見出し3",
-      "bullet": "箇条書き",
-      "ordered": "番号付きリスト",
-      "task": "タスクリスト",
-      "fence": "コードブロック",
-      "quote": "引用",
-      "hr": "水平線",
-      "table": "表",
-      "wiki": "Wikiリンク",
-      "embed": "ドキュメント埋め込み",
-      "callout": "コールアウト",
-      "math": "数式ブロック",
-      "mathInline": "インライン数式",
-      "mermaid": "Mermaid図",
-      "svg": "SVG",
-      "image": "画像",
-      "file": "ファイル添付",
-      "calloutTip": "ヒント",
-      "calloutNote": "メモ",
-      "calloutWarning": "警告",
-      "calloutDanger": "危険",
-      "calloutInfo": "情報",
-      "calloutImportant": "重要",
-      "toggle": "折りたたみ",
-      "subdoc": "サブドキュメント",
-      "copyPageLink": "ページリンクをコピー",
-      "columns": "カラム",
-      "sync": "同期ブロック",
-    },
-    "workspace": {
-      "new": "新規",
-      "noDocTitle": "ページ未選択",
-      "noDocHint": "ツリーからドキュメントまたはホワイトボードを選択するか、新規作成してください。"
-    },
-    "outline": {
-      "title": "アウトライン",
-      "empty": "このドキュメントに見出しはありません",
-      "untitled": "無題の見出し",
-      "noDoc": "ドキュメントを選択するとアウトラインが表示されます",
-        "noBoard": "ホワイトボードにアウトラインはありません",
-      "sectionOutline": "アウトライン",
-      "loading": "読み込み中…",
-    },
-    "embed": {
-      "openSource": "ソースドキュメントを開く",
-      "loading": "埋め込みを読み込み中…",
-      "missing": "ドキュメントが見つかりません: {{title}}",
-      "error": "埋め込みを読み込めませんでした",
-      "empty": "(空)",
-      "truncated": "表示のため内容が切り詰められています。"
-    },
-    "graph": {
-      "title": "ナレッジグラフ",
-      "neighborhood": "近傍",
-      "full": "全グラフ",
-      "fullConfirm": "このスペースには {{count}} 個のドキュメントがあります（上限 {{threshold}} 超過）。全グラフを表示しますか？",
-      "stats": "{{nodes}} 表示中 · {{edges}} エッジ · 全 {{total}} ドキュメント",
-      "loading": "グラフを読み込み中…",
-      "empty": "まだリンクインデックスにドキュメントがありません。先にノートを開くか保存してください。",
-      "error": "グラフを読み込めませんでした",
-      "edgeEmbed": "埋め込み"
-    },
-    "mermaid": {
-      "loading": "図をレンダリング中…"
-    },
-    "svg": {
-      "empty": "空の SVG",
-      "tooLarge": "SVG が大きすぎて描画できません",
-      "tooManyNodes": "SVG のノードが多すぎて描画できません",
-      "parseError": "SVG を解析できません",
-      "rejected": "SVG を安全に描画できません",
-      "showSource": "ソースを表示"
-    },
-    "callout": {
-      "note": "注記",
-      "tip": "ヒント",
-      "info": "情報",
-      "warning": "警告",
-      "danger": "危険",
-      "caution": "注意",
-      "important": "重要"
-    },
-    "doc": {
-      "edit": "編集",
-      "titleLabel": "ドキュメントタイトル",
-      "placeholder": "書き始めてください…",
-      "placeholderSlash": "文字を入力、または / でコマンド",
-      "untitled": "無題",
-      "metaUpdated": "更新 {{time}}",
-      "metaCreated": "作成 {{time}}",
-      "emptyTitle": "空のドキュメント",
-      "emptyHint": "書き始めてください…",
-      "saveFailed": "ドキュメントを保存できませんでした",
-      "loadFailed": "ドキュメントを読み込めませんでした",
-      "saving": "保存中…",
-      "liveLoading": "ライブエディタを読み込み中…",
-      "compatView": "互換ビューに入りました：ドキュメントが大きいかライブ描画に失敗したため、プレーンテキストで編集します。内容は引き続き完全に編集可能です。",
-      "compatViewClose": "了解",
-      "saveRetry": "再試行",
-      "findPlaceholder": "ドキュメント内を検索",
-      "findPrev": "前へ",
-      "findNext": "次へ",
-      "replacePlaceholder": "置換後の文字列",
-      "replace": "置換",
-      "replaceAll": "すべて置換",
-      "wordCount": "{{count}} 語",
-      "statusBar": {
-        "words": "{{count}} 文字",
-        "lineCol": "{{line}} 行, {{col}} 列",
-        "fmTitle": "YAML フロントマターを含むドキュメント"
-      },
-      "dialectLoss": "一部の特殊ブロックはライブ編集後に簡略化される場合があります",
-      "dialectLossHint": "簡略化されました。ソースモードで原文を確認できます。",
-      "copyBlockLink": "ブロックへのリンクをコピー",
-      "multiSelectAdd": "選択に追加",
-      "multiSelectClear": "選択から外す",
-      "blockMenuDelete": "削除",
-      "blockMenuColors": "カラー",
-      "blockMenuTurnInto": "変換…",
-      "blockMenuDuplicate": "複製",
-      "blockMenuTurnIntoFailed": "ブロックを変換できませんでした",
-      "blockMenuDuplicateFailed": "ブロックを複製できませんでした",
-      "blockMenuInsertFailed": "ブロックを挿入できませんでした",
-      "blockTypeText": "テキスト",
-      "sideMenuAdd": "ブロックを追加",
-      "sideMenuDragHandle": "ドラッグで移動、クリックでメニュー",
-      "multiSelectCount": "{{count}} ブロックを選択中",
-      "multiSelectParagraph": "段落に変換",
-      "multiSelectHeading": "見出しに変換",
-      "multiSelectQuote": "引用に変換",
-      "multiSelectDelete": "削除",
-      "linkCopied": "ページリンクをコピーしました",
-      "linkCopyFailed": "ページリンクをコピーできませんでした"
-    },
-    "wiki": {
-      "createTitle": "ドキュメントを作成しますか？",
-      "createBody": "このスペースに「{{title}}」という名前のドキュメントはありません。今作成しますか？",
-      "createConfirm": "作成",
-      "brokenHint": "リンク切れ: 「{{title}}」 — クリックして作成",
-      "openHint": "「{{title}}」を開く",
-      "noMatches": "一致するドキュメントがありません",
-    },
-    "template": {
-      "pickTitle": "テンプレートを選択",
-      "pickHint": "テンプレートを選ぶか、空のドキュメントから始めてください。キャンセルすると何も作成されません。",
-      "empty": "空のドキュメント",
-      "emptyHint": "白紙のページから始める",
-      "noPreview": "プレビューなし",
-      "saveAs": "テンプレートとして保存…",
-      "saveAsTitle": "テンプレートとして保存",
-      "nameLabel": "テンプレート名",
-      "namePlaceholder": "例: ミーティングノート",
-      "saved": "テンプレートを保存しました",
-      "delete": "テンプレートを削除"
-    },
-    "versions": {
-      "menuSave": "バージョンを保存",
-      "menuHistory": "バージョン履歴…",
-      "title": "バージョン履歴",
-      "empty": "まだバージョンがありません。バージョンを保存するか、書き続けてください。毎日最初の保存時に日次スナップショットが作成されます。",
-      "kindDaily": "日次",
-      "kindManual": "手動",
-      "restore": "復元",
-      "restoreTitle": "このバージョンを復元しますか？",
-      "restoreBody": "現在のドキュメント内容が置き換えられます。別のバージョンを復元しない限り、この操作は元に戻せません。",
-      "restoreConfirm": "復元",
-      "saved": "バージョンを保存しました",
-      "restored": "バージョンを復元しました",
-      "largeHint": "このスナップショットは大きいです（{{kb}} KB）。",
-      "diff": "差分",
-      "diffTitle": "現在との差分",
-      "groupToday": "今日",
-      "groupEarlier": "以前"
-    },
-  },
   "common": {
     "clear": "クリア",
     "cancel": "キャンセル",
     "close": "閉じる",
     "confirm": "OK",
     "back": "戻る",
+    "imagePreview": "画像プレビュー",
   },
   "dialog": {
     "closeWindowTitle": "ウィンドウを閉じるとき",
@@ -2314,10 +1825,6 @@ export const ja = {
     "exitConfirmTasks": "バックグラウンドタスク {{count}} 件",
     "exitConfirmHide": "トレイに隠す",
     "exitConfirmQuit": "終了して停止",
-      "unsavedTitle": "未保存の変更",
-      "unsavedBody": "ナレッジ文書に未保存の変更があります。閉じる前に保存しますか？",
-      "unsavedSave": "保存",
-      "unsavedDiscard": "保存しない"
   },
   "tray": {
     "showMain": "hip を表示",
@@ -2448,13 +1955,6 @@ export const ja = {
       "copyTask": "タスクをコピー",
       "copyOutput": "出力をコピー",
       "empty": "コピーするものがありません"
-    },
-    "workItem": {
-      "open": "開く",
-      "copyTitle": "タイトルをコピー",
-      "openSession": "リンクしたセッションを開く",
-      "openKnowledge": "リンクしたドキュメントを開く",
-      "openUrl": "リンクを開く"
     },
     "trashEntry": {
       "copyTitle": "タイトルをコピー"

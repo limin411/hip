@@ -746,13 +746,6 @@ export const zhTW = {
       "light": "淺色",
       "dark": "深色"
     },
-    "docWidth": "文件寬度",
-    "docWidthDesc": "文件管理中正文欄的最大寬度。修改後立即生效。",
-    "docWidths": {
-      "default": "預設",
-      "wide": "加寬",
-      "full": "全寬"
-    },
     "density": "密度",
     "densityDesc": "控制側邊欄與活動行的間距。",
     "densities": {
@@ -880,10 +873,6 @@ export const zhTW = {
         "skillConfig": "Skills",
         "mcpServer": "MCP 伺服器",
         "plugin": "外掛",
-        "knowledgeNode": "知識樹節點",
-        "knowledgeTree": "知識樹空白區",
-        "workItem": "工作事項",
-        "workItemBlank": "事項空白區",
         "trashEntry": "回收站"
       }
     },
@@ -1101,15 +1090,6 @@ export const zhTW = {
     "pluginsLabel": "外掛市場",
     "hooksLabel": "Hooks",
     "memoryLabel": "記憶",
-    "productHelp": {
-      "sections": {
-        "overview": "概覽",
-        "memory": "記憶",
-        "config": "設定與資料",
-        "troubleshooting": "故障排除",
-        "agents": "智能體與外掛"
-      }
-    },
     "memory": {
       "title": "記憶",
       "intro": "跨會話共享的長期記憶。預設關閉。",
@@ -1553,8 +1533,6 @@ export const zhTW = {
   "placeholder": {
     "comingSoon": "功能開發中，敬請期待",
     "terminals": "終端管理即將上線，用於集中管理多路終端會話。",
-    "tasks": "事項追蹤即將上線，用於跟進事項。",
-    "automation": "自動化即將上線，用於設定工作流與定時任務。"
   },
   "terminals": {
     "newLocal": "本機終端",
@@ -1751,93 +1729,6 @@ export const zhTW = {
       "errorSecretSave": "主機已儲存，但密碼/口令未能寫入。請重新輸入後儲存。"
     }
   },
-  "workItems": {
-    "title": "事項",
-    "untitled": "未命名事項",
-    "searchPlaceholder": "搜尋事項…",
-    "newItem": "新增事項",
-    "emptyTitle": "尚無事項",
-    "emptyHint": "建立事項以追蹤待辦與後續。",
-    "emptyFilterTitle": "此篩選下無事項",
-    "emptyFilterHint": "試試其他篩選，或檢視待處理事項。",
-    "emptySearchHint": "清除搜尋即可恢復列表，或嘗試其他關鍵詞。",
-    "clearSearch": "清除搜尋",
-    "showAll": "顯示全部",
-    "loading": "載入中…",
-    "filtersAria": "智慧篩選",
-    "filters": {
-      "all": "全部",
-      "todo": "待處理",
-      "in_progress": "進行中",
-      "done": "已完成",
-      "archived": "已封存"
-    },
-    "status": {
-      "todo": "待處理",
-      "in_progress": "進行中",
-      "done": "已完成",
-      "cancelled": "已取消"
-    },
-    "priority": {
-      "none": "無優先級",
-      "low": "低",
-      "medium": "中",
-      "high": "高"
-    },
-    "fields": {
-      "title": "標題",
-      "titlePlaceholder": "事項標題",
-      "status": "狀態",
-      "priority": "優先級",
-      "startOn": "開始時間",
-      "endOn": "結束時間",
-      "tags": "標籤",
-      "tagsPlaceholder": "新增標籤…",
-      "notes": "備註",
-      "notesPlaceholder": "備註…"
-    },
-    "actions": {
-      "complete": "標記完成",
-      "reopen": "重新開啟",
-      "cancel": "取消事項",
-      "archive": "封存",
-      "unarchive": "取消封存",
-      "delete": "刪除"
-    },
-    "deleteConfirm": "將此事項移入回收站？可在回收站中恢復。",
-    "modal": {
-      "createTitle": "新建事項",
-      "editTitle": "查看事項",
-      "save": "儲存",
-      "titleRequired": "請填寫標題"
-    },
-    "view": {
-      "modeAria": "展示方式",
-      "calendar": "月曆",
-      "list": "列表",
-      "calendarHint": "月曆 · 事項必含起迄日期（缺省當天）",
-      "listHint": "依開始時間排序 · 點擊列開啟彈窗"
-    },
-    "calendar": {
-      "aria": "月曆",
-      "prevMonth": "上一月",
-      "nextMonth": "下一月",
-      "today": "今天",
-      "more": "+{{count}} 更多",
-      "addOnDay": "在 {{date}} 新建"
-    },
-    "list": {
-      "count": "共 {{count}} 項 · 依開始時間排序",
-      "range": "第 {{start}}–{{end}} 項",
-      "pageInfo": "第 {{page}} / {{total}} 頁",
-      "previous": "上一頁",
-      "next": "下一頁"
-    },
-    "colors": {
-      "recolor": "狀態顏色",
-      "recolorAria": "變更{{status}}顏色"
-    },
-  },
   "automation": {
     "skipReasons": {
       "skip_previous_running": "上一次執行仍在進行",
@@ -1876,12 +1767,9 @@ export const zhTW = {
     "navForward": "前進",
     "navForwardAria": "前進到下一位置",
     "nav": {
-      "knowledge": "文件管理",
       "projects": "專案",
       "chats": "對話",
       "terminals": "終端管理",
-      "tasks": "事項追蹤",
-      "automation": "自動化"
     },
     "list": {
       "spaces": "目前目錄",
@@ -1923,390 +1811,13 @@ export const zhTW = {
       "collapse": "收起 {{name}}"
     }
   },
-  "knowledge": {
-    "browse": {
-      "multiSelectCount": "已選 {{count}} 篇",
-      "multiSelectDelete": "刪除",
-      "multiSelectMove": "移動到…",
-      "multiSelectDeleteTitle": "刪除 {{count}} 篇文件？",
-      "multiSelectDeleteBody": "選中的 {{count}} 篇文件將移入資源回收筒，可隨時還原。",
-      "moveTitle": "移動到",
-      "moveConfirm": "移動",
-      "viewLabel": "檢視切換",
-      "viewGrid": "網格檢視",
-      "viewList": "列表檢視",
-      "emptyTitle": "此資料夾為空",
-      "emptyDesc": "建立一篇文件，開始記錄。",
-      "folderKind": "資料夾",
-    },
-    "home": {
-      "mySpaces": "全部文件",
-    },
-    "space": {
-      "nameEmpty": "請輸入名稱",
-      "nameDuplicate": "已存在同名「{{name}}」",
-      "menu": "空間選單",
-    },
-          "blockRef": {
-        "linkCopied": "區塊連結已複製",
-      "noPreview": "暫無預覽"
-      },
-      "sync": {
-        "pickSource": "選擇來源區塊…",
-        "unlink": "解除同步（變為普通引用連結）",
-        "selfRef": "不能嵌入自身",
-        "sourceMissing": "來源區塊已刪除或無法讀取"
-      },
-      "backlinks": {
-        "inbound": "入鏈",
-        "outbound": "出鏈",
-        "broken": "斷鏈",
-        "emptyInbound": "暫無入鏈",
-        "emptyOutbound": "暫無出鏈",
-        "outboundUnresolved": "未找到連結目標",
-        "emptyBroken": "沒有斷鏈 🎉",
-        "expand": "展開全部（{{count}}）",
-        "collapse": "收起",
-        "createDoc": "建立缺失文件",
-        "repoint": "重新指向",
-        "repaired": "已建立「{{title}}」並建立連結",
-        "repairFailed": "建立失敗",
-        "repointed": "已重新指向",
-        "repointFailed": "重新指向失敗",
-        "repairNoTarget": "無法從連結解析目標標題",
-        "refresh": "重新整理連結面板",
-      },
-"tree": {
-      "newDoc": "文件",
-      "newTable": "表格",
-      "newFolder": "資料夾",
-      "rename": "重新命名",
-      "delete": "刪除",
-      "nameLabel": "名稱",
-      "deleteTitle": "刪除「{{title}}」？",
-      "deleteDocBody": "將永久刪除此文件，此操作無法復原。",
-      "deleteBoardBody": "將永久刪除此畫板，此操作無法復原。",
-      "deleteFolderBody": "將永久刪除此資料夾及其全部內容，此操作無法復原。",
-      "filterPlaceholder": "過濾目錄…",
-      "reveal": "在 Finder 中顯示",
-      "copyPath": "複製路徑",
-      "pathCopied": "路徑已複製",
-      "renameUpdateLinks": "同時更新指向舊標題的 wiki 連結",
-      "renameLinksDone": "已在 {{count}} 篇文件中更新 wiki 連結"
-    },
-    "export": {
-      "doc": "匯出文件…",
-      "docDone": "文件已匯出",
-      "htmlDone": "已匯出 HTML（可用瀏覽器開啟；列印 → PDF）",
-    },
-    "asset": {
-      "loading": "圖片載入中…",
-      "reveal": "在 Finder 中顯示",
-      "tooLargePaste": "圖片過大，無法貼上；請先存成檔案再用「插入」（最大 25 MB）。",
-      "tooLargeDisk": "檔案超過 25 MB 附件上限。",
-      "unsupported": "不支援的檔案類型。請使用 PNG、JPEG、GIF、WebP 或 PDF。",
-      "importFailed": "無法新增附件",
-      "preview": "圖片預覽",
-      "previewOpen": "放大檢視圖片"
-    },
-    "toolbar": {
-      "label": "Markdown 格式",
-      "h1": "一級標題",
-      "h2": "二級標題",
-      "h3": "三級標題",
-      "bold": "粗體",
-      "italic": "斜體",
-      "strike": "刪除線",
-      "code": "行內程式碼",
-      "link": "連結",
-      "bullet": "無序清單",
-      "ordered": "有序清單",
-      "quote": "引用",
-      "fence": "程式碼區塊"
-    },
-    "tableInfo": {
-      "title": "表格資訊",
-      "rowsCols": "{{rows}} 行 · {{cols}} 列",
-      "width": "{{width}}px",
-      "empty": "空表格：點擊下方「＋ 新增列」開始"
-    },
-    "table": {
-      "untitled": "未命名表格",
-      "loadFailed": "無法開啟表格",
-
-      columnLabel: "欄 {{n}}",
-      types: {
-        text: "文字",
-        number: "數字",
-        checkbox: "勾選",
-        date: "日期",
-        select: "單選",
-        selectNewOption: "新增選項…",
-      },
-      filter: {
-        title: "篩選",
-        addCondition: "新增條件",
-        clear: "清除",
-        value: "值",
-        opContains: "包含",
-        opEquals: "等於",
-        opNotEmpty: "不為空",
-        opGt: ">",
-        opLt: "<",
-      },
-      columnMenu: {
-
-        type: "類型",
-        insertLeft: "左側插入欄",
-        insertRight: "右側插入欄",
-        deleteColumn: "刪除欄",
-        sortAsc: "升冪排列",
-        sortDesc: "降冪排列",
-        sortClear: "清除排序",
-        more: "欄操作",
-        statsShow: "顯示統計",
-        statsSum: "總和",
-        statsAvg: "平均",
-        statsCount: "計數",
-        statsOff: "關閉",
-      },
-      rowMenu: {
-        insertAbove: "上方插入列",
-        insertBelow: "下方插入列",
-        duplicate: "複製列",
-        deleteRow: "刪除列",
-      },
-      ctx: {
-        copy: "複製",
-        paste: "貼上",
-        clear: "清空",
-      },
-      grid: {
-        addRow: "新增列",
-        addColumn: "新增欄",
-        firstCellHint: "雙擊輸入",
-      },
-      edit: {
-        invalidValue: "{{type}}欄不接受此輸入，未儲存",
-      },
-      toolbar: {
-        undo: "復原",
-        redo: "重做",
-        filter: "篩選",
-        stats: "統計",
-        exportCsv: "匯出 CSV",
-        more: "更多操作",
-        resetView: "重設檢視",
-        exportFullNote: "已匯出全量資料（不受目前篩選影響）",
-        freezeHeader: "凍結首列",
-      },
-      status: {
-        "visibleRows": "可見 {{n}}/{{total}} 列",
-        "selectionCount": "已選 {{n}} 格",
-        rowsCols: "{{rows}} 列 · {{cols}} 欄",
-        saving: "儲存中…",
-      },
-      toasts: {
-        columnDeleted: "已刪除欄（可復原）",
-        rowDeleted: "已刪除列（可復原）",
-        clipboardUnavailable: "剪貼簿無法使用",
-        pasteTooLarge: "貼上內容過大（上限 {{rows}} 列 × {{cols}} 欄）",
-        rowAddedFiltered: "已新增列（可能被目前篩選隱藏）",
-      },
-      dragDisabledHint: "排序/篩選下不可拖曳",
-    },
-    "slash": {
-      "listLabel": "插入區塊",
-      "noMatch": "沒有符合的插入項",
-      "group": {
-        "basic": "基礎",
-        "list": "清單",
-        "media": "媒體",
-        "advanced": "進階",
-      },
-      "h1": "一級標題",
-      "h2": "二級標題",
-      "h3": "三級標題",
-      "bullet": "無序清單",
-      "ordered": "有序清單",
-      "task": "任務清單",
-      "fence": "程式碼區塊",
-      "quote": "引用",
-      "hr": "分隔線",
-      "table": "表格",
-      "wiki": "雙向連結",
-      "embed": "嵌入文件",
-      "callout": "醒目提示",
-      "calloutTip": "Tip callout",
-      "calloutNote": "Note callout",
-      "calloutWarning": "Warning callout",
-      "calloutDanger": "Danger callout",
-      "calloutInfo": "Info callout",
-      "calloutImportant": "Important callout",
-      "toggle": "Toggle",
-      "math": "公式區塊",
-      "mathInline": "行內公式",
-      "mermaid": "Mermaid 圖",
-      "svg": "SVG",
-      "image": "圖片",
-      "file": "附件",
-      "subdoc": "Sub-document",
-      "copyPageLink": "Copy page link",
-      "columns": "Columns",
-      "sync": "Sync block",
-    },
-    "workspace": {
-      "new": "新增",
-      "noDocTitle": "未選擇頁面",
-      "noDocHint": "在左側樹中選擇文件或畫板，或新增一篇。"
-    },
-    "outline": {
-      "title": "目錄",
-      "empty": "此文件暫無標題",
-      "untitled": "未命名標題",
-      "noDoc": "選擇文件以查看目錄",
-      "noBoard": "畫板沒有大綱",
-      "sectionOutline": "大綱",
-      "loading": "載入中…",
-    },
-    "embed": {
-      "openSource": "開啟來源文件",
-      "loading": "正在載入嵌入…",
-      "missing": "找不到文件：{{title}}",
-      "error": "無法載入嵌入",
-      "empty": "（空）",
-      "truncated": "內容過長，已截斷顯示。"
-    },
-    "graph": {
-      "title": "知識圖譜",
-      "neighborhood": "鄰域",
-      "full": "全圖",
-      "fullConfirm": "目前空間有 {{count}} 篇文件（超過 {{threshold}}）。仍要渲染全圖嗎？",
-      "stats": "顯示 {{nodes}} 節點 · {{edges}} 邊 · 共 {{total}} 篇",
-      "loading": "載入圖譜…",
-      "empty": "連結索引中還沒有文件。請先開啟或儲存幾篇筆記。",
-      "error": "無法載入圖譜",
-      "edgeEmbed": "嵌入"
-    },
-    "mermaid": {
-      "loading": "正在渲染圖表…"
-    },
-    "svg": {
-      "empty": "空 SVG",
-      "tooLarge": "SVG 過大，無法渲染",
-      "tooManyNodes": "SVG 節點過多，無法渲染",
-      "parseError": "無法解析 SVG",
-      "rejected": "SVG 無法安全渲染",
-      "showSource": "顯示原始碼"
-    },
-    "callout": {
-      "note": "備註",
-      "tip": "提示",
-      "info": "資訊",
-      "warning": "警告",
-      "danger": "危險",
-      "caution": "注意",
-      "important": "重要"
-    },
-    "doc": {
-      "edit": "編輯",
-      "titleLabel": "文件標題",
-      "placeholder": "開始寫作…",
-      "placeholderSlash": "輸入文字，或 / 喚起命令",
-      "untitled": "未命名",
-      "metaUpdated": "更新於 {{time}}",
-      "metaCreated": "建立於 {{time}}",
-      "emptyTitle": "文件為空",
-      "emptyHint": "開始寫作…",
-      "saveFailed": "儲存失敗",
-      "loadFailed": "無法載入文件",
-      "saving": "儲存中…",
-      "saveRetry": "重試",
-      "liveLoading": "正在載入即時編輯器…",
-      "compatView": "已進入相容檢視：文件較大或即時渲染失敗，目前以純文字方式編輯，內容仍完整可編輯。",
-      "compatViewClose": "知道了",
-      "findPlaceholder": "在文件中查詢",
-      "findPrev": "上一個",
-      "findNext": "下一個",
-      "replacePlaceholder": "替換為",
-      "replace": "替換",
-      "replaceAll": "全部替換",
-      "wordCount": "{{count}} 字詞",
-      "statusBar": {
-        "words": "{{count}} 字",
-        "lineCol": "行 {{line}}, 列 {{col}}",
-        "fmTitle": "文件包含 YAML 中繼資料"
-      },
-      "dialectLoss": "部分特殊塊在實時編輯後可能被簡化",
-      "dialectLossHint": "已簡化，可在原始碼模式查看原文。",
-      "copyBlockLink": "複製連結到區塊",
-      "multiSelectAdd": "加入多選",
-      "multiSelectClear": "移出多選",
-      "blockMenuDelete": "刪除",
-      "blockMenuColors": "顏色",
-      "blockMenuTurnInto": "轉換成…",
-      "blockMenuDuplicate": "製作副本",
-      "blockMenuTurnIntoFailed": "無法轉換區塊類型",
-      "blockMenuDuplicateFailed": "無法製作副本",
-      "blockMenuInsertFailed": "無法插入區塊",
-      "blockTypeText": "正文",
-      "sideMenuAdd": "新增區塊",
-      "sideMenuDragHandle": "拖曳以移動，點擊開啟選單",
-      "multiSelectCount": "已選 {{count}} 個區塊",
-      "multiSelectParagraph": "轉段落",
-      "multiSelectHeading": "轉標題",
-      "multiSelectQuote": "轉引用",
-      "multiSelectDelete": "刪除",
-      "linkCopied": "頁面連結已複製",
-      "linkCopyFailed": "無法複製頁面連結"
-    },
-    "wiki": {
-      "createTitle": "建立文件？",
-      "createBody": "目前空間中沒有名為「{{title}}」的文件。現在建立嗎？",
-      "createConfirm": "建立",
-      "brokenHint": "失效連結：「{{title}}」— 點擊建立",
-      "openHint": "開啟「{{title}}」",
-      "noMatches": "無符合文件",
-    },
-    "template": {
-      "pickTitle": "選擇範本",
-      "pickHint": "選擇範本或從空白文件開始。取消不會建立文件。",
-      "empty": "空白文件",
-      "emptyHint": "從空白頁開始",
-      "noPreview": "無預覽",
-      "saveAs": "儲存為範本…",
-      "saveAsTitle": "儲存為範本",
-      "nameLabel": "範本名稱",
-      "namePlaceholder": "例如：會議記錄",
-      "saved": "範本已儲存",
-      "delete": "刪除範本"
-    },
-    "versions": {
-      "menuSave": "儲存版本",
-      "menuHistory": "版本歷史…",
-      "title": "版本歷史",
-      "empty": "尚無版本。可手動儲存，或繼續寫作——每天首次儲存會自動產生快照。",
-      "kindDaily": "每日",
-      "kindManual": "手動",
-      "restore": "還原",
-      "restoreTitle": "還原此版本？",
-      "restoreBody": "目前文件內容將被取代。除再次還原其他版本外，此操作無法復原。",
-      "restoreConfirm": "還原",
-      "saved": "版本已儲存",
-      "restored": "版本已還原",
-      "largeHint": "此快照較大（{{kb}} KB）。",
-      "diff": "比對",
-      "diffTitle": "與目前內容比對",
-      "groupToday": "今天",
-      "groupEarlier": "更早"
-    },
-  },
   "common": {
     "clear": "清除",
     "cancel": "取消",
     "close": "關閉",
     "confirm": "確定",
     "back": "返回",
+    "imagePreview": "圖片預覽",
   },
   "dialog": {
     "closeWindowTitle": "關閉視窗時",
@@ -2319,10 +1830,6 @@ export const zhTW = {
     "exitConfirmTasks": "{{count}} 個背景工作",
     "exitConfirmHide": "隱藏到系統匣",
     "exitConfirmQuit": "結束並中止",
-    "unsavedTitle": "Unsaved changes",
-    "unsavedBody": "You have unsaved Knowledge document changes. Save before closing?",
-    "unsavedSave": "Save",
-    "unsavedDiscard": "Don't save"
   },
   "tray": {
     "showMain": "顯示 hip",
@@ -2453,13 +1960,6 @@ export const zhTW = {
       "copyTask": "複製任務",
       "copyOutput": "複製輸出",
       "empty": "無可複製內容"
-    },
-    "workItem": {
-      "open": "開啟",
-      "copyTitle": "複製標題",
-      "openSession": "開啟關聯會話",
-      "openKnowledge": "開啟關聯文件",
-      "openUrl": "開啟連結"
     },
     "trashEntry": {
       "copyTitle": "複製標題"

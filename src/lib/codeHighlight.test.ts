@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   HIGHLIGHT_LANG_ALIASES,
-  KNOWLEDGE_HIGHLIGHT_LANGS,
+  CODE_HIGHLIGHT_LANGS,
   normalizeHighlightLang,
 } from './codeHighlight'
 
@@ -52,12 +52,12 @@ describe('normalizeHighlightLang', () => {
 
   it('alias targets are on the allowlist', () => {
     for (const target of Object.values(HIGHLIGHT_LANG_ALIASES)) {
-      expect(KNOWLEDGE_HIGHLIGHT_LANGS).toContain(target)
+      expect(CODE_HIGHLIGHT_LANGS).toContain(target)
     }
   })
 
   it('allowlist is non-empty and includes core set', () => {
-    expect(KNOWLEDGE_HIGHLIGHT_LANGS.length).toBeGreaterThan(10)
+    expect(CODE_HIGHLIGHT_LANGS.length).toBeGreaterThan(10)
     for (const id of [
       'typescript',
       'javascript',
@@ -73,7 +73,7 @@ describe('normalizeHighlightLang', () => {
       'html',
       'sql',
     ]) {
-      expect(KNOWLEDGE_HIGHLIGHT_LANGS).toContain(id)
+      expect(CODE_HIGHLIGHT_LANGS).toContain(id)
     }
   })
 })

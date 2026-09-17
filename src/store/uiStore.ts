@@ -182,7 +182,6 @@ export function mergeUiPersistedState<
 >(persistedState: unknown, currentState: S): S {
   const p = (persistedState ?? {}) as Partial<UiPersistedState> & {
     activeView?: ActiveView
-    knowledgeTabOpen?: boolean
     sidebarSection?: SidebarSection
     openSessionIds?: string[]
     settingsNavCollapsed?: boolean
@@ -191,7 +190,6 @@ export function mergeUiPersistedState<
   // Drop legacy / non-persisted fields that must not rehydrate into shell state.
   const {
     activeView: _legacyView,
-    knowledgeTabOpen: _legacyKb,
     sidebarSection: _legacySection,
     openSessionIds: _legacyTabs,
     settingsNavCollapsed: _legacySettingsNav,
@@ -461,8 +459,8 @@ export const useUiStore = create<UiState>()(
       partialize: (s): UiPersistedState => ({
         chatSessionId: s.chatSessionId,
         codeSessionId: s.codeSessionId,
-        // Never persist activeView — verified on device that hip-ui still held
-        // activeView:"knowledge" and reopened the KB shell after restart.
+        // Never persist activeView — verified on device that hip-ui held a stale
+        // special view and reopened that shell after restart.
         theme: s.theme,
         language: s.language,
         density: s.density,

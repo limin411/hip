@@ -69,17 +69,6 @@ export type GlobalCommandLabels = {
   }
 }
 
-export type KnowledgeDocHit = {
-  spaceId: string
-  docId: string
-  title: string
-  spaceName: string
-  path: string
-  snippet?: string
-  /** MiniSearch score (descending) — unused by palette, kept for tests. */
-  score?: number
-}
-
 export type GlobalCommandContext = {
   sessions: SessionVM[]
   activeView: ActiveView

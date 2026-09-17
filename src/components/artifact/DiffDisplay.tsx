@@ -13,7 +13,7 @@ import {
   CODE_BLOCK_CHROME,
   normalizeCodeBlockThemeId,
   type CodeBlockChromePalette,
-} from '@/domain/knowledge/codeBlockTheme'
+} from '@/lib/codeBlockTheme'
 import { useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'

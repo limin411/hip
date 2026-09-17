@@ -133,7 +133,7 @@ describe('README product screenshots @docs-shots', function () {
     await leaveSpecialViewsIfOpen()
   })
 
-  it('captures Chat landing, Code landing, agent session, Settings, Knowledge', async function () {
+  it('captures Chat landing, Code landing, agent session, Settings, Terminals', async function () {
     if (!enabled) {
       this.skip()
       return
@@ -170,10 +170,11 @@ describe('README product screenshots @docs-shots', function () {
     await shot('settings-models')
     await closeOverlayForE2e()
 
-    const knowledgeNav = await browser.$('[data-testid="sidebar-nav-knowledge"]')
-    await knowledgeNav.waitForExist({ timeout: 15000 })
-    await browser.execute((el: HTMLElement) => el.click(), knowledgeNav)
-    await (await browser.$('[data-testid="knowledge-page"]')).waitForExist({ timeout: 20000 })
-    await shot('knowledge-home')
+    // Third surface: managed terminals (no SSH host needed for the library page).
+    const terminalsNav = await browser.$('[data-testid="sidebar-nav-terminals"]')
+    await terminalsNav.waitForExist({ timeout: 15000 })
+    await browser.execute((el: HTMLElement) => el.click(), terminalsNav)
+    await (await browser.$('[data-testid="terminal-management-page"]')).waitForExist({ timeout: 20000 })
+    await shot('terminals-management')
   })
 })

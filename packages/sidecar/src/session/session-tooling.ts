@@ -30,7 +30,7 @@ export interface BuildSessionToolingInput {
   sessionId: string
   mode: PermissionMode
   /** Product surface for tool clamps + skill filtering (Chat vs Code). */
-  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
+  surface?: 'chat' | 'code' | 'terminal'
   /** Terminal shared-PTY bridge (terminal surface only). */
   terminalUiBridge?: TerminalUiBridge
   skills: SkillMeta[]

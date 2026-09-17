@@ -10,7 +10,6 @@ function entry(partial: Partial<NavEntry> & Pick<NavEntry, 'activeView'>): NavEn
   return {
     sidebarSection: 'chats',
     sessionId: null,
-    knowledgeSpaceId: null,
     settingsPage: 'general',
     managedTerminalId: null,
     ...partial,

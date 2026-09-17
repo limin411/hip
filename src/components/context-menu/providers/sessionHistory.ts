@@ -16,7 +16,7 @@ export const sessionHistoryProvider: ContextProvider = (req, ctx) => {
       label: ctx.t('contextMenu.sessionHistory.open'),
       group: 'primary',
       run: () => {
-        // Flush-safe open (leave knowledge if needed) — same path as sidebar click.
+        // Flush-safe open — same path as sidebar click.
         void selectSessionFromSidebar(sessionId)
       },
     },

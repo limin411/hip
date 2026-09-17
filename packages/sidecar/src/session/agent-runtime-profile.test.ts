@@ -91,12 +91,6 @@ describe('resolveAgentRuntimeProfile', () => {
     expect(p.surface).toBe('code')
     expect(p.promptBody).toBe('code')
   })
-
-  it('knowledge surface is reserved with knowledge body', () => {
-    const p = resolveAgentRuntimeProfile({ surface: 'knowledge', permissionMode: 'edit' })
-    expect(p.promptBody).toBe('knowledge')
-    expect(p.skillPolicy.excludeIds).toContain(CODING_SKILL_ID)
-  })
 })
 
 describe('filterSkillsForProfile', () => {

@@ -68,20 +68,6 @@ pub(crate) fn ensure_private_dir(dir: &std::path::Path) -> Option<()> {
     Some(())
 }
 
-/// Local whisper.cpp models (`~/.hip/models/whisper/`, mode 0700).
-pub fn whisper_models_dir(app: &AppHandle) -> Option<PathBuf> {
-    let dir = hip_base_dir(app)?.join("models").join("whisper");
-    ensure_private_dir(&dir)?;
-    Some(dir)
-}
-
-/// Voice capture scratch (`~/.hip/scratch/voice/`, mode 0700).
-pub fn voice_scratch_dir(app: &AppHandle) -> Option<PathBuf> {
-    let dir = scratch_dir(app)?.join("voice");
-    ensure_private_dir(&dir)?;
-    Some(dir)
-}
-
 /// Runtime discovery for product CLI attach (`run/sidecar.json`).
 pub fn run_dir(app: &AppHandle) -> Option<PathBuf> {
     let dir = hip_subdir(app, "run")?;
@@ -135,21 +121,6 @@ pub fn terminal_hosts_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("terminal-hosts.json"))
 }
 
-/// Product work-items root (`<base>/work-items`) — content dir, not under config/.
-pub fn work_items_dir(app: &AppHandle) -> Option<PathBuf> {
-    hip_subdir(app, "work-items")
-}
-
-/// Canonical path of the work-items catalog (`work-items/catalog.json`).
-pub fn work_items_catalog_path(app: &AppHandle) -> Option<PathBuf> {
-    Some(work_items_dir(app)?.join("catalog.json"))
-}
-
-/// Work-item UI prefs (status colors) next to the catalog.
-pub fn work_items_ui_prefs_path(app: &AppHandle) -> Option<PathBuf> {
-    Some(work_items_dir(app)?.join("ui-prefs.json"))
-}
-
 /// Product automations root (`<base>/automations`) — content dir, not under config/.
 pub fn automations_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "automations")
@@ -170,24 +141,9 @@ pub fn plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "plugins")
 }
 
-/// Local-first knowledge base root (`<base>/knowledge`).
-pub fn knowledge_dir(app: &AppHandle) -> Option<PathBuf> {
-    hip_subdir(app, "knowledge")
-}
-
 /// Product recycle-bin root (`<base>/trash`).
 pub fn trash_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "trash")
-}
-
-/// Knowledge quarantine under trash (`<base>/trash/knowledge`).
-pub fn trash_knowledge_dir(app: &AppHandle) -> Option<PathBuf> {
-    trash_dir(app).map(|p| p.join("knowledge"))
-}
-
-/// Work-items quarantine under trash (`<base>/trash/work-items`).
-pub fn trash_work_items_dir(app: &AppHandle) -> Option<PathBuf> {
-    trash_dir(app).map(|p| p.join("work-items"))
 }
 
 /// Automations quarantine under trash (`<base>/trash/automations`).
@@ -243,36 +199,6 @@ mod tests {
             base.join("config").join("terminal-hosts.json"),
             PathBuf::from("/Users/x/.hip/config/terminal-hosts.json"),
         );
-    }
-
-    #[test]
-    fn work_items_catalog_lives_under_base_not_config() {
-        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
-        assert_eq!(
-            base.join("work-items").join("catalog.json"),
-            PathBuf::from("/Users/x/.hip/work-items/catalog.json"),
-        );
-        let s = base
-            .join("work-items")
-            .join("catalog.json")
-            .to_string_lossy()
-            .replace('\\', "/");
-        assert!(!s.contains("/config/"));
-    }
-
-    #[test]
-    fn work_items_ui_prefs_lives_under_work_items_not_config() {
-        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
-        assert_eq!(
-            base.join("work-items").join("ui-prefs.json"),
-            PathBuf::from("/Users/x/.hip/work-items/ui-prefs.json"),
-        );
-        let s = base
-            .join("work-items")
-            .join("ui-prefs.json")
-            .to_string_lossy()
-            .replace('\\', "/");
-        assert!(!s.contains("/config/"));
     }
 
     #[test]

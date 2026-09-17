@@ -10,7 +10,7 @@ import { CODING_SKILL_ID } from './ops/content.js'
 import { HIP_PRODUCT_VERSION, HIP_SKILL_ID, PRODUCT_CAPABILITY_MAP } from './product/content.js'
 import { surfaceOf } from './surface.js'
 
-export type ProductSurface = 'chat' | 'code' | 'knowledge' | 'terminal'
+export type ProductSurface = 'chat' | 'code' | 'terminal'
 
 export interface AgentRuntimeProfile {
   surface: ProductSurface
@@ -22,7 +22,7 @@ export interface AgentRuntimeProfile {
    */
   capabilityNarrative: string
   /** Which always-on body `buildSystemPrompt` should use. */
-  promptBody: 'chat' | 'code' | 'knowledge' | 'terminal'
+  promptBody: 'chat' | 'code' | 'terminal'
   includeGitGuidance: boolean
   includeMcpCatalog: boolean
   skillPolicy: {
@@ -39,7 +39,7 @@ export interface AgentRuntimeProfile {
 }
 
 export interface ResolveAgentRuntimeProfileInput {
-  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
+  surface?: 'chat' | 'code' | 'terminal'
   permissionMode?: PermissionMode
   sessionId?: string
   cwd?: string
@@ -52,7 +52,6 @@ function normalizePermissionMode(mode: PermissionMode | undefined): PermissionMo
 }
 
 function resolveSurface(input: ResolveAgentRuntimeProfileInput): ProductSurface {
-  if (input.surface === 'knowledge') return 'knowledge'
   if (input.surface === 'terminal') return 'terminal'
   if (input.surface === 'chat' || input.surface === 'code') return input.surface
   // Legacy / missing: infer chat from scratch cwd when sessionId known; else code.
@@ -93,16 +92,6 @@ export function productCapabilityMapForSurface(surface: ProductSurface): string 
       '- Local data: ~/.hip/ (config, db, skills, plugins, logs).'
     )
   }
-  if (surface === 'knowledge') {
-    return (
-      'Product facts (hip):\n' +
-      `- Version: ${HIP_PRODUCT_VERSION}.\n` +
-      '- You are on the **Knowledge** surface: help with the user\'s notes spaces.\n' +
-      '- Do not claim to be a coding agent editing a software project unless the user opens Code.\n' +
-      '- API keys: ~/.hip/config/auth.json (0600 plaintext by design).\n' +
-      '- Local data: ~/.hip/ (config, db, skills, plugins, logs).'
-    )
-  }
   // Code: ship the SoT L0 map (packages/product-content → content.ts).
   return PRODUCT_CAPABILITY_MAP
 }
@@ -121,12 +110,6 @@ function capabilityNarrative(surface: ProductSurface, permissionMode: Permission
       'You are in **Chat**: a private sandbox workspace. ' +
       'You may write previewable artifacts with write_file when useful. ' +
       'You are **not** in Code edit mode and must not claim to be editing a user project or operating under Code permission modes.'
-    )
-  }
-  if (surface === 'knowledge') {
-    return (
-      'You are on the **Knowledge** surface: answer from the user\'s notes and open documents. ' +
-      'Do not claim to be a coding agent in project edit mode.'
     )
   }
   // Code
@@ -179,29 +162,6 @@ export function resolveAgentRuntimeProfile(input: ResolveAgentRuntimeProfileInpu
         allowRunScript: !readOnly,
         allowPluginInstall: false,
         pathJail: permissionMode === 'full' ? 'none' : 'sandbox',
-      },
-    }
-  }
-
-  if (surface === 'knowledge') {
-    const readOnly = permissionMode === 'chat'
-    return {
-      surface,
-      permissionMode,
-      capabilityNarrative: capabilityNarrative('knowledge', permissionMode),
-      promptBody: 'knowledge',
-      includeGitGuidance: false,
-      includeMcpCatalog: false,
-      skillPolicy: {
-        pinIds: [HIP_SKILL_ID],
-        excludeIds: [CODING_SKILL_ID],
-      },
-      toolPolicy: {
-        allowWrites: !readOnly,
-        allowGit: false,
-        allowRunScript: false,
-        allowPluginInstall: false,
-        pathJail: 'sandbox',
       },
     }
   }
@@ -262,7 +222,7 @@ export function filterSkillsForProfile(skills: SkillMeta[] | undefined, profile:
 
 /** Model-facing capability reminder (injector / fragment). */
 export function renderCapabilityNarrative(input: {
-  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
+  surface?: 'chat' | 'code' | 'terminal'
   permissionMode?: PermissionMode
   sessionId?: string
   cwd?: string

@@ -16,7 +16,7 @@ function formatBytes(n: number): string {
 
 /**
  * Managed-terminal files rail (local term_fs or remote SFTP).
- * Shell right drawer chrome matches ArtifactPanel / PreviewPanel / KnowledgeOutlinePanel.
+ * Shell right drawer chrome matches ArtifactPanel / PreviewPanel.
  */
 export function TerminalFilesPanel({
   terminalId,

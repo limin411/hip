@@ -738,13 +738,6 @@ export const ko = {
       "light": "라이트",
       "dark": "다크"
     },
-    "docWidth": "문서 너비",
-    "docWidthDesc": "문서 관리에서 본문 열의 최대 너비입니다. 변경 사항이 즉시 적용됩니다.",
-    "docWidths": {
-      "default": "기본",
-      "wide": "넓게",
-      "full": "전체 너비"
-    },
     "density": "밀도",
     "densityDesc": "사이드바 및 활동 행 간격을 제어합니다.",
     "densities": {
@@ -873,10 +866,6 @@ export const ko = {
         "skillConfig": "Skills",
         "mcpServer": "MCP 서버",
         "plugin": "플러그인",
-        "knowledgeNode": "지식 트리",
-        "knowledgeTree": "지식 빈 영역",
-        "workItem": "작업 항목",
-        "workItemBlank": "작업 항목 빈 영역",
         "trashEntry": "휴지통"
       }
     },
@@ -1094,15 +1083,6 @@ export const ko = {
     "pluginsLabel": "플러그인 마켓",
     "hooksLabel": "Hooks",
     "memoryLabel": "메모리",
-    "productHelp": {
-      "sections": {
-        "overview": "개요",
-        "memory": "메모리",
-        "config": "설정 및 데이터",
-        "troubleshooting": "문제 해결",
-        "agents": "에이전트 및 플러그인"
-      }
-    },
     "memory": {
       "title": "메모리",
       "intro": "대화 간에 공유되는 장기 기억입니다. 기본적으로 비활성화되어 있습니다.",
@@ -1547,8 +1527,6 @@ export const ko = {
   "placeholder": {
     "comingSoon": "출시 예정",
     "terminals": "터미널 관리가 곧 출시됩니다 — 여러 터미널 세션을 한 곳에서 관리하세요.",
-    "tasks": "작업 항목 추적이 곧 출시됩니다 — 작업 항목을 추적하세요.",
-    "automation": "자동화가 곧 출시됩니다 — 워크플로우와 예약 작업을 구성하세요."
   },
   "terminals": {
     "newLocal": "로컬 터미널",
@@ -1745,93 +1723,6 @@ export const ko = {
       "errorSecretSave": "호스트는 저장되었지만 비밀번호/암호 구문을 저장하지 못했습니다. 다시 입력한 뒤 저장하세요."
     }
   },
-  "workItems": {
-    "title": "작업 항목",
-    "untitled": "제목 없음",
-    "searchPlaceholder": "작업 항목 검색…",
-    "newItem": "새 작업 항목",
-    "emptyTitle": "작업 항목이 없습니다",
-    "emptyHint": "할 일과 후속을 추적할 항목을 만드세요.",
-    "emptyFilterTitle": "이 필터에 항목이 없습니다",
-    "emptyFilterHint": "다른 필터를 시도하거나 할 일을 보세요.",
-    "emptySearchHint": "검색을 지우면 목록이 다시 나타납니다. 다른 키워드를 시도해 보세요.",
-    "clearSearch": "검색 지우기",
-    "showAll": "전체 보기",
-    "loading": "불러오는 중…",
-    "filters": {
-      "all": "전체",
-      "todo": "할 일",
-      "in_progress": "진행 중",
-      "done": "완료",
-      "archived": "보관됨"
-    },
-    "status": {
-      "todo": "할 일",
-      "in_progress": "진행 중",
-      "done": "완료",
-      "cancelled": "취소됨"
-    },
-    "priority": {
-      "none": "우선순위 없음",
-      "low": "낮음",
-      "medium": "보통",
-      "high": "높음"
-    },
-    "fields": {
-      "title": "제목",
-      "titlePlaceholder": "작업 항목 제목",
-      "status": "상태",
-      "priority": "우선순위",
-      "startOn": "시작일",
-      "endOn": "종료일",
-      "tags": "태그",
-      "tagsPlaceholder": "태그 추가…",
-      "notes": "메모",
-      "notesPlaceholder": "메모…"
-    },
-    "actions": {
-      "complete": "완료 표시",
-      "reopen": "다시 열기",
-      "cancel": "항목 취소",
-      "archive": "보관",
-      "unarchive": "보관 취소",
-      "delete": "삭제"
-    },
-    "deleteConfirm": "이 작업 항목을 휴지통으로 이동할까요? 나중에 복원할 수 있습니다.",
-    "modal": {
-      "createTitle": "새 항목",
-      "editTitle": "항목",
-      "save": "저장",
-      "titleRequired": "제목은 필수입니다"
-    },
-    "view": {
-      "modeAria": "표시 방식",
-      "calendar": "달력",
-      "list": "목록",
-      "calendarHint": "월간 · 날짜 필수(기본 오늘)",
-      "listHint": "시작일 정렬 · 행을 클릭해 열기"
-    },
-    "calendar": {
-      "aria": "월 달력",
-      "prevMonth": "이전 달",
-      "nextMonth": "다음 달",
-      "today": "오늘",
-      "more": "+{{count}}개 더",
-      "addOnDay": "{{date}}에 만들기"
-    },
-    "list": {
-      "count": "{{count}}개 · 시작일 순",
-      "range": "{{start}}–{{end}}",
-      "pageInfo": "{{page}}/{{total}} 페이지",
-      "previous": "이전 페이지",
-      "next": "다음 페이지"
-    },
-    "colors": {
-      "recolor": "상태 색",
-      "recolorAria": "{{status}} 색 변경"
-    },
-    "filtersAria": "스마트 필터",
-  },
 
   "automation": {
     "skipReasons": {
@@ -1871,12 +1762,9 @@ export const ko = {
     "navForward": "앞으로",
     "navForwardAria": "다음 위치로 이동",
     "nav": {
-      "knowledge": "문서",
       "projects": "프로젝트",
       "chats": "채팅",
       "terminals": "터미널",
-      "tasks": "작업",
-      "automation": "자동화"
     },
     "list": {
       "spaces": "현재 폴더",
@@ -1918,390 +1806,13 @@ export const ko = {
       "collapse": "{{name}} 접기"
     },
   },
-  "knowledge": {
-    "browse": {
-      "multiSelectCount": "{{count}}개 선택됨",
-      "multiSelectDelete": "삭제",
-      "multiSelectMove": "이동…",
-      "multiSelectDeleteTitle": "{{count}}개 문서를 삭제할까요?",
-      "multiSelectDeleteBody": "선택한 {{count}}개 문서가 휴지통으로 이동하며 언제든 복원할 수 있습니다.",
-      "moveTitle": "이동",
-      "moveConfirm": "이동",
-      "viewLabel": "보기 전환",
-      "viewGrid": "그리드 보기",
-      "viewList": "목록 보기",
-      "emptyTitle": "이 폴더는 비어 있습니다",
-      "emptyDesc": "문서를 만들어 기록을 시작하세요.",
-      "folderKind": "폴더",
-    },
-    "home": {
-      "mySpaces": "모든 문서",
-    },
-    "space": {
-      "nameEmpty": "스페이스 이름을 입력하세요",
-      "nameDuplicate": "“{{name}}” 이름의 스페이스가 이미 있습니다",
-      "menu": "스페이스 메뉴",
-    },
-          "blockRef": {
-        "linkCopied": "블록 링크가 복사되었습니다",
-      "noPreview": "미리보기 없음"
-      },
-      "sync": {
-        "pickSource": "소스 블록 선택…",
-        "unlink": "동기화 해제(일반 참조 링크가 됩니다)",
-        "selfRef": "자기 자신은 임베드할 수 없습니다",
-        "sourceMissing": "소스 블록이 삭제되었거나 읽을 수 없습니다"
-      },
-      "backlinks": {
-        "inbound": "들어오는 링크",
-        "outbound": "나가는 링크",
-        "broken": "끊긴 링크",
-        "emptyInbound": "들어오는 링크 없음",
-        "emptyOutbound": "나가는 링크 없음",
-        "outboundUnresolved": "링크 대상을 찾을 수 없음",
-        "emptyBroken": "끊긴 링크 없음 🎉",
-        "expand": "모두 표시({{count}})",
-        "collapse": "접기",
-        "createDoc": "누락된 문서 만들기",
-        "repoint": "다시 지정",
-        "repaired": "「{{title}}」을(를) 만들고 연결했습니다",
-        "repairFailed": "만들기 실패",
-        "repointed": "다시 지정했습니다",
-        "repointFailed": "다시 지정 실패",
-        "repairNoTarget": "링크에서 대상 제목을 해석할 수 없습니다",
-        "refresh": "링크 패널 새로고침",
-      },
-"tree": {
-      "newDoc": "문서",
-      "newTable": "표",
-      "newFolder": "폴더",
-      "rename": "이름 바꾸기",
-      "delete": "삭제",
-      "nameLabel": "이름",
-      "deleteTitle": "“{{title}}”을(를) 삭제할까요?",
-      "deleteDocBody": "이 문서가 영구 삭제되며 되돌릴 수 없습니다.",
-      "deleteBoardBody": "이 화이트보드가 영구 삭제되며 되돌릴 수 없습니다.",
-      "deleteFolderBody": "이 폴더와 그 안의 모든 항목이 영구 삭제되며 되돌릴 수 없습니다.",
-      "filterPlaceholder": "트리 필터…",
-      "reveal": "Finder에서 보기",
-      "copyPath": "경로 복사",
-      "pathCopied": "경로가 복사되었습니다",
-      "renameUpdateLinks": "이전 제목을 가리키는 위키 링크도 업데이트",
-      "renameLinksDone": "{{count}}개 문서의 위키 링크를 업데이트했습니다"
-    },
-    "export": {
-      "doc": "문서 내보내기…",
-      "docDone": "문서 내보내기 완료",
-      "htmlDone": "HTML 내보내기 완료 (브라우저에서 열기; 필요 시 인쇄 → PDF 사용)",
-    },
-    "asset": {
-      "loading": "이미지 로딩 중…",
-      "reveal": "Finder에서 보기",
-      "tooLargePaste": "이미지가 너무 커서 붙여넣을 수 없습니다. 파일을 저장한 후 첨부(최대 25MB)를 사용하세요.",
-      "tooLargeDisk": "파일이 25MB 첨부 제한을 초과했습니다.",
-      "unsupported": "지원되지 않는 파일 형식입니다. PNG, JPEG, GIF, WebP 또는 PDF를 사용하세요.",
-      "importFailed": "파일을 첨부할 수 없습니다",
-      "preview": "이미지 미리보기",
-      "previewOpen": "이미지 확대 보기"
-    },
-    "toolbar": {
-      "label": "Markdown 서식",
-      "h1": "제목 1",
-      "h2": "제목 2",
-      "h3": "제목 3",
-      "bold": "굵게",
-      "italic": "기울임",
-      "strike": "취소선",
-      "code": "인라인 코드",
-      "link": "링크",
-      "bullet": "글머리 목록",
-      "ordered": "번호 목록",
-      "quote": "인용",
-      "fence": "코드 블록"
-    },
-    "tableInfo": {
-      "title": "테이블 정보",
-      "rowsCols": "{{rows}} 행 · {{cols}} 열",
-      "width": "{{width}}px",
-      "empty": "빈 테이블: 아래의 「＋ 행 추가」로 시작"
-    },
-    "table": {
-      "untitled": "제목 없는 표",
-      "loadFailed": "표를 열 수 없습니다",
-
-      columnLabel: "열 {{n}}",
-      types: {
-        text: "텍스트",
-        number: "숫자",
-        checkbox: "체크",
-        date: "날짜",
-        select: "선택",
-        selectNewOption: "새 옵션…",
-      },
-      filter: {
-        title: "필터",
-        addCondition: "조건 추가",
-        clear: "지우기",
-        value: "값",
-        opContains: "포함",
-        opEquals: "같음",
-        opNotEmpty: "비어 있지 않음",
-        opGt: ">",
-        opLt: "<",
-      },
-      columnMenu: {
-
-        type: "유형",
-        insertLeft: "왼쪽에 열 추가",
-        insertRight: "오른쪽에 열 추가",
-        deleteColumn: "열 삭제",
-        sortAsc: "오름차순 정렬",
-        sortDesc: "내림차순 정렬",
-        sortClear: "정렬 지우기",
-        more: "열 작업",
-        statsShow: "통계 표시",
-        statsSum: "합계",
-        statsAvg: "평균",
-        statsCount: "개수",
-        statsOff: "끄기",
-      },
-      rowMenu: {
-        insertAbove: "위에 행 추가",
-        insertBelow: "아래에 행 추가",
-        duplicate: "행 복제",
-        deleteRow: "행 삭제",
-      },
-      ctx: {
-        copy: "복사",
-        paste: "붙여넣기",
-        clear: "지우기",
-      },
-      grid: {
-        addRow: "행 추가",
-        addColumn: "열 추가",
-        firstCellHint: "더블클릭하여 입력",
-      },
-      edit: {
-        invalidValue: "{{type}} 열에 잘못된 입력입니다. 저장되지 않았습니다",
-      },
-      toolbar: {
-        undo: "실행 취소",
-        redo: "다시 실행",
-        filter: "필터",
-        stats: "통계",
-        exportCsv: "CSV 내보내기",
-        more: "더 보기",
-        resetView: "보기 초기화",
-        exportFullNote: "전체 데이터를 내보냈습니다(현재 필터 미적용)",
-        freezeHeader: "첫 행 고정",
-      },
-      status: {
-        "visibleRows": "표시 {{n}}/{{total}}개 행",
-        "selectionCount": "{{n}}개 셀 선택됨",
-        rowsCols: "{{rows}}개 행 · {{cols}}개 열",
-        saving: "저장 중…",
-      },
-      toasts: {
-        columnDeleted: "열이 삭제되었습니다(실행 취소 가능)",
-        rowDeleted: "행이 삭제되었습니다(실행 취소 가능)",
-        clipboardUnavailable: "클립보드를 사용할 수 없습니다",
-        pasteTooLarge: "붙여넣기 내용이 너무 큽니다 (최대 {{rows}}행 × {{cols}}열)",
-        rowAddedFiltered: "행이 추가되었습니다(현재 필터로 숨겨졌을 수 있음)",
-      },
-      dragDisabledHint: "정렬/필터 중에는 드래그할 수 없습니다",
-    },
-    "slash": {
-      "listLabel": "블록 삽입",
-      "noMatch": "일치하는 항목이 없습니다",
-      "group": {
-        "basic": "기본",
-        "list": "목록",
-        "media": "미디어",
-        "advanced": "고급",
-      },
-      "h1": "제목 1",
-      "h2": "제목 2",
-      "h3": "제목 3",
-      "bullet": "글머리 목록",
-      "ordered": "번호 목록",
-      "task": "작업 목록",
-      "fence": "코드 블록",
-      "quote": "인용",
-      "hr": "가로선",
-      "table": "표",
-      "wiki": "위키 링크",
-      "embed": "문서 포함",
-      "callout": "강조 상자",
-      "math": "수학 블록",
-      "mathInline": "인라인 수식",
-      "mermaid": "Mermaid 다이어그램",
-      "svg": "SVG",
-      "image": "이미지",
-      "file": "파일 첨부",
-      "calloutTip": "팁",
-      "calloutNote": "메모",
-      "calloutWarning": "경고",
-      "calloutDanger": "위험",
-      "calloutInfo": "정보",
-      "calloutImportant": "중요",
-      "toggle": "접기",
-      "subdoc": "하위 문서",
-      "copyPageLink": "페이지 링크 복사",
-      "columns": "컬럼",
-      "sync": "동기화 블록",
-    },
-    "workspace": {
-      "new": "새로 만들기",
-      "noDocTitle": "선택된 페이지 없음",
-      "noDocHint": "트리에서 문서나 화이트보드를 선택하거나 새로 만드세요."
-    },
-    "outline": {
-      "title": "개요",
-      "empty": "이 문서에 제목이 없습니다",
-      "untitled": "제목 없는 제목",
-      "noDoc": "문서를 선택하면 개요를 볼 수 있습니다",
-        "noBoard": "화이트보드에는 개요가 없습니다",
-      "sectionOutline": "개요",
-      "loading": "불러오는 중…",
-    },
-    "embed": {
-      "openSource": "소스 문서 열기",
-      "loading": "임베드 불러오는 중…",
-      "missing": "문서를 찾을 수 없음: {{title}}",
-      "error": "임베드를 불러올 수 없습니다",
-      "empty": "(비어 있음)",
-      "truncated": "표시를 위해 내용이 잘렸습니다."
-    },
-    "graph": {
-      "title": "지식 그래프",
-      "neighborhood": "주변 그래프",
-      "full": "전체 그래프",
-      "fullConfirm": "이 공간에는 문서가 {{count}}개 있습니다({{threshold}}개 초과). 전체 그래프를 렌더링할까요?",
-      "stats": "노드 {{nodes}}개 · 엣지 {{edges}}개 · 전체 문서 {{total}}개",
-      "loading": "그래프 불러오는 중…",
-      "empty": "아직 링크 인덱스에 문서가 없습니다. 먼저 노트를 열거나 저장해 주세요.",
-      "error": "그래프를 불러올 수 없습니다",
-      "edgeEmbed": "임베드"
-    },
-    "mermaid": {
-      "loading": "다이어그램 렌더링 중…"
-    },
-    "svg": {
-      "empty": "빈 SVG",
-      "tooLarge": "SVG가 너무 커서 렌더링할 수 없습니다",
-      "tooManyNodes": "SVG 노드가 너무 많아 렌더링할 수 없습니다",
-      "parseError": "SVG를 파싱할 수 없습니다",
-      "rejected": "SVG를 안전하게 렌더링할 수 없습니다",
-      "showSource": "소스 보기"
-    },
-    "callout": {
-      "note": "참고",
-      "tip": "팁",
-      "info": "정보",
-      "warning": "경고",
-      "danger": "위험",
-      "caution": "주의",
-      "important": "중요"
-    },
-    "doc": {
-      "edit": "편집",
-      "titleLabel": "문서 제목",
-      "placeholder": "작성 시작…",
-      "placeholderSlash": "텍스트 입력, 또는 / 로 명령",
-      "untitled": "제목 없음",
-      "metaUpdated": "업데이트 {{time}}",
-      "metaCreated": "생성 {{time}}",
-      "emptyTitle": "빈 문서",
-      "emptyHint": "작성 시작…",
-      "saveFailed": "문서를 저장할 수 없습니다",
-      "loadFailed": "문서를 불러올 수 없습니다",
-      "saving": "저장 중…",
-      "liveLoading": "라이브 편집기 로딩 중…",
-      "compatView": "호환 보기로 전환했습니다: 문서가 크거나 라이브 렌더링에 실패해 일반 텍스트로 편집합니다. 내용은 계속 완전히 편집할 수 있습니다.",
-      "compatViewClose": "확인",
-      "saveRetry": "다시 시도",
-      "findPlaceholder": "문서에서 찾기",
-      "findPrev": "이전",
-      "findNext": "다음",
-      "replacePlaceholder": "바꿀 내용",
-      "replace": "바꾸기",
-      "replaceAll": "모두 바꾸기",
-      "wordCount": "{{count}}단어",
-      "statusBar": {
-        "words": "{{count}}자",
-        "lineCol": "{{line}}행 {{col}}열",
-        "fmTitle": "YAML 프론트매터가 포함된 문서"
-      },
-      "dialectLoss": "일부 특수 블록이 라이브 편집 후 단순화될 수 있습니다",
-      "dialectLossHint": "단순화되었습니다. 소스 모드에서 원문을 확인하세요.",
-      "copyBlockLink": "블록 링크 복사",
-      "multiSelectAdd": "선택에 추가",
-      "multiSelectClear": "선택에서 제외",
-      "blockMenuDelete": "삭제",
-      "blockMenuColors": "색상",
-      "blockMenuTurnInto": "다음으로 전환…",
-      "blockMenuDuplicate": "복제",
-      "blockMenuTurnIntoFailed": "블록을 변환할 수 없습니다",
-      "blockMenuDuplicateFailed": "블록을 복제할 수 없습니다",
-      "blockMenuInsertFailed": "블록을 삽입할 수 없습니다",
-      "blockTypeText": "본문",
-      "sideMenuAdd": "블록 추가",
-      "sideMenuDragHandle": "드래그하여 이동, 클릭하여 메뉴 열기",
-      "multiSelectCount": "{{count}}개 블록 선택됨",
-      "multiSelectParagraph": "문단으로",
-      "multiSelectHeading": "제목으로",
-      "multiSelectQuote": "인용으로",
-      "multiSelectDelete": "삭제",
-      "linkCopied": "페이지 링크를 복사했습니다",
-      "linkCopyFailed": "페이지 링크를 복사할 수 없습니다"
-    },
-    "wiki": {
-      "createTitle": "문서를 만들까요?",
-      "createBody": "이 공간에 “{{title}}” 문서가 없습니다. 지금 만드시겠습니까?",
-      "createConfirm": "만들기",
-      "brokenHint": "끊어진 링크: “{{title}}” — 클릭하여 만들기",
-      "openHint": "“{{title}}” 열기",
-      "noMatches": "일치하는 문서 없음",
-    },
-    "template": {
-      "pickTitle": "템플릿 선택",
-      "pickHint": "템플릿을 선택하거나 빈 문서로 시작하세요. 취소하면 아무것도 생성되지 않습니다.",
-      "empty": "빈 문서",
-      "emptyHint": "빈 페이지로 시작",
-      "noPreview": "미리보기 없음",
-      "saveAs": "템플릿으로 저장…",
-      "saveAsTitle": "템플릿으로 저장",
-      "nameLabel": "템플릿 이름",
-      "namePlaceholder": "예: 회의록",
-      "saved": "템플릿 저장됨",
-      "delete": "템플릿 삭제"
-    },
-    "versions": {
-      "menuSave": "버전 저장",
-      "menuHistory": "버전 기록…",
-      "title": "버전 기록",
-      "empty": "아직 버전이 없습니다. 버전을 저장하거나 계속 작성하세요. 매일 첫 저장 시 일일 스냅샷이 생성됩니다.",
-      "kindDaily": "일일",
-      "kindManual": "수동",
-      "restore": "복원",
-      "restoreTitle": "이 버전을 복원할까요?",
-      "restoreBody": "현재 문서 내용이 대체됩니다. 다른 버전을 복원하지 않는 한 되돌릴 수 없습니다.",
-      "restoreConfirm": "복원",
-      "saved": "버전 저장됨",
-      "restored": "버전 복원됨",
-      "largeHint": "이 스냅샷은 용량이 큽니다 ({{kb}} KB).",
-      "diff": "차이",
-      "diffTitle": "현재와 차이 보기",
-      "groupToday": "오늘",
-      "groupEarlier": "이전"
-    },
-  },
   "common": {
     "clear": "지우기",
     "cancel": "취소",
     "close": "닫기",
     "confirm": "확인",
     "back": "뒤로",
+    "imagePreview": "이미지 미리보기",
   },
   "dialog": {
     "closeWindowTitle": "창을 닫을 때",
@@ -2314,10 +1825,6 @@ export const ko = {
     "exitConfirmTasks": "백그라운드 작업 {{count}}개",
     "exitConfirmHide": "트레이로 숨기기",
     "exitConfirmQuit": "종료하고 중지",
-      "unsavedTitle": "저장되지 않은 변경사항",
-      "unsavedBody": "지식 문서에 저장되지 않은 변경사항이 있습니다. 닫기 전에 저장할까요?",
-      "unsavedSave": "저장",
-      "unsavedDiscard": "저장 안 함"
   },
   "tray": {
     "showMain": "hip 표시",
@@ -2448,13 +1955,6 @@ export const ko = {
       "copyTask": "작업 복사",
       "copyOutput": "출력 복사",
       "empty": "복사할 내용 없음"
-    },
-    "workItem": {
-      "open": "열기",
-      "copyTitle": "제목 복사",
-      "openSession": "연결된 세션 열기",
-      "openKnowledge": "연결된 문서 열기",
-      "openUrl": "링크 열기"
     },
     "trashEntry": {
       "copyTitle": "제목 복사"

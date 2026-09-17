@@ -16,7 +16,6 @@ import type {
   TerminalConfig,
   TerminalShellPref,
   CodeBlockConfig,
-  KnowledgeConfig,
   TrashConfig,
   WindowConfig,
   WindowCloseAction,
@@ -27,7 +26,6 @@ import type {
 } from '@hip/protocol'
 import {
   isCodeBlockColorThemeId,
-  isDocWidthId,
   isTerminalColorThemeId,
   isWindowCloseAction,
   parseContextGateMode,
@@ -432,18 +430,6 @@ function normalizeCodeBlock(raw: Record<string, unknown>): CodeBlockConfig {
   return out
 }
 
-function normalizeKnowledge(raw: Record<string, unknown>): KnowledgeConfig {
-  const out: KnowledgeConfig = {}
-  const dw = raw.docWidth ?? raw.doc_width
-  if (typeof dw === 'string') {
-    const id = dw.trim().toLowerCase()
-    if (isDocWidthId(id)) {
-      out.docWidth = id
-    }
-  }
-  return out
-}
-
 function normalizeTrash(raw: Record<string, unknown>): TrashConfig {
   const out: TrashConfig = {}
   const days = raw.retentionDays ?? raw.retention_days
@@ -618,11 +604,6 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
     config.codeBlock = normalizeCodeBlock(codeBlock as Record<string, unknown>)
   }
 
-  const knowledge = obj.knowledge
-  if (knowledge && typeof knowledge === 'object' && !Array.isArray(knowledge)) {
-    config.knowledge = normalizeKnowledge(knowledge as Record<string, unknown>)
-  }
-
   const trash = obj.trash
   if (trash && typeof trash === 'object' && !Array.isArray(trash)) {
     config.trash = normalizeTrash(trash as Record<string, unknown>)
@@ -725,10 +706,6 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   // Project codeBlock replaces global wholesale (same as agentLoop / acp).
   if (project.codeBlock !== undefined) {
     merged.codeBlock = project.codeBlock
-  }
-  // Project knowledge replaces global wholesale (same as agentLoop / acp).
-  if (project.knowledge !== undefined) {
-    merged.knowledge = project.knowledge
   }
   // Project acp replaces global wholesale (same as agentLoop).
   if (project.acp !== undefined) {

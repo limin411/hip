@@ -2,7 +2,7 @@
  * Map a file path extension → Shiki language id for code preview.
  * Returns null when we have no grammar (caller falls back to plain text).
  */
-import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
+import { normalizeHighlightLang } from '@/lib/codeHighlight'
 
 /** Extension (with leading dot, lowercased) → fence/lang tag. */
 const EXT_TO_LANG: Readonly<Record<string, string>> = {

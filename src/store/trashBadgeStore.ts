@@ -2,45 +2,23 @@ import { create } from 'zustand'
 
 /**
  * Lightweight badge counts for the Recycle Bin footer entry.
- * Sessions (WS) + knowledge + work items.
+ * Sessions (WS) only.
  */
 interface TrashBadgeState {
   sessionCount: number
-  knowledgeCount: number
-  workItemCount: number
   setSessionCount: (n: number) => void
-  setKnowledgeCount: (n: number) => void
-  setWorkItemCount: (n: number) => void
   adjustSessions: (delta: number) => void
-  adjustKnowledge: (delta: number) => void
-  adjustWorkItems: (delta: number) => void
 }
 
 export const useTrashBadgeStore = create<TrashBadgeState>((set) => ({
   sessionCount: 0,
-  knowledgeCount: 0,
-  workItemCount: 0,
   setSessionCount: (n) => set({ sessionCount: Math.max(0, n) }),
-  setKnowledgeCount: (n) => set({ knowledgeCount: Math.max(0, n) }),
-  setWorkItemCount: (n) => set({ workItemCount: Math.max(0, n) }),
   adjustSessions: (delta) =>
     set((s) => ({ sessionCount: Math.max(0, s.sessionCount + delta) })),
-  adjustKnowledge: (delta) =>
-    set((s) => ({ knowledgeCount: Math.max(0, s.knowledgeCount + delta) })),
-  adjustWorkItems: (delta) =>
-    set((s) => ({ workItemCount: Math.max(0, s.workItemCount + delta) })),
 }))
 
-export function trashBadgeTotal(
-  sessionCount: number,
-  knowledgeCount: number,
-  workItemCount = 0,
-): number {
-  return (
-    Math.max(0, sessionCount) +
-    Math.max(0, knowledgeCount) +
-    Math.max(0, workItemCount)
-  )
+export function trashBadgeTotal(sessionCount: number): number {
+  return Math.max(0, sessionCount)
 }
 
 /** Display string for footer badge; empty when zero. */

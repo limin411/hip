@@ -21,8 +21,6 @@ import { messageProvider } from './providers/message'
 import { pluginProvider } from './providers/plugin'
 import { sessionHistoryProvider } from './providers/sessionHistory'
 import { skillConfigProvider } from './providers/skillConfig'
-import { knowledgeNodeProvider } from './providers/knowledgeNode'
-import { knowledgeTreeProvider } from './providers/knowledgeTree'
 import { subAgentProvider } from './providers/subAgent'
 import { terminalProvider } from './providers/terminal'
 import { managedTerminalProvider } from './providers/managedTerminal'
@@ -48,8 +46,6 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   pluginProvider,
   sessionHistoryProvider,
   skillConfigProvider,
-  knowledgeNodeProvider,
-  knowledgeTreeProvider,
   subAgentProvider,
   terminalProvider,
   managedTerminalProvider,

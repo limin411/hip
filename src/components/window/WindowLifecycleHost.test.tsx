@@ -65,13 +65,6 @@ vi.mock('@/store/taskRuntimeStore', () => ({
   },
 }))
 
-vi.mock('@/store/knowledgeStore', () => ({
-  syncActiveEditorToDraft: vi.fn(),
-  useKnowledgeStore: {
-    getState: () => ({ hasUnsavedChanges: () => false }),
-  },
-}))
-
 vi.mock('@/lib/activeWork', () => ({
   countActiveWork: () => ({ total: 0, running: 0 }),
 }))

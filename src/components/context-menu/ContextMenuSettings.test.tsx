@@ -80,22 +80,13 @@ describe('catalogKinds', () => {
     expect(kinds).toEqual(expect.arrayContaining(['message', 'fileEntry', 'sessionHistory']))
   })
 
-  it('includes shipped knowledge and terminal-management kinds in section order', () => {
+  it('includes shipped terminal-management kinds in section order', () => {
     const kinds = catalogKinds()
     expect(kinds).toEqual(
-      expect.arrayContaining([
-        'managedTerminal',
-        'sftpEntry',
-        'termFsEntry',
-        'knowledgeNode',
-        'knowledgeTree',
-      ]),
+      expect.arrayContaining(['managedTerminal', 'sftpEntry', 'termFsEntry']),
     )
-    // 文档管理 v2：空间级右键菜单已删除
-    expect(kinds).not.toContain('knowledgeSpace')
-    // Section order: managedTerminal after terminal; knowledge kinds after plugin.
+    // Section order: managedTerminal after terminal.
     expect(kinds.indexOf('managedTerminal')).toBeGreaterThan(kinds.indexOf('terminal'))
-    expect(kinds.indexOf('knowledgeNode')).toBeGreaterThan(kinds.indexOf('plugin'))
   })
 })
 

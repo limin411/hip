@@ -13,7 +13,7 @@ import { useHipConfigStore } from '@/store/hipConfigStore'
 import {
   CODE_BLOCK_CHROME,
   normalizeCodeBlockThemeId,
-} from '@/domain/knowledge/codeBlockTheme'
+} from '@/lib/codeBlockTheme'
 import { highlightLangFromPath } from './previewLang'
 import {
   CSV_PREVIEW_MAX_ROWS,
@@ -138,7 +138,7 @@ export function CodePreviewBody({
           style={chrome ? { color: chrome.text } : undefined}
           className="whitespace-pre-wrap break-words font-mono text-meta text-ink [&_.line]:whitespace-pre-wrap"
           data-testid="preview-code-highlighted"
-          // Shiki token HTML only (same trust model as knowledge CodeBlock).
+          // Shiki token HTML only (same trust model as CodeBlock).
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (

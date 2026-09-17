@@ -94,7 +94,7 @@ export async function newConversationFromSidebar(surface: 'chat' | 'code'): Prom
  * - Else if opts?.resetToGeneral !== false → setSettingsPage('general')
  * - Else → leave current settingsPage unchanged
  *
- * Intentional: do NOT leaveKnowledge / leaveWorkItems / recordNavEntry.
+ * Intentional: do NOT recordNavEntry.
  */
 export function openSettingsOverlay(
   page?: SettingsPageId,

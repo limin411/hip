@@ -1,5 +1,5 @@
 /**
- * CSP-safe Shiki highlighter for knowledge code blocks.
+ * CSP-safe Shiki highlighter for code blocks.
  *
  * - Fine-grained: `shiki/core` + `shiki/engine/javascript` only
  * - NEVER import full `shiki` browser entry or oniguruma WASM
@@ -9,16 +9,12 @@
 
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
-import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
+import { normalizeHighlightLang } from '@/lib/codeHighlight'
 import {
   normalizeCodeBlockThemeId,
   resolveShikiTheme,
   type CodeBlockThemeId,
-} from '@/domain/knowledge/codeBlockTheme'
-import {
-  isKnowledgePerfEnabled,
-  kbPerfShiki,
-} from '@/domain/knowledge/knowledgePerf'
+} from '@/lib/codeBlockTheme'
 
 export type ShikiLangRegistration = Parameters<HighlighterCore['loadLanguage']>[0]
 
@@ -186,12 +182,10 @@ export async function highlightCode(
   const key = cacheKey(canonical, theme, code)
   const cached = cacheGet(key)
   if (cached !== undefined) {
-    if (isKnowledgePerfEnabled()) kbPerfShiki(0)
     return cached
   }
 
   return withHighlightSlot(async () => {
-    const t0 = isKnowledgePerfEnabled() ? performance.now() : 0
     try {
       const hl = await getHighlighter()
       const ok = await ensureLang(hl, canonical)
@@ -204,7 +198,6 @@ export async function highlightCode(
         structure: 'inline',
       })
       cacheSet(key, html)
-      if (isKnowledgePerfEnabled()) kbPerfShiki(performance.now() - t0)
       return html
     } catch {
       return null

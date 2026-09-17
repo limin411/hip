@@ -39,7 +39,7 @@ yarn test:e2e:smoke
 # Sets HIP_VOICE_MOCK=1 so voice specs do not need whisper-cli / mic.
 yarn test:e2e:gate
 
-# Full unpaid suite (everything except @live — knowledge-phase1/p2, perf, …)
+# Full unpaid suite (everything except @live)
 yarn test:e2e:full
 
 # Voice only (mock engine)
@@ -117,70 +117,13 @@ yarn dogfood:msm -- --task msm-multi-file-db
 yarn dogfood:msm -- --scenario watchlist
 # manual desktop: bind Code session to $HIP_EVAL_MSM_PATH, paste e2e/eval/tasks/make-stock-money/scenarios/*
 ```
-| `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
-| `@knowledge-perf` | Knowledge open/type usability budgets + unusable hard lines | **no** (nightly / `test:e2e:full`) |
-| `@work-items` | Work item tracking (事项追踪) full business flows | smoke/core cases also tagged → in gate |
-| `@automations` | Automations page (local schedule jobs) | smoke also `@smoke` → in gate |
+| `@automations` | Scheduled-task composer flow (the Automations page was removed) | smoke also `@smoke` → in gate |
 
 Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`, `context-menu-panel.spec.ts`.
 
-Knowledge helpers: `e2e/helpers/knowledge.ts`. Specs (all unpaid, isolated `HIP_DATA_DIR`, no `@live`):
-
-| Spec | Cases |
-|------|--------|
-| `knowledge-editor.spec.ts` | KE: open → space → default Live/Source → title → bold → export md → tree filter |
-| `knowledge-advanced.spec.ts` | KA: palette nav/search, context newDoc, DnD, import folder (KA5 may skip) |
-| `knowledge-lifecycle.spec.ts` | KL: create → disk save → export md/zip → **delete space** → shell reopen |
-| `knowledge-home.spec.ts` | KH: multi-space, rename, delete/cancel |
-| `knowledge-tree-crud.spec.ts` | KT: folder/doc rename, delete, context newDoc |
-| `knowledge-preview.spec.ts` | KP1: GFM task checkbox write-back (Live/Source; no Preview writing mode) |
-| `knowledge-nav.spec.ts` | KN1: flush-fail + durability; KN2: multi-space sidebar reopen |
-| `knowledge-wiki.spec.ts` | KW1–KW4: `[[title]]` navigate, create/cancel (some soft) |
-| `knowledge-phase1.spec.ts` | K1C–G: templates, versions, frontmatter, assets, portable zip (`@knowledge`, not `@core`) |
-| `knowledge-live.spec.ts` | KF1 Source slash `/h1`; KF2 Live (BlockNote) type + disk; KF3 fences on Live host (`@knowledge`) |
-| `knowledge-live-r3.spec.ts` | KR1 default Live, KR3 medium-rich host, KR4 large→Source (`@knowledge @core`); KR2 slash skipped pending BN UI |
-| `knowledge-live-r5.spec.ts` | skipped — Milkdown gutter/table chrome; re-enable when BlockNote side-menu has stable testids |
-| `knowledge-p2.spec.ts` | KP2: graph modal, collection views, outline, backlinks, soft-delete restore (`@knowledge`) |
-| `knowledge-perf.spec.ts` | KP-O/T: fixture open/type budgets; large-doc → Source (`@knowledge-perf`) |
-
-Boards / whiteboards were removed from the product (Live is BlockNote only). Board helpers and `knowledge-board.spec.ts` are gone.
-
-Perf budgets: `e2e/helpers/knowledge-perf-budgets.ts` (hard unusable lines always; targets soft unless `KNOWLEDGE_PERF_STRICT=1`).
-
-Fixtures: `e2e/fixtures/knowledge/` (`small-prose.md`, `medium-rich.md`, …).  
-Perf seam: `window.__hipKnowledgePerf` (`enable` / `reset` / `snapshot`) — see `src/domain/knowledge/knowledgePerf.ts`.  
-Write-fail seam: `window.__hipKnowledgeWriteFail` (see `installWriteFailSeam` / `src/ipc/knowledge.ts`).  
-Attachment seam: `window.__hipPickAttachmentFiles`. Live flag: `localStorage.hip-knowledge-live=true`.
-
-```bash
-# All knowledge functional specs
-yarn test:e2e:knowledge
-# Usability / perf (not in gate)
-yarn test:e2e:knowledge-perf
-```
-
-Work-item helpers: `e2e/helpers/work-items.ts`. Specs (all unpaid, isolated `HIP_DATA_DIR`, no `@live`):
-
-| Spec | Cases |
-|------|--------|
-| `work-items-smoke.spec.ts` | WS1–2: nav → page (not placeholder); sidebar filters / inbox / CTAs (`@smoke`) |
-| `work-items-lifecycle.spec.ts` | WL1–7: create → fields → disk → complete/cancel/archive/delete → leave flush (`@core`) |
-| `work-items-filters.spec.ts` | WF1–6: smart filters, search, user list CRUD + migrate-to-inbox (`@core`) |
-| `work-items-nav.spec.ts` | WN1–5: palette nav, empty-title discard/Untitled, keyboard N/Space, re-enter (`@core`) |
-
-Persistence: `HIP_DATA_DIR/work-items/catalog.json` (Tauri IPC `work_items_list` / `work_items_save`).  
-List create/rename/delete and hard-delete use in-app Modals (never `window.prompt` / `confirm` — freezes Tauri WKWebView).
-
-```bash
-# All work-item functional specs
-yarn test:e2e:work-items
-# Gate-relevant work-item paths
-E2E_GREP='@work-items @core' yarn test:e2e
-```
-
 Automations page specs were removed with the page itself (`e2e/specs/automations-smoke.spec.ts`,
 `e2e/helpers/automations.ts`). The schedule still needs test coverage — it now lives in the
-composer flow (see `docs/scheduled-task-spec.md`).
+composer flow (`runtime-task-strip.spec.ts`).
 
 Persistence: `HIP_DATA_DIR/automations/catalog.json` + `runs.json` (Tauri IPC).  
 Schedule due is forced via `window.__hipE2E.automationTick(now)` — never wait the real tick interval.
@@ -191,21 +134,6 @@ because WebView2 throttles timers while the window is hidden to the tray.
 E2E_GREP=@context-menu yarn test:e2e
 # or panel-only:
 E2E_GREP='@context-menu @panel' yarn test:e2e --spec e2e/specs/context-menu-panel.spec.ts
-
-# Gate: core knowledge paths (includes A–D)
-E2E_GREP='@knowledge @core' yarn test:e2e
-
-# All knowledge business flows (includes Phase1 + Live)
-E2E_GREP=@knowledge yarn test:e2e
-yarn test:e2e --spec e2e/specs/knowledge-lifecycle.spec.ts
-yarn test:e2e --spec e2e/specs/knowledge-home.spec.ts
-yarn test:e2e --spec e2e/specs/knowledge-tree-crud.spec.ts
-yarn test:e2e --spec e2e/specs/knowledge-editor.spec.ts
-yarn test:e2e --spec e2e/specs/knowledge-preview.spec.ts
-yarn test:e2e --spec e2e/specs/knowledge-nav.spec.ts
-yarn test:e2e --spec e2e/specs/knowledge-wiki.spec.ts
-yarn test:e2e --spec e2e/specs/knowledge-phase1.spec.ts
-yarn test:e2e --spec e2e/specs/knowledge-live.spec.ts
 ```
 
 ## Isolation notes
@@ -261,7 +189,7 @@ Helpers: `e2e/helpers/e2e-hooks.ts`, `e2e/helpers/memory.ts`, `git-workspace.ts`
 | Live | `yarn test:e2e:live` | **not in CI** (paid / secret) |
 
 Gate grep: `@smoke\|@core\|@harness\|@memory\|@panel\|@settings\|@voice`  
-Full unpaid: invert `@live` (includes knowledge-phase1/p2, knowledge-perf, etc.).
+Full unpaid: invert `@live`.
 
 Failure PNGs upload as Actions artifacts (`e2e-*-screenshots`, 7-day retention).
 
@@ -277,14 +205,10 @@ Failure PNGs upload as Actions artifacts (`e2e-*-screenshots`, 7-day retention).
 | Settings | `settings-smoke` (+ model verify precheck) | yes |
 | Voice dictation | `voice-dictation` (`HIP_VOICE_MOCK=1`) | yes |
 | Memory | `memory-settings`, `memory-slash`, `memory-citations-harness` | yes |
-| Knowledge (main) | `knowledge-*` with `@core` | yes |
-| Knowledge (extra) | `knowledge-phase1`, `knowledge-live`, `knowledge-p2` | full only |
-| Knowledge perf | `knowledge-perf` | full only |
-| Work items | `work-items-*` | yes |
 | Diff / Changes | `diff-workspace`, `write-to-changes`, harness cancel keeps diff | yes |
 | Code terminal | `code-terminal` | yes |
 | Context menus | `context-menu-*` | yes (panel via `@panel`) |
-| Recycle bin / trash | `recycle-bin`, `context-menu-trash` | yes |
+| Recycle bin / trash | `recycle-bin` | yes |
 | Plugins / extensions | `plugin-install-error`, `extension-registry`, `skill-plugin-dialogue` | yes |
 | Agents / plan / cancel | `harness-*`, `smooth-p*` | yes |
 | Token usage chip | `token-usage-chip` | yes |

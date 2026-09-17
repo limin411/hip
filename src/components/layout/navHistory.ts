@@ -1,6 +1,6 @@
 /**
  * Shell back/forward history (ChatGPT Desktop-style).
- * Captures / restores active view, sidebar section, session, knowledge space, etc.
+ * Captures / restores active view, sidebar section, session, etc.
  * Overlay open/close is not recorded; apply always clears overlay first.
  */
 import { sessionService, useDomainStore } from '@/domain'
@@ -17,7 +17,6 @@ export function captureNavEntry(): NavEntry {
     activeView: ui.activeView,
     sidebarSection: ui.sidebarSection,
     sessionId: domain.activeSessionId,
-    knowledgeSpaceId: null,
     settingsPage: ui.settingsPage,
     managedTerminalId: managed.focusedId,
   }

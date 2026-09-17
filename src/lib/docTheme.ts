@@ -1,7 +1,6 @@
 /**
  * Shared document-level dark theme helpers.
- * One MutationObserver on documentElement for all subscribers (Live Shiki,
- * KnowledgeMermaid, etc.).
+ * One MutationObserver on documentElement for all subscribers (Live Shiki, etc.).
  */
 
 export function isDocDark(): boolean {

@@ -3,10 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDomainStore } from '@/domain'
 import { useTaskRuntimeStore } from '@/store/taskRuntimeStore'
-import {
-  syncActiveEditorToDraft,
-  useKnowledgeStore,
-} from '@/store/knowledgeStore'
 import { countActiveWork } from '@/lib/activeWork'
 import {
   isMainWindowVisible,
@@ -39,42 +35,11 @@ export function WindowLifecycleHost() {
   const { t } = useTranslation()
   const [closeOpen, setCloseOpen] = useState(false)
   const [exitOpen, setExitOpen] = useState(false)
-  const [unsavedOpen, setUnsavedOpen] = useState(false)
   const [remember, setRemember] = useState(true)
   const [pick, setPick] = useState<'hide' | 'quit'>('hide')
   const [work, setWork] = useState(() => countActiveWork())
-  /** After unsaved dialog: continue to first-close policy prompt. */
-  const [pendingPolicyPrompt, setPendingPolicyPrompt] = useState(false)
 
   const updateSection = useHipConfigStore((s) => s.updateSection)
-
-  // Flush knowledge buffer before hide/quit when dirty.
-  const flushKnowledgeIfNeeded = useCallback(async (): Promise<boolean> => {
-    try {
-      syncActiveEditorToDraft({ leaveActiveLeaf: false })
-      const store = useKnowledgeStore.getState()
-      if (!store.hasUnsavedChanges()) return true
-      return await store.flushSave()
-    } catch {
-      return false
-    }
-  }, [])
-
-  // beforeunload for browser/dev: prompt when knowledge dirty
-  useEffect(() => {
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      try {
-        if (useKnowledgeStore.getState().hasUnsavedChanges()) {
-          e.preventDefault()
-          e.returnValue = ''
-        }
-      } catch {
-        // ignore
-      }
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [])
 
   // ── Shell events ──────────────────────────────────────────────
   useEffect(() => {
@@ -84,17 +49,6 @@ export function WindowLifecycleHost() {
       try {
         const u1 = await listenClosePrompt(() => {
           if (cancelled) return
-          // If knowledge has unsaved changes, intercept first.
-          try {
-            syncActiveEditorToDraft({ leaveActiveLeaf: false })
-            if (useKnowledgeStore.getState().hasUnsavedChanges()) {
-              setPendingPolicyPrompt(true)
-              setUnsavedOpen(true)
-              return
-            }
-          } catch {
-            // fall through
-          }
           setPick('hide')
           setRemember(true)
           setCloseOpen(true)
@@ -273,13 +227,11 @@ export function WindowLifecycleHost() {
   }, [t])
 
   // ── Close prompt actions ──────────────────────────────────────
-  const onCloseConfirm = async () => {
+  const onCloseConfirm = () => {
     setCloseOpen(false)
-    // Silent flush before hide/quit so buffers are not lost.
-    await flushKnowledgeIfNeeded()
     if (remember) {
       const trayEnabled = pick === 'hide' ? true : useHipConfigStore.getState().config.window?.trayEnabled === true
-      await updateSection('window', (prev) => ({
+      void updateSection('window', (prev) => ({
         ...(prev ?? {}),
         closeAction: pick,
         trayEnabled,
@@ -295,53 +247,15 @@ export function WindowLifecycleHost() {
     setCloseOpen(false)
   }
 
-  const onUnsavedSave = async () => {
-    setUnsavedOpen(false)
-    const ok = await flushKnowledgeIfNeeded()
-    if (!ok) return
-    if (pendingPolicyPrompt) {
-      setPendingPolicyPrompt(false)
-      setPick('hide')
-      setRemember(true)
-      setCloseOpen(true)
-    }
-  }
-
-  const onUnsavedDiscard = () => {
-    setUnsavedOpen(false)
-    // Drop dirty buffer so close is not blocked again.
-    const st = useKnowledgeStore.getState()
-    if (st.activeDocId) {
-      useKnowledgeStore.setState({ draftBody: st.docBody, saveState: 'idle' })
-    }
-    if (pendingPolicyPrompt) {
-      setPendingPolicyPrompt(false)
-      setPick('hide')
-      setRemember(true)
-      setCloseOpen(true)
-    }
-  }
-
-  const onUnsavedCancel = () => {
-    setUnsavedOpen(false)
-    setPendingPolicyPrompt(false)
-  }
-
   // ── Exit confirm actions ──────────────────────────────────────
   const onExitQuit = () => {
     setExitOpen(false)
-    void (async () => {
-      await flushKnowledgeIfNeeded()
-      void windowForceQuit()
-    })()
+    void windowForceQuit()
   }
 
   const onExitHide = () => {
     setExitOpen(false)
-    void (async () => {
-      await flushKnowledgeIfNeeded()
-      void windowExitHideInstead()
-    })()
+    void windowExitHideInstead()
   }
 
   const onExitCancel = () => {
@@ -351,45 +265,6 @@ export function WindowLifecycleHost() {
 
   return (
     <>
-      <Modal
-        open={unsavedOpen}
-        onOpenChange={(o) => {
-          if (!o) onUnsavedCancel()
-        }}
-        title={t('dialog.unsavedTitle')}
-        footer={
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onUnsavedCancel}
-              data-testid="unsaved-prompt-cancel"
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onUnsavedDiscard}
-              data-testid="unsaved-prompt-discard"
-            >
-              {t('dialog.unsavedDiscard')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void onUnsavedSave()}
-              data-testid="unsaved-prompt-save"
-            >
-              {t('dialog.unsavedSave')}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-2 px-5 py-4" data-testid="unsaved-prompt-dialog">
-          <p className="text-body text-ink">{t('dialog.unsavedBody')}</p>
-        </div>
-      </Modal>
-
       <Modal
         open={closeOpen}
         onOpenChange={(o) => {

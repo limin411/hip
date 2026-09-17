@@ -34,10 +34,6 @@ const KIND_SECTION_ORDER: ContextKind[] = [
   'skillConfig',
   'mcpServer',
   'plugin',
-  'knowledgeNode',
-  'knowledgeTree',
-  'workItem',
-  'workItemBlank',
   'trashEntry',
 ]
 
@@ -60,10 +56,6 @@ const KIND_LABEL_KEY = {
   skillConfig: 'settings.contextMenu.kinds.skillConfig',
   mcpServer: 'settings.contextMenu.kinds.mcpServer',
   plugin: 'settings.contextMenu.kinds.plugin',
-  knowledgeNode: 'settings.contextMenu.kinds.knowledgeNode',
-  knowledgeTree: 'settings.contextMenu.kinds.knowledgeTree',
-  workItem: 'settings.contextMenu.kinds.workItem',
-  workItemBlank: 'settings.contextMenu.kinds.workItemBlank',
   trashEntry: 'settings.contextMenu.kinds.trashEntry',
 } as const satisfies Partial<Record<ContextKind, string>>
 

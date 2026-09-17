@@ -16,18 +16,12 @@ mod pty;
 mod term_fs;
 mod workspace_file_search;
 mod terminal_hosts;
-mod work_items;
-mod work_items_trash;
-mod work_items_ui_prefs;
 mod automations;
 mod automations_trash;
 mod terminal_budget;
 mod ssh_path;
 mod ssh_known_hosts;
 mod sftp_path;
-mod knowledge;
-mod knowledge_trash;
-mod knowledge_link_index;
 
 mod provider_logo;
 mod updates;
@@ -244,7 +238,6 @@ const MODELS_FALLBACK_URLS: &[&str] = &[
 ];
 /// Bundled fallback when no on-disk cache exists yet (first launch / wiped cache).
 const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
-
 
 #[tauri::command]
 fn get_plugins_config(app: tauri::AppHandle) -> Result<String, String> {
@@ -907,10 +900,6 @@ pub fn run() {
             window_tray::tray_set_labels,
             terminal_hosts::terminal_hosts_list,
             terminal_hosts::terminal_hosts_save,
-            work_items::work_items_list,
-            work_items::work_items_save,
-            work_items_ui_prefs::work_items_list_ui_prefs,
-            work_items_ui_prefs::work_items_save_ui_prefs,
             automations::automations_list,
             automations::automations_save,
             automations::automation_runs_list,
@@ -921,12 +910,6 @@ pub fn run() {
             automations_trash::automations_hard_delete_trash_entry,
             automations_trash::automations_empty_trash,
             automations_trash::automations_purge_expired_trash,
-            work_items_trash::work_items_soft_delete,
-            work_items_trash::work_items_list_trash,
-            work_items_trash::work_items_restore_trash_entry,
-            work_items_trash::work_items_hard_delete_trash_entry,
-            work_items_trash::work_items_empty_trash,
-            work_items_trash::work_items_purge_expired_trash,
             models_catalog,
             models_catalog_refresh,
             get_hip_config,
@@ -988,53 +971,7 @@ pub fn run() {
             sftp::sftp_download,
             sftp::sftp_upload,
             sftp::sftp_cancel,
-            knowledge::knowledge_ensure_root,
-            knowledge::knowledge_list_spaces,
-            knowledge::knowledge_create_space,
-            knowledge::knowledge_update_space,
-            knowledge::knowledge_delete_space,
-            knowledge_trash::knowledge_soft_delete_space,
-            knowledge_trash::knowledge_soft_delete_nodes,
-            knowledge_trash::knowledge_list_trash,
-            knowledge_trash::knowledge_restore_trash_entry,
-            knowledge_trash::knowledge_hard_delete_trash_entry,
-            knowledge_trash::knowledge_empty_trash,
-            knowledge_trash::knowledge_purge_expired_trash,
-            knowledge_trash::knowledge_reconcile_trash,
-            knowledge::knowledge_get_tree,
-            knowledge::knowledge_save_tree,
-            knowledge::knowledge_read_doc,
-            knowledge::knowledge_write_doc,
-            knowledge::knowledge_read_table,
-            knowledge::knowledge_write_table,
-            knowledge::knowledge_delete_doc_file,
-            knowledge::knowledge_export_bytes,
-            knowledge::knowledge_save_version,
-            knowledge::knowledge_list_versions,
-            knowledge::knowledge_read_version,
-            knowledge::knowledge_restore_version,
             write_text_file,
-            knowledge::knowledge_export_doc,
-            knowledge::knowledge_export_text,
-            knowledge::knowledge_export_space_zip,
-            knowledge::knowledge_import_folder,
-            knowledge::knowledge_reveal_doc,
-            knowledge::knowledge_import_asset_from_path,
-            knowledge::knowledge_import_asset_bytes,
-            knowledge::knowledge_read_asset_data,
-            knowledge::knowledge_asset_abs_path,
-            knowledge::knowledge_reveal_path,
-            knowledge::knowledge_list_templates,
-            knowledge::knowledge_save_template,
-            knowledge::knowledge_delete_template,
-            knowledge_link_index::knowledge_link_index_upsert,
-            knowledge_link_index::knowledge_link_index_remove_doc,
-            knowledge_link_index::knowledge_link_index_replace_all,
-            knowledge_link_index::knowledge_link_index_backlinks,
-            knowledge_link_index::knowledge_link_index_outbound,
-            knowledge_link_index::knowledge_link_index_broken,
-            knowledge_link_index::knowledge_link_index_doc_count,
-            knowledge_link_index::knowledge_link_index_graph,
 
             provider_logo::provider_logo,
         ])
@@ -2316,7 +2253,6 @@ softApproveOnComposer = false
             Some(false)
         );
     }
-
 
     #[test]
     fn invalid_toml_returns_error() {

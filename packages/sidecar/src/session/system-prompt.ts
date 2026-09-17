@@ -70,12 +70,6 @@ function identityForSurface(surface: ProductSurface): string {
       'You are the Chat assistant in a private sandbox workspace (not the Code project workbench).'
     )
   }
-  if (surface === 'knowledge') {
-    return (
-      `${IDENTITY_CORE} ` +
-      'You are the Knowledge assistant for the user\'s notes spaces.'
-    )
-  }
   if (surface === 'terminal') {
     return (
       `${IDENTITY_CORE} ` +
@@ -256,7 +250,7 @@ export interface SystemPromptInput {
   permissionMode?: PermissionMode
   mcpCatalog?: string
   /** Product surface owns persona/body; permissionMode owns tool gates only. */
-  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
+  surface?: 'chat' | 'code' | 'terminal'
 }
 
 const BASE_CHAT =
@@ -268,12 +262,6 @@ const BASE_CHAT =
   'appears in the artifacts preview. Do not only paste large HTML/source into the chat. ' +
   'Do not invent shell tool names; use run_script only if it is available. ' +
   'If asked what mode or surface you are in, say Chat (sandbox) — never Code edit mode.'
-
-const BASE_KNOWLEDGE =
-  'You are a knowledge-space assistant. Prefer clear answers grounded in the user\'s notes. ' +
-  'Use file tools only within the knowledge workspace when available. ' +
-  'Do not claim to be a coding agent editing a software project. ' +
-  'For simple questions, answer directly without tools or sub-agents.'
 
 /** §5.5 Terminal Ops body: shared-PTY rules + uncertainty + multi-session notes.
  *  Host metadata / ring tail are injected per turn by TerminalContextInjector (P1). */
@@ -303,11 +291,9 @@ export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMod
   const body =
     profile.promptBody === 'chat'
       ? BASE_CHAT
-      : profile.promptBody === 'knowledge'
-        ? BASE_KNOWLEDGE
-        : profile.promptBody === 'terminal'
-          ? BASE_TERMINAL_OPS
-          : BASE
+      : profile.promptBody === 'terminal'
+        ? BASE_TERMINAL_OPS
+        : BASE
   const skillsForPrompt = filterSkillsForProfile(skills, profile)
   const hipAvailable = isHipProductSkillAvailable(skillsForPrompt)
   const capabilityMap = productCapabilityMapForSurface(profile.surface)

@@ -3,7 +3,6 @@ import type { Message, ToolCall } from '@hip/protocol'
 import type { PaletteIconName } from '@/components/command-palette/types'
 import type { TurnAgent } from '@/lib/turnAgents'
 import type { ActiveView, Surface } from '@/store/uiStore'
-import type { WorkItemLinks, WorkItemStatus } from '@/domain/work-items'
 
 export type ContextKind =
   | 'message'
@@ -31,12 +30,6 @@ export type ContextKind =
   | 'plugin'
   | 'chatEmpty'
   | 'artifactChrome'
-  | 'knowledgeNode'
-  | 'knowledgeTree'
-  /** Work-item list row / calendar bar / day-more row. */
-  | 'workItem'
-  /** Calendar day blank / list empty create. */
-  | 'workItemBlank'
   /** Recycle bin unified row. */
   | 'trashEntry'
 
@@ -145,46 +138,6 @@ export type ContextPayloadMap = {
   }
   chatEmpty: { sessionId: string | null }
   artifactChrome: { tab: string }
-  /**
-   * Knowledge tree node. Hosts supply callbacks so menus reuse Workspace modals
-   * (same pattern as skillConfig / agentConfig).
-   */
-  knowledgeNode: {
-    nodeId: string
-    /** Legacy `board` kind remains for removed-product payload compat. */
-    kind: 'folder' | 'doc' | 'table' | 'board'
-    spaceId: string
-    onRename: () => void
-    onDelete: () => void
-    onReveal?: () => void
-    /** 复制标题路径（如 全部文档 / F1 / 文档），host 提供实现。 */
-    onCopyPath?: () => void
-  }
-  /**
-   * Knowledge tree blank area (root). Hosts supply create callbacks so menus
-   * reuse Workspace create flows (same pattern as knowledgeNode).
-   */
-  knowledgeTree: {
-    onNewDoc: () => void
-    onNewTable: () => void
-    onNewFolder: () => void
-  }
-  /**
-   * Work item row/bar. Identity-only payload; provider imports stores/dialogs
-   * (sessionHistory pattern). No onSoftDelete — delete opens dialog store.
-   */
-  workItem: {
-    itemId: string
-    title: string
-    status: WorkItemStatus
-    archived: boolean
-    links: WorkItemLinks
-  }
-  /** Blank area create; missing dates normalize to local today. */
-  workItemBlank: {
-    startOn?: string
-    endOn?: string
-  }
   /** Recycle bin row — host supplies restore / hard-delete openers. */
   trashEntry: {
     key: string

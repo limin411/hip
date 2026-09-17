@@ -42,7 +42,7 @@ interface ModalProps {
 
 /**
  * Portaled floating layers (Popover / Dropdown / Select) render outside Dialog.Content.
- * Without this guard, picking a day in DateField counts as "outside" and closes the modal.
+ * Without this guard, interacting with such a layer counts as "outside" and closes the modal.
  */
 function isPortaledFloatingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false
@@ -53,8 +53,6 @@ function isPortaledFloatingTarget(target: EventTarget | null): boolean {
         '[data-radix-menu-content]',
         '[data-radix-select-content]',
         '[role="listbox"]',
-        // DateField month panel (createPortal to body)
-        '[data-date-field-panel]',
         // ModelSelectField panel (createPortal to body; includes search input)
         '[data-model-select-panel]',
       ].join(','),
@@ -131,8 +129,8 @@ export function Modal({
         />
         {/*
           Content must NOT be full-viewport hit-target. A full-screen Content at z-50 sits
-          above portaled Popovers (wrapper often has z-index:auto) and steals day/today
-          clicks in DateField — keep the panel sized to its width/height (or h-fit).
+          above portaled Popovers (wrapper often has z-index:auto) and steals clicks in
+          those panels — keep the panel sized to its width/height (or h-fit).
 
           Center with inset + m-auto, not left/top 50% + -translate-*. modalMotion animates
           the individual `scale` property; combining that with transform-based centering
@@ -190,8 +188,8 @@ export function Modal({
             }
           }}
           onFocusOutside={(e) => {
-            // DateField / menus portal outside Dialog.Content; keep focus trap from
-            // dismissing the modal when those layers receive focus.
+            // Menus and other portaled layers live outside Dialog.Content; keep focus trap
+            // from dismissing the modal when those layers receive focus.
             if (closeDisabled || isPortaledFloatingTarget(e.target)) {
               e.preventDefault()
             }

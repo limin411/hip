@@ -3,15 +3,17 @@
  * Generate product progressive-disclosure embeds from packages/product-content/ (SoT).
  *
  * Outputs:
- *   packages/sidecar/src/session/product/content.ts  — agent L0–L3 strings
- *   src/domain/product/productDocs.generated.ts      — UI Help panel strings
+ *   packages/sidecar/src/session/product/content.ts — agent L0–L3 strings (English)
  *
  * Usage:
- *   node scripts/generate-product-content.mjs           # write both
- *   node scripts/generate-product-content.mjs --check   # exit 1 if either is stale
+ *   node scripts/generate-product-content.mjs           # write
+ *   node scripts/generate-product-content.mjs --check   # exit 1 if stale
  *
  * Also verifies README path smoke strings + package.json vs tauri.conf version.
  * Repo root docs/ is developer documentation only and is not read here.
+ *
+ * NOTE: the old second output `src/domain/product/productDocs.generated.ts`
+ * (Settings → Product help UI pack, 5 locales) was removed with the feature.
  */
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
@@ -22,7 +24,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const SOT = join(ROOT, 'packages', 'product-content')
 const OUT_SIDECAR = join(ROOT, 'packages', 'sidecar', 'src', 'session', 'product', 'content.ts')
-const OUT_UI = join(ROOT, 'src', 'domain', 'product', 'productDocs.generated.ts')
 const PKG = join(ROOT, 'package.json')
 const README = join(ROOT, 'README.md')
 
@@ -32,13 +33,6 @@ const REF_ORDER = [
   'troubleshooting.md',
   'agents-and-plugins.md',
 ]
-
-const REF_SECTION_META = {
-  'memory.md': { id: 'memory', titleKey: 'settings.productHelp.sections.memory' },
-  'config-and-data.md': { id: 'config', titleKey: 'settings.productHelp.sections.config' },
-  'troubleshooting.md': { id: 'troubleshooting', titleKey: 'settings.productHelp.sections.troubleshooting' },
-  'agents-and-plugins.md': { id: 'agents', titleKey: 'settings.productHelp.sections.agents' },
-}
 
 /** Paths that must appear in README (lightweight drift guard). */
 const README_MUST_CONTAIN = [
@@ -76,61 +70,12 @@ function asSingleQuoted(s) {
   return `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 }
 
-const UI_LOCALES = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko']
-
 function loadMeta() {
   const raw = JSON.parse(readText(join(SOT, 'meta.json')))
   for (const k of ['skillId', 'skillName', 'skillVersion', 'description']) {
     if (typeof raw[k] !== 'string' || !raw[k].trim()) die(`meta.json missing string field: ${k}`)
   }
   return raw
-}
-
-/** Load one UI locale pack. en lives at product-content root; others under locales/<id>/. */
-function loadUiLocalePack(locale, vars, enFallback) {
-  const root = locale === 'en' ? SOT : join(SOT, 'locales', locale)
-  if (locale !== 'en' && !existsSync(root)) {
-    die(`missing locale pack: locales/${locale}/`)
-  }
-  const skillPath = join(root, 'SKILL.md')
-  const capPath = join(root, 'capability-map.md')
-  const descPath = join(root, 'description.txt')
-  if (!existsSync(skillPath) || !existsSync(capPath)) {
-    die(`locale ${locale}: need SKILL.md and capability-map.md under ${relative(ROOT, root)}`)
-  }
-  const skillBody = applyPlaceholders(readText(skillPath).replace(/\r\n/g, '\n').trimEnd() + '\n', vars)
-  const capabilityMap = applyPlaceholders(readText(capPath).replace(/\r\n/g, '\n').trimEnd(), vars)
-  let description = enFallback.description
-  if (existsSync(descPath)) {
-    description = applyPlaceholders(readText(descPath).replace(/\r\n/g, '\n').trim(), vars)
-  } else if (locale === 'en') {
-    description = enFallback.description
-  }
-  const refBodies = {}
-  for (const name of REF_ORDER) {
-    const p = join(root, 'references', name)
-    if (!existsSync(p)) {
-      if (locale === 'en') die(`missing reference: references/${name}`)
-      // Fall back to English reference for partial locale packs
-      refBodies[name] = enFallback.refBodies[name]
-      console.warn(`[generate-product-content] locale ${locale}: using en fallback for references/${name}`)
-    } else {
-      refBodies[name] = applyPlaceholders(readText(p).replace(/\r\n/g, '\n').trimEnd() + '\n', vars)
-    }
-  }
-  const sections = [
-    {
-      id: 'overview',
-      titleKey: 'settings.productHelp.sections.overview',
-      markdown: skillBody,
-    },
-    ...REF_ORDER.map((name) => ({
-      id: REF_SECTION_META[name].id,
-      titleKey: REF_SECTION_META[name].titleKey,
-      markdown: refBodies[name],
-    })),
-  ]
-  return { description, capabilityMap, sections, skillBody, refBodies }
 }
 
 function build() {
@@ -173,31 +118,6 @@ function build() {
     }
   }
 
-  const enPack = {
-    description: meta.description,
-    capabilityMap,
-    skillBody,
-    refBodies,
-  }
-  const localePacks = {}
-  for (const loc of UI_LOCALES) {
-    localePacks[loc] =
-      loc === 'en'
-        ? {
-            description: meta.description,
-            capabilityMap,
-            sections: [
-              { id: 'overview', titleKey: 'settings.productHelp.sections.overview', markdown: skillBody },
-              ...REF_ORDER.map((name) => ({
-                id: REF_SECTION_META[name].id,
-                titleKey: REF_SECTION_META[name].titleKey,
-                markdown: refBodies[name],
-              })),
-            ],
-          }
-        : loadUiLocalePack(loc, vars, enPack)
-  }
-
   const fingerprint = createHash('sha256')
     .update(meta.skillVersion)
     .update('\0').update(skillMd)
@@ -206,13 +126,6 @@ function build() {
     .update('\0').update(helpFallback)
   for (const name of REF_ORDER) {
     fingerprint.update('\0').update(name).update('\0').update(refBodies[name])
-  }
-  for (const loc of UI_LOCALES) {
-    fingerprint.update('\0').update(loc).update('\0').update(localePacks[loc].description)
-    fingerprint.update('\0').update(localePacks[loc].capabilityMap)
-    for (const s of localePacks[loc].sections) {
-      fingerprint.update('\0').update(s.id).update('\0').update(s.markdown)
-    }
   }
   const contentHash = fingerprint.digest('hex').slice(0, 16)
   const header = `/**
@@ -267,89 +180,7 @@ export const PRODUCT_SKILL_FILES: ReadonlyArray<{ rel: string; body: string }> =
 ]
 `
 
-  function emitSections(sections) {
-    return sections
-      .map(
-        (s) =>
-          `  {\n    id: ${asSingleQuoted(s.id)},\n    titleKey: ${asSingleQuoted(s.titleKey)},\n    markdown: \`${asTemplateLiteral(s.markdown)}\`,\n  }`,
-      )
-      .join(',\n')
-  }
-
-  function emitPack(pack) {
-    return `{
-  description: ${asSingleQuoted(pack.description)},
-  capabilityMap: \`${asTemplateLiteral(pack.capabilityMap)}\`,
-  sections: [
-${emitSections(pack.sections)}
-  ],
-}`
-  }
-
-  const sectionIds = localePacks.en.sections.map((s) => s.id)
-
-  const uiOut = `${header}
-
-export type ProductHelpSectionId = ${sectionIds.map((id) => asSingleQuoted(id)).join(' | ')}
-
-/** UI product-help locale ids (matches app language tags). */
-export type ProductHelpLocale = ${UI_LOCALES.map((l) => asSingleQuoted(l)).join(' | ')}
-
-export interface ProductHelpSection {
-  id: ProductHelpSectionId
-  /** i18n key for the tab / nav label */
-  titleKey: string
-  /** Markdown body for this locale. */
-  markdown: string
-}
-
-export interface ProductHelpLocalePack {
-  description: string
-  capabilityMap: string
-  sections: readonly ProductHelpSection[]
-}
-
-/** App version from root package.json. */
-export const HIP_PRODUCT_VERSION = ${asSingleQuoted(productVersion)}
-
-/** Content schema version from packages/product-content/meta.json. */
-export const PRODUCT_SKILL_VERSION = ${asSingleQuoted(meta.skillVersion)}
-
-/** English defaults (agent-aligned). Prefer getProductHelpPack(lang) in UI. */
-export const HIP_SKILL_DESCRIPTION = ${asSingleQuoted(meta.description)}
-
-/** L0 capability map English (agent + default UI). */
-export const PRODUCT_CAPABILITY_MAP = \`${asTemplateLiteral(capabilityMap)}\`
-
-/** English help sections (backward compatible). */
-export const PRODUCT_HELP_SECTIONS: readonly ProductHelpSection[] = [
-${emitSections(localePacks.en.sections)}
-] as const
-
-/** All UI locales for Settings → Product help. Agent embeds stay English. */
-export const PRODUCT_HELP_LOCALES: Record<ProductHelpLocale, ProductHelpLocalePack> = {
-${UI_LOCALES.map((loc) => `  ${loc.includes('-') ? asSingleQuoted(loc) : loc}: ${emitPack(localePacks[loc])},`).join('\n')}
-}
-
-/** Map app language / BCP-47 tag → product help locale. */
-export function resolveProductHelpLocale(lang: string | null | undefined): ProductHelpLocale {
-  const raw = (lang ?? '').trim()
-  if (raw === 'zh-CN' || raw === 'zh-TW' || raw === 'en' || raw === 'ja' || raw === 'ko') return raw
-  if (raw.startsWith('zh-TW') || raw.startsWith('zh-HK') || raw === 'zh-Hant') return 'zh-TW'
-  if (raw.startsWith('zh')) return 'zh-CN'
-  if (raw === 'ja' || raw.startsWith('ja-') || raw.startsWith('ja_')) return 'ja'
-  if (raw === 'ko' || raw.startsWith('ko-') || raw.startsWith('ko_')) return 'ko'
-  if (raw.startsWith('en')) return 'en'
-  return 'en'
-}
-
-/** Locale pack for Settings Help; falls back to English. */
-export function getProductHelpPack(lang: string | null | undefined): ProductHelpLocalePack {
-  return PRODUCT_HELP_LOCALES[resolveProductHelpLocale(lang)]
-}
-`
-
-  return { sidecarOut, uiOut, contentHash, productVersion, meta }
+  return { sidecarOut, contentHash, productVersion, meta }
 }
 
 function checkReadmePaths() {
@@ -417,14 +248,13 @@ function checkSkillEvalCases(meta) {
 
 function main() {
   const check = process.argv.includes('--check')
-  const { sidecarOut, uiOut, contentHash, productVersion, meta } = build()
+  const { sidecarOut, contentHash, productVersion, meta } = build()
   checkReadmePaths()
   checkTauriVersion(productVersion)
   checkSkillEvalCases(meta)
 
   if (check) {
     assertFresh(OUT_SIDECAR, sidecarOut, 'sidecar content.ts')
-    assertFresh(OUT_UI, uiOut, 'UI productDocs.generated.ts')
     console.log(
       `[generate-product-content] ok (check) hash=${contentHash} skill=${meta.skillVersion} product=${productVersion}`,
     )
@@ -432,9 +262,8 @@ function main() {
   }
 
   writeFileSync(OUT_SIDECAR, sidecarOut, 'utf8')
-  writeFileSync(OUT_UI, uiOut, 'utf8')
   console.log(
-    `[generate-product-content] wrote ${relative(ROOT, OUT_SIDECAR)} + ${relative(ROOT, OUT_UI)} hash=${contentHash} skill=${meta.skillVersion} product=${productVersion}`,
+    `[generate-product-content] wrote ${relative(ROOT, OUT_SIDECAR)} hash=${contentHash} skill=${meta.skillVersion} product=${productVersion}`,
   )
 }
 

@@ -1,11 +1,11 @@
 /**
- * Knowledge code-highlight language allowlist + aliases (pure domain).
+ * Code-block highlight language allowlist + aliases (pure domain).
  * Consumers (shikiLazy, CodeBlock, Live NodeView) normalize fence info strings
  * through here before requesting a Shiki grammar.
  */
 
 /** Canonical Shiki language ids we ship (lazy-loaded one-by-one). */
-export const KNOWLEDGE_HIGHLIGHT_LANGS = [
+export const CODE_HIGHLIGHT_LANGS = [
   'typescript',
   'javascript',
   'tsx',
@@ -39,9 +39,9 @@ export const KNOWLEDGE_HIGHLIGHT_LANGS = [
   'ini',
 ] as const
 
-export type KnowledgeHighlightLang = (typeof KNOWLEDGE_HIGHLIGHT_LANGS)[number]
+export type CodeHighlightLang = (typeof CODE_HIGHLIGHT_LANGS)[number]
 
-const LANG_SET: ReadonlySet<string> = new Set(KNOWLEDGE_HIGHLIGHT_LANGS)
+const LANG_SET: ReadonlySet<string> = new Set(CODE_HIGHLIGHT_LANGS)
 
 /**
  * Map common fence tags / short names → canonical allowlist id.

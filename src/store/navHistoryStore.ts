@@ -13,7 +13,6 @@ export type NavEntry = {
   activeView: NavEntryActiveView
   sidebarSection: SidebarSection
   sessionId: string | null
-  knowledgeSpaceId: string | null
   settingsPage: SettingsPageId
   managedTerminalId: string | null
 }
@@ -25,7 +24,6 @@ export function navEntriesEqual(a: NavEntry, b: NavEntry): boolean {
     a.activeView === b.activeView &&
     a.sidebarSection === b.sidebarSection &&
     a.sessionId === b.sessionId &&
-    a.knowledgeSpaceId === b.knowledgeSpaceId &&
     a.settingsPage === b.settingsPage &&
     a.managedTerminalId === b.managedTerminalId
   )

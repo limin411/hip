@@ -23,7 +23,7 @@ export function ImageLightbox({
   alt = '',
 }: ImageLightboxProps) {
   const { t } = useTranslation()
-  const title = alt.trim() || t('knowledge.asset.preview')
+  const title = alt.trim() || t('common.imagePreview')
 
   return (
     <Dialog.Root open={open && Boolean(src)} onOpenChange={onOpenChange}>

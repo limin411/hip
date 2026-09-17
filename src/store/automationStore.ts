@@ -73,7 +73,7 @@ const lastSkipSignature = new Map<string, string>()
 
 /**
  * Serialize runNow bodies so disk/session side effects cannot interleave
- * for concurrent tick+manual paths (workItemStore saveChain pattern).
+ * for concurrent tick+manual paths (same pattern as saveChain below).
  */
 let runNowChain: Promise<void> = Promise.resolve()
 

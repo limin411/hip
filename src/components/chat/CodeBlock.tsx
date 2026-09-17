@@ -10,11 +10,11 @@ import { Copy, Check } from 'lucide-react'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { copyText } from '@/ipc/clipboard'
 import { cn } from '@/lib/utils'
-import { normalizeHighlightLang } from '@/domain/knowledge/codeHighlight'
+import { normalizeHighlightLang } from '@/lib/codeHighlight'
 import {
   CODE_BLOCK_CHROME,
   normalizeCodeBlockThemeId,
-} from '@/domain/knowledge/codeBlockTheme'
+} from '@/lib/codeBlockTheme'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import {
   CODEBLOCK_LAZY_HIGHLIGHT,
@@ -67,9 +67,9 @@ function useIsDark(enabled: boolean): boolean {
 export type CodeBlockProps = ComponentPropsWithoutRef<'pre'> & {
   node?: unknown
   /**
-   * Lazy Shiki highlight (knowledge Reader / embed). Default false so chat
+   * Lazy Shiki highlight. Default false so chat
    * pays zero cost and never statically imports the highlighter.
-   * When true, forces highlight (knowledge path) regardless of craft flags.
+   * When true, forces highlight regardless of craft flags.
    */
   syntaxHighlight?: boolean
   /** Optional path label — producer must pass; chat P0 does not parse fences. */

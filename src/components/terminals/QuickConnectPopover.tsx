@@ -16,7 +16,7 @@ import {
 import { cn } from '@/lib/utils'
 
 /**
- * Single trailing action under 终端管理 (matches chat / code / knowledge):
+ * Single trailing action under 终端管理 (matches chat / code):
  * one "新建终端" button → popover with create actions + 快捷连接 recents (K11).
  * Command palette can open via `useHostLibraryUi.requestOpenQuickConnect`.
  */

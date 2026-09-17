@@ -647,7 +647,7 @@ export interface BuildToolsOpts {
    * Product surface. Chat further clamps git/plugin tools even when permissionMode
    * allows writes (artifact writes stay; project mutation tools do not).
    */
-  surface?: 'chat' | 'code' | 'knowledge' | 'terminal'
+  surface?: 'chat' | 'code' | 'terminal'
   /** Terminal shared-PTY bridge (terminal surface only). */
   terminalUiBridge?: {
     send: (msg: import('@hip/protocol').ServerMessage) => void

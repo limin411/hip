@@ -68,6 +68,17 @@ function buildTrigger(draft: ScheduledTaskDraft): AutomationTrigger {
   return { kind: 'daily', hour: draft.hour, minute: draft.minute }
 }
 
+/**
+ * Project path a task inherits from the conversation that owns it.
+ *
+ * The fire's surface is derived from this path alone — a task recorded without
+ * it runs as a chat no matter which scene it was configured in. Written on both
+ * create and update so rows saved before this field existed heal on next edit.
+ */
+function ownerProjectPath(owner: { config: { cwd?: string } } | null): string | null {
+  return owner?.config.cwd?.trim() || null
+}
+
 export function useScheduledTask() {
   const { t } = useTranslation()
   const activeId = useActiveSessionId()
@@ -180,6 +191,10 @@ export function useScheduledTask() {
           trigger: buildTrigger(draft),
           enabled: true,
           sessionId: activeId,
+          // The fire must land in this conversation's own scene. A project
+          // conversation runs its task inside that project (code surface),
+          // not in Chats.
+          projectPath: ownerProjectPath(activeSession),
         }),
       ).then(
         () => toast.success(t('scheduledTask.toast.created'), { description: summary }),
@@ -208,6 +223,10 @@ export function useScheduledTask() {
           name: taskName,
           prompt: draft.prompt,
           trigger: buildTrigger(draft),
+          // Re-recorded on edit: a row persisted before the field existed (or
+          // after the conversation was rebound) heals here instead of staying
+          // stuck firing into Chats.
+          projectPath: ownerProjectPath(activeSession),
         }),
       ).then(
         () => toast.success(t('scheduledTask.toast.updated'), { description: summary }),

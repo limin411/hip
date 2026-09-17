@@ -3,6 +3,7 @@ import type { AgentConfig } from '@hip/protocol'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
+import { DEFAULT_CONFIG, useDomainStore } from '@/domain/sessionStore'
 import type { Automation } from './types'
 
 const isDirectory = vi.fn()
@@ -198,5 +199,73 @@ describe('buildSessionConfigFromAutomation', () => {
     expect(r.ok).toBe(true)
     if (!r.ok) return
     expect(r.config.permissionMode).toBe('full')
+  })
+})
+
+describe('buildSessionConfigFromAutomation — owning conversation fallback', () => {
+  beforeEach(() => {
+    useDomainStore.setState({ sessions: [], activeSessionId: null })
+  })
+
+  it('inherits the owning conversation cwd for a row persisted without projectPath', async () => {
+    useProjectPathStore.getState().markOk('/work/proj')
+    useDomainStore.getState().createSession('sess_owner', {
+      ...DEFAULT_CONFIG,
+      surface: 'code',
+      cwd: '/work/proj',
+    })
+
+    // Regression: the composer persisted `sessionId` only, and the fire's surface
+    // is derived from the project path alone — so a task configured inside a
+    // project conversation fired its run into Chats.
+    const r = await buildSessionConfigFromAutomation(
+      auto({ id: 'auto_legacy', sessionId: 'sess_owner' }),
+    )
+
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.config.surface).toBe('code')
+    expect(r.config.cwd).toBe('/work/proj')
+  })
+
+  it('lets an explicit projectPath win over the owning conversation cwd', async () => {
+    useProjectPathStore.getState().markOk('/explicit')
+    useProjectPathStore.getState().markOk('/owner-cwd')
+    useDomainStore.getState().createSession('sess_owner', {
+      ...DEFAULT_CONFIG,
+      surface: 'code',
+      cwd: '/owner-cwd',
+    })
+
+    const r = await buildSessionConfigFromAutomation(
+      auto({ id: 'auto_pin', sessionId: 'sess_owner', projectPath: '/explicit' }),
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.config.cwd).toBe('/explicit')
+  })
+
+  it('stays a chat fire when the owning conversation is gone', async () => {
+    const r = await buildSessionConfigFromAutomation(
+      auto({ id: 'auto_gone', sessionId: 'sess_deleted' }),
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.config.surface).toBe('chat')
+    expect(r.config.cwd).toBeUndefined()
+  })
+
+  it('stays a chat fire for a sandbox conversation with no project path', async () => {
+    useDomainStore.getState().createSession('sess_chat', {
+      ...DEFAULT_CONFIG,
+      surface: 'chat',
+    })
+
+    const r = await buildSessionConfigFromAutomation(
+      auto({ id: 'auto_chat', sessionId: 'sess_chat' }),
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.config.surface).toBe('chat')
   })
 })

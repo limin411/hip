@@ -10,9 +10,15 @@ const SESSION_A = 'sess-a'
 const SESSION_B = 'sess-b'
 
 let activeId: string | null = SESSION_A
-let activeSession: { id: string; title: string } | null = {
+// Mirrors SessionVM: `config` is required, only `cwd` is optional.
+let activeSession: {
+  id: string
+  title: string
+  config: { cwd?: string }
+} | null = {
   id: SESSION_A,
   title: 'Weekly digest',
+  config: {},
 }
 
 vi.mock('@/domain', () => ({
@@ -73,7 +79,7 @@ beforeEach(async () => {
   localStorage.clear()
   automations = []
   activeId = SESSION_A
-  activeSession = { id: SESSION_A, title: 'Weekly digest' }
+  activeSession = { id: SESSION_A, title: 'Weekly digest', config: {} }
   create.mockReset().mockResolvedValue('auto-new')
   update.mockReset().mockResolvedValue(undefined)
   remove.mockReset().mockResolvedValue(undefined)
@@ -259,6 +265,27 @@ describe('useScheduledTask — mutations', () => {
     expect(create.mock.calls[0]![0].trigger).toEqual({ kind: 'interval', intervalMinutes: 30 })
   })
 
+  it('records the project path so a project task fires back into its project', () => {
+    activeSession = {
+      id: SESSION_A,
+      title: 'Weekly digest',
+      config: { cwd: '  /work/proj  ' },
+    }
+    const { result } = renderHook()
+    result.current!.createScheduledTask(draft)
+
+    // Regression: the owning conversation id was persisted without its project
+    // path, and the fire's surface is derived from that path alone — so a task
+    // configured in a project conversation produced its runs in Chats.
+    expect(create.mock.calls[0]![0].projectPath).toBe('/work/proj')
+  })
+
+  it('records a null project path for a sandbox conversation', () => {
+    const { result } = renderHook()
+    result.current!.createScheduledTask(draft)
+    expect(create.mock.calls[0]![0].projectPath).toBeNull()
+  })
+
   it('does nothing without an active session', () => {
     activeId = null
     activeSession = null
@@ -294,6 +321,26 @@ describe('useScheduledTask — mutations', () => {
     )
     await waitFor(() =>
       expect(JSON.parse(localStorage.getItem('scheduledTaskDismissed') || '{}')).toEqual({}),
+    )
+  })
+
+  it('re-records the project path when an existing task is edited', () => {
+    activeSession = {
+      id: SESSION_A,
+      title: 'Weekly digest',
+      config: { cwd: '/work/proj' },
+    }
+    automations = [
+      auto({ id: 'auto_a', sessionId: SESSION_A, trigger: { kind: 'daily', hour: 9, minute: 0 } }),
+    ]
+    const { result } = renderHook()
+    result.current!.updateScheduledTask(draft)
+
+    // Lets a row saved before the field existed heal on edit instead of staying
+    // stuck firing into Chats forever.
+    expect(update).toHaveBeenCalledWith(
+      'auto_a',
+      expect.objectContaining({ projectPath: '/work/proj' }),
     )
   })
 

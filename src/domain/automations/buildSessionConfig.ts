@@ -9,7 +9,7 @@ import { resolveModelConfig, activeModelKey } from '@/lib/modelKey'
 import { clampEffortForKey } from '@/lib/modelEffort'
 import { resolveValidAcpAgentId } from '@/lib/sessionAgent'
 import { projectPathKey } from '@/lib/sessionProjectGroups'
-import { DEFAULT_CONFIG } from '@/domain/sessionStore'
+import { DEFAULT_CONFIG, useDomainStore } from '@/domain/sessionStore'
 import i18n from '@/i18n'
 import { normalizeAppLanguage, type AppLanguage } from '@/store/uiStore'
 import { useDetectionStore } from '@/store/detectionStore'
@@ -57,6 +57,24 @@ export async function probeProjectPath(
 }
 
 /**
+ * Project path that decides the fire's surface.
+ *
+ * Prefers the row's own `projectPath` (written by the composer's scheduled-task
+ * UI). Rows persisted before that field was recorded carry only `sessionId`, so
+ * fall back to the owning conversation's cwd — a project task must not silently
+ * fire into Chats just because its row predates the field.
+ *
+ * Returns '' when neither source has a path → chat surface (unchanged behaviour).
+ */
+function resolveProjectPath(a: Automation): string {
+  const own = a.projectPath?.trim()
+  if (own) return own
+  if (!a.sessionId) return ''
+  const owner = useDomainStore.getState().sessions.find((s) => s.id === a.sessionId)
+  return owner?.config.cwd?.trim() ?? ''
+}
+
+/**
  * Resolve SessionConfig from an Automation (project gate + model/agent).
  * Failures return `{ ok: false, error }` with stable codes:
  * `project_missing` | `project_required` | `no_model_configured` | `model_unresolvable`
@@ -64,11 +82,13 @@ export async function probeProjectPath(
 export async function buildSessionConfigFromAutomation(
   a: Automation,
 ): Promise<BuildSessionConfigResult> {
+  const projectPath = resolveProjectPath(a)
+
   // 1. Project gate — never create on 'unknown'; probe first
-  if (a.projectPath?.trim()) {
-    let st = useProjectPathStore.getState().statusOf(a.projectPath)
+  if (projectPath) {
+    let st = useProjectPathStore.getState().statusOf(projectPath)
     if (st === 'unknown') {
-      st = await probeProjectPath(a.projectPath)
+      st = await probeProjectPath(projectPath)
     }
     if (st === 'unknown' || st === 'missing') {
       return { ok: false, error: 'project_missing' }
@@ -77,7 +97,7 @@ export async function buildSessionConfigFromAutomation(
 
   // surface is code iff projectPath is non-empty (project_required is reserved
   // for a future explicit surface pin without path; unreachable with current mapping).
-  const surface: 'chat' | 'code' = a.projectPath?.trim() ? 'code' : 'chat'
+  const surface: 'chat' | 'code' = projectPath ? 'code' : 'chat'
 
   // 2. Mirror configFromDraft model/agent path
   const agents = useHipConfigStore.getState().config.agents ?? []
@@ -89,7 +109,7 @@ export async function buildSessionConfigFromAutomation(
 
   let base: SessionConfig =
     surface === 'code'
-      ? { ...DEFAULT_CONFIG, surface, cwd: a.projectPath!.trim() }
+      ? { ...DEFAULT_CONFIG, surface, cwd: projectPath }
       : { ...DEFAULT_CONFIG, surface }
 
   // 3. permissionMode — KD-14

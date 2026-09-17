@@ -29,9 +29,13 @@ import {
   rollNextRunAt,
   isAutomationNameTaken,
 } from '@/domain/automations'
-import { buildSessionConfigFromAutomation } from '@/domain/automations/buildSessionConfig'
+import {
+  buildSessionConfigFromAutomation,
+  isProjectPathReady,
+} from '@/domain/automations/buildSessionConfig'
 import { sessionService } from '@/domain/sessionService'
 import { useDomainStore } from '@/domain/sessionStore'
+import type { SessionConfig } from '@hip/protocol'
 import { toast } from 'sonner'
 import i18n from '@/i18n'
 
@@ -958,6 +962,51 @@ export const useAutomationStore = create<AutomationStore>((set, get) => ({
 
 // ─── runNow body (normative) ─────────────────────────────────
 
+/**
+ * Where a fire lands.
+ *
+ * - `reuse`: the conversation that owns the task (composer scheduled task) —
+ *   the prompt joins that transcript, which is what "scheduled task" means to
+ *   the user. `sessionId` there.
+ * - `create`: owner-less rows (automations created before the composer recorded
+ *   `sessionId`, or whose conversation was deleted) keep the historical
+ *   behaviour and mint a fresh `⏱ name` session.
+ */
+type FireTarget =
+  | { kind: 'reuse'; sessionId: string }
+  | { kind: 'create'; config: SessionConfig }
+
+/** The live owning conversation, when it still exists. */
+function resolveOwnerSession(a: Automation) {
+  if (!a.sessionId) return undefined
+  return useDomainStore.getState().sessions.find((s) => s.id === a.sessionId)
+}
+
+/**
+ * Resolve the fire target, applying the pre-session gate.
+ *
+ * The reuse path deliberately skips model/agent resolution: the conversation
+ * already carries them, and a global `activeModel` that has since changed (or
+ * been removed) must not fail a run that would work. Only the project gate
+ * still applies — a session bound to a vanished folder cannot send.
+ */
+async function resolveFireTarget(
+  a: Automation,
+): Promise<{ ok: true; target: FireTarget } | { ok: false; error: string }> {
+  const owner = resolveOwnerSession(a)
+
+  if (owner) {
+    if (!(await isProjectPathReady(owner.config.cwd ?? ''))) {
+      return { ok: false, error: 'project_missing' }
+    }
+    return { ok: true, target: { kind: 'reuse', sessionId: owner.id } }
+  }
+
+  const built = await buildSessionConfigFromAutomation(a)
+  if (!built.ok) return { ok: false, error: built.error }
+  return { ok: true, target: { kind: 'create', config: built.config } }
+}
+
 async function runNowBody(
   automationId: string,
   opts: RunNowOpts,
@@ -967,6 +1016,11 @@ async function runNowBody(
   const trigger = resolveTrigger(opts)
   const a = get().automations.find((x) => x.id === automationId)
   if (!a) return
+
+  // Boot race: an owner-bound row must not be resolved against an unapplied
+  // session list — an empty store reads as "conversation deleted" and would
+  // mint a stray session. Leave nextRunAt due; a later tick fires it.
+  if (a.sessionId && !get().sessionListReady) return
 
   // SYNC claim BEFORE any await (closes TOCTOU with concurrent onTick/manual)
   const claim = tryClaimInFlight(automationId, { trigger })
@@ -988,26 +1042,27 @@ async function runNowBody(
 
   let runId: string | null = null
   try {
-    const built = await buildSessionConfigFromAutomation(a)
-    if (!built.ok) {
+    const resolved = await resolveFireTarget(a)
+    if (!resolved.ok) {
       // failBeforeSession MUST releaseInFlight
       await get().failBeforeSession(automationId, {
         trigger,
-        error: built.error,
+        error: resolved.error,
         now,
       })
       if (trigger === 'manual') {
         toast.error(
-          i18n.t(`automation.errors.${built.error}` as 'automation.errors.no_model_configured', {
+          i18n.t(`automation.errors.${resolved.error}` as 'automation.errors.no_model_configured', {
             defaultValue: i18n.t(
-              `automation.skipReasons.${built.error}` as 'automation.skipReasons.project_missing',
-              { defaultValue: built.error },
+              `automation.skipReasons.${resolved.error}` as 'automation.skipReasons.project_missing',
+              { defaultValue: resolved.error },
             ),
           }),
         )
       }
       return
     }
+    const target = resolved.target
 
     // Delete-vs-run race: re-check catalog after await; release if removed.
     const stillThere = get().automations.some((x) => x.id === automationId)
@@ -1027,14 +1082,22 @@ async function runNowBody(
 
     // Background lifecycle — MUST NOT steal active chat when focus=false
     const focus = opts.focus === true
-    const sessionId = sessionService.createSession(built.config, {
-      activate: focus,
-    })
-    // Always set title BEFORE send so tray notification copy is useful
-    sessionService.renameSession(
-      sessionId,
-      formatAutomationSessionTitle(a.name),
-    )
+    let sessionId: string
+    if (target.kind === 'reuse') {
+      // Fire *into* the owning conversation. A busy one is fine: the sidecar
+      // queues the prompt behind the running turn (durable input queue) instead
+      // of dropping it, so the task runs right after.
+      sessionId = target.sessionId
+    } else {
+      sessionId = sessionService.createSession(target.config, {
+        activate: focus,
+      })
+      // Always set title BEFORE send so tray notification copy is useful
+      sessionService.renameSession(
+        sessionId,
+        formatAutomationSessionTitle(a.name),
+      )
+    }
 
     if (focus) {
       sessionService.selectSession(sessionId)

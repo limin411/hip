@@ -32,10 +32,12 @@ vi.mock('@/domain/sessionService', () => ({
 }))
 
 const buildSessionConfigFromAutomation = vi.fn()
+const isProjectPathReady = vi.fn()
 
 vi.mock('@/domain/automations/buildSessionConfig', () => ({
   buildSessionConfigFromAutomation: (...a: unknown[]) =>
     buildSessionConfigFromAutomation(...a),
+  isProjectPathReady: (...a: unknown[]) => isProjectPathReady(...a),
 }))
 
 // Domain store sessions for recoverOrphanRuns
@@ -48,6 +50,8 @@ const domainSessions: Array<{
   interrupt?: unknown | null
   planApprovalPending?: boolean | null
   error?: { message?: string; code?: string } | null
+  /** Required on a reuse fire (project gate reads the session's cwd). */
+  config?: SessionConfig
 }> = []
 
 vi.mock('@/domain/sessionStore', async (importOriginal) => {
@@ -125,6 +129,7 @@ describe('automationStore', () => {
       ok: true,
       config: okConfig,
     })
+    isProjectPathReady.mockReset().mockResolvedValue(true)
   })
 
   afterEach(() => {
@@ -662,6 +667,195 @@ describe('automationStore', () => {
     })
     expect(createSession).toHaveBeenCalledWith(okConfig, { activate: true })
     expect(selectSession).toHaveBeenCalledWith(expect.any(String))
+  })
+
+  // ─── runNow target: owning conversation ────────────────────
+  // A composer scheduled task belongs to the conversation it was created in;
+  // firing it must not mint a new "⏱ name" session on every tick.
+
+  it('runNow fires into the owning conversation (no new session, no rename)', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({
+          id: 'auto_own',
+          name: 'Daily standup',
+          prompt: 'summarize',
+          sessionId: 's-owner',
+        }),
+      ],
+      loaded: true,
+      sessionListReady: true,
+    })
+    domainSessions.push({
+      id: 's-owner',
+      status: 'idle',
+      config: { ...DEFAULT_CONFIG, surface: 'chat' },
+    })
+
+    await useAutomationStore.getState().runNow('auto_own', {
+      trigger: 'schedule',
+      focus: false,
+      nowMs: 5000,
+    })
+
+    expect(createSession).not.toHaveBeenCalled()
+    // Never rename the user's own conversation into "⏱ …".
+    expect(renameSession).not.toHaveBeenCalled()
+    expect(selectSession).not.toHaveBeenCalled()
+    // The conversation already carries cwd/model/agent — no config build needed.
+    expect(buildSessionConfigFromAutomation).not.toHaveBeenCalled()
+    expect(sendMessageToSession).toHaveBeenCalledWith('s-owner', 'summarize')
+
+    const run = useAutomationStore.getState().runs[0]
+    expect(run.status).toBe('running')
+    expect(run.sessionId).toBe('s-owner')
+    expect(getWatch(run.id)).toEqual({
+      sessionId: 's-owner',
+      automationId: 'auto_own',
+    })
+    expect(isInFlight('auto_own')).toBe(true)
+  })
+
+  it('runNow focus=true selects the owning conversation', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({ id: 'auto_own_fg', prompt: 'go', sessionId: 's-owner' }),
+      ],
+      loaded: true,
+      sessionListReady: true,
+    })
+    domainSessions.push({
+      id: 's-owner',
+      status: 'idle',
+      config: { ...DEFAULT_CONFIG, surface: 'chat' },
+    })
+
+    await useAutomationStore.getState().runNow('auto_own_fg', {
+      trigger: 'manual',
+      focus: true,
+      nowMs: 5001,
+    })
+
+    expect(createSession).not.toHaveBeenCalled()
+    expect(selectSession).toHaveBeenCalledWith('s-owner')
+  })
+
+  it('reuses the owning conversation while its turn is running (prompt queues)', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({ id: 'auto_own_busy', prompt: 'go', sessionId: 's-owner' }),
+      ],
+      loaded: true,
+      sessionListReady: true,
+    })
+    domainSessions.push({
+      id: 's-owner',
+      status: 'running',
+      config: { ...DEFAULT_CONFIG, surface: 'chat' },
+    })
+
+    await useAutomationStore.getState().runNow('auto_own_busy', {
+      trigger: 'schedule',
+      focus: false,
+      nowMs: 5002,
+    })
+
+    // The sidecar input queue takes it behind the running turn — dropping the
+    // message (or opening yet another session) would lose the task's work.
+    expect(sendMessageToSession).toHaveBeenCalledWith('s-owner', 'go')
+    expect(createSession).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a fresh session when the owning conversation is gone', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({ id: 'auto_orphan', name: 'Orphan', prompt: 'go', sessionId: 's-deleted' }),
+      ],
+      loaded: true,
+      sessionListReady: true,
+    })
+    // domainSessions stays empty: the conversation was deleted.
+
+    await useAutomationStore.getState().runNow('auto_orphan', {
+      trigger: 'schedule',
+      focus: false,
+      nowMs: 5003,
+    })
+
+    expect(createSession).toHaveBeenCalledTimes(1)
+    expect(renameSession).toHaveBeenCalledWith(expect.any(String), '⏱ Orphan')
+    expect(isProjectPathReady).not.toHaveBeenCalled()
+  })
+
+  it('project gate still blocks a reuse fire into a vanished folder', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({ id: 'auto_reuse_pm', prompt: 'go', sessionId: 's-owner' }),
+      ],
+      loaded: true,
+      sessionListReady: true,
+    })
+    domainSessions.push({
+      id: 's-owner',
+      status: 'idle',
+      config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/gone' },
+    })
+    isProjectPathReady.mockResolvedValueOnce(false)
+
+    await useAutomationStore.getState().runNow('auto_reuse_pm', {
+      trigger: 'schedule',
+      focus: false,
+      nowMs: 5004,
+    })
+
+    // Gate reads the owning conversation's own cwd (what the send would use).
+    expect(isProjectPathReady).toHaveBeenCalledWith('/gone')
+    expect(sendMessageToSession).not.toHaveBeenCalled()
+    expect(createSession).not.toHaveBeenCalled()
+    expect(isInFlight('auto_reuse_pm')).toBe(false)
+    const failed = useAutomationStore
+      .getState()
+      .runs.find((r) => r.status === 'failed')
+    expect(failed?.error).toBe('project_missing')
+  })
+
+  it('waits for the session list instead of reading an empty store as deleted', async () => {
+    useAutomationStore.setState({
+      automations: [
+        auto({ id: 'auto_boot', prompt: 'go', sessionId: 's-owner' }),
+      ],
+      loaded: true,
+      // Boot: catalog loaded, session:list:result not applied yet.
+      sessionListReady: false,
+    })
+
+    await useAutomationStore.getState().runNow('auto_boot', {
+      trigger: 'catchup',
+      focus: false,
+      nowMs: 5005,
+    })
+
+    // Nothing claimed, nothing logged, nothing spawned — nextRunAt stays due so
+    // the next tick fires it once the conversations are known.
+    expect(createSession).not.toHaveBeenCalled()
+    expect(sendMessageToSession).not.toHaveBeenCalled()
+    expect(useAutomationStore.getState().runs).toHaveLength(0)
+    expect(isInFlight('auto_boot')).toBe(false)
+
+    // Once the list lands, the very same row reuses its conversation.
+    useAutomationStore.getState().markSessionListReady()
+    domainSessions.push({
+      id: 's-owner',
+      status: 'idle',
+      config: { ...DEFAULT_CONFIG, surface: 'chat' },
+    })
+    await useAutomationStore.getState().runNow('auto_boot', {
+      trigger: 'catchup',
+      focus: false,
+      nowMs: 5006,
+    })
+    expect(createSession).not.toHaveBeenCalled()
+    expect(sendMessageToSession).toHaveBeenCalledWith('s-owner', 'go')
   })
 
   // ─── completeRun releases claim ────────────────────────────

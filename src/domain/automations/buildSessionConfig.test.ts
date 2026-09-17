@@ -14,6 +14,7 @@ vi.mock('@/ipc/pathExists', () => ({
 
 import {
   buildSessionConfigFromAutomation,
+  isProjectPathReady,
   probeProjectPath,
 } from './buildSessionConfig'
 
@@ -199,6 +200,38 @@ describe('buildSessionConfigFromAutomation', () => {
     expect(r.ok).toBe(true)
     if (!r.ok) return
     expect(r.config.permissionMode).toBe('full')
+  })
+})
+
+describe('isProjectPathReady', () => {
+  beforeEach(() => {
+    isDirectory.mockReset()
+    useProjectPathStore.setState({ byKey: {} })
+  })
+
+  it('passes an empty path — chat fire, nothing to check', async () => {
+    expect(await isProjectPathReady('')).toBe(true)
+    expect(isDirectory).not.toHaveBeenCalled()
+  })
+
+  it('probes an unknown path and passes when it exists', async () => {
+    isDirectory.mockResolvedValueOnce(true)
+    expect(await isProjectPathReady('/ok-proj')).toBe(true)
+  })
+
+  it('fails a known-missing path without probing', async () => {
+    useProjectPathStore.setState({
+      byKey: {
+        '/gone': { exists: false, checkedAt: Date.now(), inFlight: false },
+      },
+    })
+    expect(await isProjectPathReady('/gone')).toBe(false)
+    expect(isDirectory).not.toHaveBeenCalled()
+  })
+
+  it('fails when the probe cannot run (never pass on unknown)', async () => {
+    isDirectory.mockResolvedValueOnce(null)
+    expect(await isProjectPathReady('/maybe')).toBe(false)
   })
 })
 

@@ -75,6 +75,24 @@ function resolveProjectPath(a: Automation): string {
 }
 
 /**
+ * Project gate shared by both fire paths — building a fresh session *and*
+ * reusing an owning conversation (which needs no config but must not send
+ * into a folder that no longer exists).
+ *
+ * Empty path → nothing to check (chat surface). Never passes on 'unknown':
+ * probe first, exactly as the create path always did.
+ */
+export async function isProjectPathReady(path: string): Promise<boolean> {
+  const key = path.trim()
+  if (!key) return true
+  let st = useProjectPathStore.getState().statusOf(key)
+  if (st === 'unknown') {
+    st = await probeProjectPath(key)
+  }
+  return st === 'ok'
+}
+
+/**
  * Resolve SessionConfig from an Automation (project gate + model/agent).
  * Failures return `{ ok: false, error }` with stable codes:
  * `project_missing` | `project_required` | `no_model_configured` | `model_unresolvable`
@@ -85,14 +103,8 @@ export async function buildSessionConfigFromAutomation(
   const projectPath = resolveProjectPath(a)
 
   // 1. Project gate — never create on 'unknown'; probe first
-  if (projectPath) {
-    let st = useProjectPathStore.getState().statusOf(projectPath)
-    if (st === 'unknown') {
-      st = await probeProjectPath(projectPath)
-    }
-    if (st === 'unknown' || st === 'missing') {
-      return { ok: false, error: 'project_missing' }
-    }
+  if (!(await isProjectPathReady(projectPath))) {
+    return { ok: false, error: 'project_missing' }
   }
 
   // surface is code iff projectPath is non-empty (project_required is reserved

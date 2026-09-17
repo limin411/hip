@@ -12,10 +12,9 @@ describe('resolvePaletteSessionId', () => {
     expect(resolvePaletteSessionId('code', 'c1', null)).toBeNull()
   })
 
-  it('falls back chat then code on other work surfaces', () => {
+  it('falls back chat then code on non-chat/code work surfaces', () => {
     expect(resolvePaletteSessionId('terminals', 'c1', 'd1')).toBe('c1')
     expect(resolvePaletteSessionId('terminals', null, 'd1')).toBe('d1')
-    expect(resolvePaletteSessionId('automation', null, null)).toBeNull()
-    expect(resolvePaletteSessionId('automation', null, 'd1')).toBe('d1')
+    expect(resolvePaletteSessionId('terminals', null, null)).toBeNull()
   })
 })

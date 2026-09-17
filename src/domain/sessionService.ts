@@ -299,9 +299,7 @@ export class SessionService {
     // Cold launch / reconnect with no active session: New Conversation.
     // Force-clear non-chat shells + any residual overlay.
     const st = useUiStore.getState()
-    const special =
-      st.activeView === 'terminals' ||
-      st.activeView === 'automation'
+    const special = st.activeView === 'terminals'
     if (special || st.overlay != null) {
       useUiStore.setState({
         activeView: 'chat',

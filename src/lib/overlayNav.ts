@@ -60,10 +60,7 @@ export function coerceUnderlyingFromEntry(entry: NavEntry): WorkSurface {
       }
     }
   }
-  if (
-    entry.sidebarSection === 'terminals' ||
-    entry.sidebarSection === 'automation'
-  ) {
+  if (entry.sidebarSection === 'terminals') {
     return {
       view: entry.sidebarSection as ActiveView,
       section: entry.sidebarSection,

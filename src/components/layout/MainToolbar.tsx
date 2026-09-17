@@ -72,10 +72,9 @@ export function MainToolbar() {
   const isMac = isMacPlatform()
 
   // Terminals keeps MainToolbar panel chrome (right-rail toggle) like chat/code.
-  // automation / settings stay chrome-light. History/trash remain modal shells.
+  // Settings stays chrome-light. History/trash remain modal shells.
   const settingsOpen = overlay === 'settings'
-  const isSpecial =
-    settingsOpen || activeView === 'automation'
+  const isSpecial = settingsOpen
   const showPanelChrome = !isSpecial
   const showSidebarExpand = !sidebarOpen
 
@@ -85,8 +84,6 @@ export function MainToolbar() {
     // Prefer the active category label when available.
     const pageKey = settingsPageTitleKey(settingsPage)
     if (pageKey) title = t(pageKey)
-  } else if (activeView === 'automation') {
-    title = t('sidebar.nav.automation')
   } else if (activeView === 'terminals') {
     title = t('sidebar.nav.terminals')
   } else if (activeSession) {

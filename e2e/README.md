@@ -178,19 +178,14 @@ yarn test:e2e:work-items
 E2E_GREP='@work-items @core' yarn test:e2e
 ```
 
-Automations helpers: `e2e/helpers/automations.ts`. Specs (unpaid, isolated `HIP_DATA_DIR`, no `@live`):
-
-| Spec | Cases |
-|------|--------|
-| `automations-smoke.spec.ts` | AS1–3: sidebar nav → page (not placeholder); palette `nav-automations`; `__hipE2E.automationTick` callable (`@smoke`) |
+Automations page specs were removed with the page itself (`e2e/specs/automations-smoke.spec.ts`,
+`e2e/helpers/automations.ts`). The schedule still needs test coverage — it now lives in the
+composer flow (see `docs/scheduled-task-spec.md`).
 
 Persistence: `HIP_DATA_DIR/automations/catalog.json` + `runs.json` (Tauri IPC).  
-Schedule due is forced via `window.__hipE2E.automationTick(now)` — never wait the real 30s host interval.
-
-```bash
-E2E_GREP=@automations yarn test:e2e
-yarn test:e2e --spec e2e/specs/automations-smoke.spec.ts
-```
+Schedule due is forced via `window.__hipE2E.automationTick(now)` — never wait the real tick interval.
+Ticks are emitted natively (`automation://tick`, every 30s) instead of by a webview `setInterval`,
+because WebView2 throttles timers while the window is hidden to the tray.
 
 ```bash
 E2E_GREP=@context-menu yarn test:e2e

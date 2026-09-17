@@ -60,28 +60,6 @@ export async function enterTerminalsSection(opts?: {
 }
 
 /**
- * Enter automations section.
- * AppSidebar wires onNav to this when AUTOMATION_PAGE is true.
- * Always forces activeView to `automation` so re-entry from trash/settings/history works
- * even when sidebarSection is already `automation` (stale pairing).
- */
-export async function enterAutomationsSection(): Promise<void> {
-  const view = useUiStore.getState().activeView
-  dismissSettingsIfOpen()
-  if (view === 'automation') {
-    useUiStore.getState().setSidebarSection('automation')
-    return
-  }
-  useUiStore.getState().setSidebarSection('automation')
-  useUiStore.getState().setActiveView('automation')
-  recordNavEntry()
-  const { useAutomationStore } = await import('@/store/automationStore')
-  if (!useAutomationStore.getState().loaded) {
-    void useAutomationStore.getState().load()
-  }
-}
-
-/**
  * Select a session from sidebar / History (row or context-menu Open).
  * Selects session, records nav.
  * Dismisses history/trash/settings so the work surface is visible.
@@ -193,16 +171,6 @@ export function openHistoryFromChrome(): void {
 /** @deprecated Prefer openTrashOverlay / toggleTrashOverlay. */
 export function openTrashFromChrome(): void {
   openTrashOverlay()
-}
-
-export async function openAutomationFromChrome(): Promise<void> {
-  const { AUTOMATION_PAGE } = await import('@/components/automation/feature')
-  if (AUTOMATION_PAGE) {
-    await enterAutomationsSection()
-    return
-  }
-  useUiStore.getState().setActiveView('automation')
-  recordNavEntry()
 }
 
 export function sectionForSurface(surface: 'chat' | 'code'): SidebarSection {

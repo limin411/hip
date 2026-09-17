@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import type { AgentConfig, McpServerConfig } from '@hip/protocol'
 import { TERMINAL_MANAGEMENT } from '@/components/terminals/feature'
-import { AUTOMATION_PAGE } from '@/components/automation/feature'
 import {
   clampSidebarWidth,
   SIDEBAR_WIDTH_DEFAULT,
@@ -47,7 +46,6 @@ export type ActiveView =
   | 'chat'
   | 'code'
   | 'terminals'
-  | 'automation'
 export type Surface = 'chat' | 'code'
 /** Managed-terminal right-rail tabs (spec §3.2). */
 export type TerminalPanelTab = 'files' | 'agent'
@@ -60,20 +58,16 @@ export type SidebarSection =
   | 'projects'
   | 'chats'
   | 'terminals'
-  | 'automation'
 
 /**
  * Primary nav sections that only show a "coming soon" placeholder page.
  * When TERMINAL_MANAGEMENT is on, `terminals` is a real section (not placeholder) — K14.
- * When AUTOMATION_PAGE is on, `automation` is a real section (not placeholder).
  */
 export type PlaceholderSidebarSection =
-  | (typeof AUTOMATION_PAGE extends true ? never : 'automation')
-  | (typeof TERMINAL_MANAGEMENT extends true ? never : 'terminals')
+  typeof TERMINAL_MANAGEMENT extends true ? never : 'terminals'
 
 export function isPlaceholderSidebarSection(s: SidebarSection): s is PlaceholderSidebarSection {
   if (s === 'terminals') return !TERMINAL_MANAGEMENT
-  if (s === 'automation') return !AUTOMATION_PAGE
   return false
 }
 
@@ -179,10 +173,7 @@ export type UiPersistedState = {
 
 /** Non-chat/code work surfaces are session-ephemeral; cold launch always lands on chats. */
 export function isEphemeralActiveView(v: ActiveView): boolean {
-  return (
-    v === 'terminals' ||
-    v === 'automation'
-  )
+  return v === 'terminals'
 }
 
 /** Merge hip-ui storage into runtime state; strip legacy shell fields. */

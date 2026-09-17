@@ -54,19 +54,10 @@ describe('terminal gating matrix', () => {
   })
 
   // G6: non chat/code/knowledge work surfaces never open ArtifactPanel (terminal host)
-  it('G6: tasks and automation never open code ArtifactPanel (terminal host)', () => {
+  it('G6: terminals never opens the code ArtifactPanel (terminal host)', () => {
     expect(
       rightPanelKind({
-        activeView: 'tasks',
-        codePanelOpen: true,
-        chatPanelOpen: true,
-        knowledgePanelOpen: true,
-        hasSession: true,
-      }),
-    ).toBe('none')
-    expect(
-      rightPanelKind({
-        activeView: 'automation',
+        activeView: 'terminals',
         codePanelOpen: true,
         chatPanelOpen: true,
         knowledgePanelOpen: true,

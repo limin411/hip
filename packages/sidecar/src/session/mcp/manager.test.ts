@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { CAN_SYMLINK, IS_POSIX } from '../../test/env.js'
-import { symlinkSync, unlinkSync, existsSync } from 'node:fs'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { CAN_SYMLINK, IS_POSIX, IS_WIN32, rmRetrySync } from '../../test/env.js'
+import { symlinkSync, unlinkSync, existsSync, mkdtempSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { McpServerConfig } from '@hip/protocol'
@@ -44,8 +44,8 @@ class TestManager extends McpManager {
     return client
   }
 
-  async testValidate(command: string | undefined): Promise<string | undefined> {
-    return this.validateStdioCommand(command)
+  async testResolve(command: string | undefined, args?: string[]) {
+    return this.resolveStdioCommand(command, args)
   }
 }
 
@@ -181,25 +181,83 @@ describe('McpManager.tools', () => {
   })
 })
 
-describe('McpManager.validateStdioCommand', () => {
+describe('McpManager.resolveStdioCommand', () => {
+  let pathDir = ''
+  const originalPath = process.env.PATH
+  const originalPathExt = process.env.PATHEXT
+
+  beforeEach(() => {
+    pathDir = mkdtempSync(path.join(os.tmpdir(), 'hip-mcp-path-'))
+    process.env.PATH = pathDir
+    delete process.env.PATHEXT
+  })
+  afterEach(() => {
+    process.env.PATH = originalPath
+    if (originalPathExt === undefined) delete process.env.PATHEXT
+    else process.env.PATHEXT = originalPathExt
+    rmRetrySync(pathDir)
+  })
+
+  /** Drop a stub runner on the (temp) PATH so resolution is deterministic on any platform. */
+  const stubRunner = (name: string): string => {
+    const file = path.join(pathDir, IS_WIN32 ? `${name}.exe` : name)
+    writeFileSync(file, IS_WIN32 ? '' : '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    return file
+  }
+  /** Error text of a rejected resolution (asserting ok===false first). */
+  const errorOf = (r: Awaited<ReturnType<TestManager['testResolve']>>): string => {
+    expect(r.ok).toBe(false)
+    return r.ok ? '' : r.error
+  }
+
   it.skipIf(!IS_POSIX)('accepts /usr/bin/env (allowed directory)', async () => {
-    const result = await mgr.testValidate('/usr/bin/env')
-    expect(result).toBeUndefined()
+    const result = await mgr.testResolve('/usr/bin/env')
+    expect(result.ok).toBe(true)
   })
 
   it('rejects /tmp/malicious (not in allowed directories)', async () => {
-    const result = await mgr.testValidate('/tmp/malicious')
-    expect(result).toMatch(/does not exist or cannot be resolved/)
+    expect(errorOf(await mgr.testResolve('/tmp/malicious'))).toMatch(/does not exist or cannot be resolved/)
   })
 
-  it('rejects a relative path like npx (requires absolute)', async () => {
-    const result = await mgr.testValidate('npx')
-    expect(result).toMatch(/must be an absolute path/)
+  it('rejects a bare command that is not a package runner', async () => {
+    expect(errorOf(await mgr.testResolve('curl'))).toMatch(/package runner/)
+  })
+
+  it('resolves a package runner from PATH (market + plugin drafts use bare names)', async () => {
+    const stub = stubRunner('docker')
+    const result = await mgr.testResolve('docker', ['run', '-i', '--rm', 'img'])
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.command).toBe(realpathSync(stub))
+      expect(result.args).toEqual(['run', '-i', '--rm', 'img'])
+    }
+  })
+
+  it('reports a package runner that is not installed', async () => {
+    expect(errorOf(await mgr.testResolve('uvx'))).toMatch(/not found on PATH/)
+  })
+
+  it.skipIf(!IS_WIN32)('relaunches an npx .cmd shim as node + npx-cli.js (never a shell)', async () => {
+    mkdirSync(path.join(pathDir, 'node_modules', 'npm', 'bin'), { recursive: true })
+    writeFileSync(path.join(pathDir, 'npx.cmd'), '@ECHO off\r\n')
+    writeFileSync(path.join(pathDir, 'node.exe'), '')
+    const entry = path.join(pathDir, 'node_modules', 'npm', 'bin', 'npx-cli.js')
+    writeFileSync(entry, '')
+    const result = await mgr.testResolve('npx', ['-y', 'chrome-devtools-mcp@1.7.0'])
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.command).toBe(path.join(pathDir, 'node.exe'))
+      expect(result.args).toEqual([entry, '-y', 'chrome-devtools-mcp@1.7.0'])
+    }
+  })
+
+  it.skipIf(!IS_WIN32)('rejects a .cmd shim it cannot relaunch without a shell', async () => {
+    writeFileSync(path.join(pathDir, 'uvx.cmd'), '@ECHO off\r\n')
+    expect(errorOf(await mgr.testResolve('uvx'))).toMatch(/without a shell/)
   })
 
   it.skipIf(!IS_POSIX)('rejects path traversal like /usr/bin/../tmp/malicious', async () => {
-    const result = await mgr.testValidate('/usr/bin/../tmp/malicious')
-    expect(result).toMatch(/does not exist or cannot be resolved/)
+    expect(errorOf(await mgr.testResolve('/usr/bin/../tmp/malicious'))).toMatch(/does not exist or cannot be resolved/)
   })
 
   it.skipIf(!CAN_SYMLINK)('accepts a symlink whose realpath falls inside an allowed directory', async () => {
@@ -207,8 +265,8 @@ describe('McpManager.validateStdioCommand', () => {
     const link = path.join(os.tmpdir(), 'hip-test-allowed-link')
     try { symlinkSync(target, link) } catch { /* may already exist */ }
     try {
-      const result = await mgr.testValidate(link)
-      expect(result).toBeUndefined()
+      const result = await mgr.testResolve(link)
+      expect(result.ok).toBe(true)
     } finally {
       try { unlinkSync(link) } catch { /* best-effort cleanup */ }
     }
@@ -218,14 +276,12 @@ describe('McpManager.validateStdioCommand', () => {
     const target = path.join(os.tmpdir(), 'hip-test-evil-target')
     // Create a real file outside allowed dirs so realpath succeeds but the check fails
     try {
-      const { writeFileSync } = await import('node:fs')
       writeFileSync(target, '#!/bin/sh\necho pwned\n', { mode: 0o755 })
     } catch { /* ok if exists */ }
     const link = path.join(os.tmpdir(), 'hip-test-malicious-link')
     try { symlinkSync(target, link) } catch { /* may already exist */ }
     try {
-      const result = await mgr.testValidate(link)
-      expect(result).toMatch(/not in the allowed directory list/)
+      expect(errorOf(await mgr.testResolve(link))).toMatch(/not in the allowed directory list/)
     } finally {
       try { unlinkSync(link) } catch { /* best-effort */ }
       try { unlinkSync(target) } catch { /* best-effort */ }

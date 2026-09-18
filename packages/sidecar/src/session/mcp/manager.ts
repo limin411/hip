@@ -1,6 +1,7 @@
 import { tool, type StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import * as fs from 'node:fs/promises'
+import { constants as fsConstants } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { McpServerConfig } from '@hip/protocol'
@@ -64,6 +65,35 @@ interface Connection {
 
 /** Default: pre-load all MCP tools when total count < 20. */
 export const DEFAULT_LAZY_THRESHOLD = 20
+
+/** Result of {@link McpManager.resolveStdioCommand}. */
+export type StdioCommandResolution =
+  | { ok: true; command: string; args: string[] | undefined }
+  | { ok: false; error: string }
+
+/**
+ * Bare command names hip resolves on `PATH`. These are exactly the package runners the MCP
+ * registry install drafts emit (`src/lib/mcpRegistryInstall.ts`) and plugin manifests declare
+ * (`npx` in `chrome-devtools-mcp`), so they must work by name. Any other command has to be an
+ * absolute path inside the allowlist.
+ */
+const PACKAGE_RUNNERS = ['npx', 'uvx', 'pipx', 'dnx', 'docker'] as const
+
+/** Directories an absolute stdio command must live in (symlinks resolved first). */
+function allowedCommandDirs(): string[] {
+  return ['/usr/bin', '/usr/local/bin', '/opt', path.join(os.homedir(), '.hip', 'bin')]
+}
+
+/**
+ * Windows `.cmd` / `.bat` shims cannot be spawned without a shell (CreateProcess needs a PE
+ * image), and hip never sets `shell: true` — that would turn MCP args into a command-injection
+ * surface. For the JS shims npm ships we relaunch them as `<node.exe> <cli entry>` instead, so
+ * argv stays argv. Key = shim basename without extension; value = cli entry relative to the
+ * shim's directory.
+ */
+const WINDOWS_JS_SHIMS: Record<string, string> = {
+  npx: path.join('node_modules', 'npm', 'bin', 'npx-cli.js'),
+}
 
 /** Default context window (128k tokens) for calculating pct-based threshold. */
 const DEFAULT_CONTEXT_WINDOW_TOKENS = 128_000
@@ -155,35 +185,112 @@ export class McpManager {
 
   /**
    * Open a client to `server` and complete the MCP handshake.
+   * stdio commands are resolved first — see {@link resolveStdioCommand}.
    * Overridden in tests to inject a Fake client (no real process/network).
    */
   protected async connect(server: McpServerConfig): Promise<ClientLike> {
+    let target = server
     if (server.transport === 'stdio') {
-      const error = await this.validateStdioCommand(server.command)
-      if (error) throw new Error(error)
+      const resolved = await this.resolveStdioCommand(server.command, server.args)
+      if (!resolved.ok) throw new Error(resolved.error)
+      target = { ...server, command: resolved.command, args: resolved.args }
     }
     const client = new Client({ name: 'hip', version: HIP_PRODUCT_VERSION })
-    await client.connect(this.buildTransport(server))
+    await client.connect(this.buildTransport(target))
     return client as unknown as ClientLike
   }
 
-  /** Validate a stdio command against the absolute-path allowlist, resolving symlinks. */
-  protected async validateStdioCommand(command: string | undefined): Promise<string | undefined> {
-    if (!command) return 'MCP stdio server is missing a command'
-    if (!path.isAbsolute(command)) return `MCP stdio command must be an absolute path: ${command}`
-    const normalized = path.normalize(command)
-    const allowedDirs = ['/usr/bin', '/usr/local/bin', '/opt', path.join(os.homedir(), '.hip', 'bin')]
+  /**
+   * Resolve an MCP stdio command into something actually spawnable.
+   * - absolute path → realpath must land inside {@link allowedCommandDirs} (unchanged policy)
+   * - bare package runner (`npx`/`uvx`/`pipx`/`dnx`/`docker`) → resolved on `PATH`, because those
+   *   are what market install drafts and plugin manifests declare
+   * - any other bare name → rejected
+   * Never throws.
+   */
+  protected async resolveStdioCommand(
+    command: string | undefined,
+    args: string[] | undefined,
+  ): Promise<StdioCommandResolution> {
+    if (!command) return { ok: false, error: 'MCP stdio server is missing a command' }
+    if (path.isAbsolute(command)) {
+      const error = await this.validateAllowedCommand(command)
+      return error ? { ok: false, error } : { ok: true, command, args }
+    }
+    const name = command.trim().toLowerCase().replace(/\.(exe|cmd|bat)$/, '')
+    if (!(PACKAGE_RUNNERS as readonly string[]).includes(name)) {
+      return {
+        ok: false,
+        error:
+          `MCP stdio command must be an absolute path or a package runner ` +
+          `(${PACKAGE_RUNNERS.join('/')}): ${command}`,
+      }
+    }
+    const found = await this.resolveOnPath(name)
+    if (!found) return { ok: false, error: `MCP stdio command not found on PATH: ${command}` }
+    if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(found)) {
+      const dir = path.dirname(found)
+      const entry = path.join(dir, WINDOWS_JS_SHIMS[name] ?? '')
+      const nodeExe = path.join(dir, 'node.exe')
+      if (!WINDOWS_JS_SHIMS[name] || !(await this.isRunnableFile(entry)) || !(await this.isRunnableFile(nodeExe))) {
+        return {
+          ok: false,
+          error:
+            `MCP stdio command "${command}" resolves to the Windows shim ${found}, which hip ` +
+            `cannot launch without a shell; point command at a real .exe instead`,
+        }
+      }
+      return { ok: true, command: nodeExe, args: [entry, ...(args ?? [])] }
+    }
+    return { ok: true, command: found, args }
+  }
+
+  /** Absolute path + realpath inside the allowlist. Error string, or undefined when allowed. */
+  private async validateAllowedCommand(command: string): Promise<string | undefined> {
     let real: string
     try {
-      real = await fs.realpath(normalized)
+      real = await fs.realpath(path.normalize(command))
     } catch {
       return `MCP stdio command does not exist or cannot be resolved: ${command}`
     }
     const resolved = path.normalize(real)
-    for (const dir of allowedDirs) {
+    for (const dir of allowedCommandDirs()) {
       if (resolved === dir || resolved.startsWith(dir + path.sep)) return undefined
     }
     return `MCP stdio command is not in the allowed directory list: ${command}`
+  }
+
+  /** Find a bare command on PATH. Windows tries PATHEXT candidates with .exe first. Never throws. */
+  private async resolveOnPath(name: string): Promise<string | undefined> {
+    const dirs = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)
+    const exts =
+      process.platform === 'win32'
+        ? [...new Set(['.exe', ...(process.env.PATHEXT ?? '.CMD;.BAT').split(';').map((e) => e.trim().toLowerCase()).filter(Boolean)])]
+        : ['']
+    for (const dir of dirs) {
+      for (const ext of exts) {
+        const candidate = path.join(dir, name + ext)
+        if (!(await this.isRunnableFile(candidate))) continue
+        try {
+          return await fs.realpath(candidate)
+        } catch {
+          return candidate
+        }
+      }
+    }
+    return undefined
+  }
+
+  /** True when `p` is a regular file (and, on POSIX, executable). Never throws. */
+  private async isRunnableFile(p: string): Promise<boolean> {
+    try {
+      if (!(await fs.stat(p)).isFile()) return false
+      if (process.platform === 'win32') return true
+      await fs.access(p, fsConstants.X_OK)
+      return true
+    } catch {
+      return false
+    }
   }
 
   /** Map a server config to the matching MCP transport. */

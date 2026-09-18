@@ -76,6 +76,31 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "## vX.Y.Z — <title>
 
 Release URL: https://github.com/limin411/hip/releases
 
+### 6. Update CHANGELOG
+
+`CHANGELOG.md` 按 Keep a Changelog 格式补一段，**插在 `## [Unreleased]` 之后**：
+
+```markdown
+## [X.Y.Z] - YYYY-MM-DD
+
+### Added
+### Fixed
+### Removed
+```
+
+内容与 Release notes 同步即可（表达可以更紧凑）。
+
+### 7. Sync main
+
+main 平时严格落后 dev，快进即可，**两个分支都要更新**：
+
+```bash
+git checkout main && git merge --ff-only dev && git push origin main
+git checkout dev
+```
+
+若报分叉（非 fast-forward），停下来问用户怎么处理，别自作主张 merge。
+
 ## GitHub Actions 打包（推荐）
 
 `.github/workflows/release.yml` 的触发条件是：

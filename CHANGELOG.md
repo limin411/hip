@@ -11,6 +11,28 @@ and this project aims to follow [Semantic Versioning](https://semver.org/).
 
 - ...
 
+## [2.0.3] - 2026-09-18
+
+### Added
+
+- **定时任务迁入会话**：删除独立的「自动化」页面，定时任务改为归属具体会话并在所属会话内执行；删除会话即随之删除其定时任务，不再改投新会话。
+- **会话启用定时任务后，侧边栏显示时钟标识。**
+- **终端主机库改为卡片网格**：主机卡片压扁到 84px，主副操作收拢到右上角。
+
+### Fixed
+
+- **定时任务从不执行**：恢复 `AutomationRunHost` 挂载；调度 tick 改用原生定时器驱动，窗口隐藏时也能正常触发；interval 触发器全线打通。
+- **项目场景的定时任务把执行记录混进「对话」列表**，现已剔除。
+- **MCP 市场安装与插件 MCP 失效**：恢复裸包运行器命令（`npx` / `uvx` / `pipx` / `dnx` / `docker`）的解析；`hip.toml` 变更后刷新插件与 MCP 缓存；写回配置时保留 MCP 条目的 `plugin_id` / `allow_duplicate`。
+- **automations catalog 不可读时被改名隔离**，导致 dev 与打包构建互相看不见数据；改为版本门：读到更高版本时不加载、不覆盖。
+- **后台任务输出内存无上限**；`wait_any` 在无 timeout 时永久自旋；沙箱 wrapper 吞掉真实命令。
+- **Windows 兼容性与资源泄漏**系列修复。
+
+### Removed
+
+- 「自动化」页面、「事项追踪」、「文档管理」、设置里的「IM 连接」、语音听写（whisper.cpp）、Knowledge 特性。
+- 同步清理 434 个 i18n 死键与相关 store / 路由 / 文档残留。
+
 ## [1.0.6] - 2026-08-27
 
 ### Added

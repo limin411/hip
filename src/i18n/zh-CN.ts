@@ -1843,6 +1843,7 @@ export const zhCN = {
       },
       status: {
         running: '运行中',
+        scheduled: '定时任务',
       },
       newSpace: '新建…',
       newTask: '新建任务',

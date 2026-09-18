@@ -1781,7 +1781,8 @@ export const ko = {
       "code": "코드"
     },
     "status": {
-      "running": "실행 중"
+      "running": "실행 중",
+      "scheduled": "예약 작업"
     },
     "newSpace": "새로 만들기…",
     "newTask": "새 작업",

@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Code2,
   MessageSquare,
   Monitor,
@@ -21,6 +22,10 @@ import {
   Terminal,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
+// Narrow import (not the `@/domain/automations` barrel) so the sidebar does not
+// pull buildSessionConfig's store/IPC graph into every render.
+import { scheduledSessionIds } from '@/domain/automations/sessionFlags'
+import { useAutomationStore } from '@/store/automationStore'
 import { isMacPlatform } from '@/lib/platform'
 import { isTerminalSession, surfaceOf } from '@/lib/sessions'
 import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProjectGroups'
@@ -89,6 +94,13 @@ export function AppSidebar() {
   const overlay = useUiStore((s) => s.overlay)
   const sessions = useSessions()
   const activeSessionId = useActiveSessionId()
+  /**
+   * Conversations that own an enabled scheduled task. The catalog is loaded
+   * app-lifetime by `AutomationRunHost`, so it is available (possibly empty on
+   * the very first paint) without any extra IPC here.
+   */
+  const automations = useAutomationStore((s) => s.automations)
+  const scheduledIds = useMemo(() => scheduledSessionIds(automations), [automations])
 
   const managedTerminals = useManagedTerminalStore((s) => s.terminals)
   const focusedManagedId = useManagedTerminalStore((s) => s.focusedId)
@@ -692,6 +704,7 @@ export function AppSidebar() {
                           session={session}
                           activeSessionId={activeSessionId}
                           activeView={activeView}
+                          hasScheduledTask={scheduledIds.has(session.id)}
                           enterIndex={i}
                         />
                       ))}
@@ -751,6 +764,7 @@ export function AppSidebar() {
                           session={session}
                           activeSessionId={activeSessionId}
                           activeView={activeView}
+                          hasScheduledTask={scheduledIds.has(session.id)}
                           enterIndex={i}
                         />
                       ))}
@@ -841,12 +855,15 @@ function SidebarSessionRow({
   session,
   activeSessionId,
   activeView,
+  /** Conversation owns an enabled scheduled task (composer "scheduled task"). */
+  hasScheduledTask = false,
   /** Stagger index for first-mount fade (ui-enhancement-bui P1-4); omit to skip. */
   enterIndex,
 }: {
   session: SessionVM
   activeSessionId: string | null
   activeView: string
+  hasScheduledTask?: boolean
   enterIndex?: number
 }) {
   const { t } = useTranslation()
@@ -857,9 +874,10 @@ function SidebarSessionRow({
     session.id === activeSessionId && (activeView === 'chat' || activeView === 'code')
   const running = session.status === 'running'
   const surfaceLabel = surface === 'code' ? t('sidebar.badge.code') : t('sidebar.badge.chat')
-  const ariaLabel = running
-    ? `${session.title}, ${surfaceLabel}, ${t('sidebar.status.running')}`
-    : `${session.title}, ${surfaceLabel}`
+  const scheduledLabel = t('sidebar.status.scheduled')
+  let ariaLabel = `${session.title}, ${surfaceLabel}`
+  if (running) ariaLabel += `, ${t('sidebar.status.running')}`
+  if (hasScheduledTask) ariaLabel += `, ${scheduledLabel}`
 
   // Session rows sit one level below their group header; indent the title to the
   // header label column so the folder/date → session hierarchy stays aligned.
@@ -919,6 +937,16 @@ function SidebarSessionRow({
               <span className="block min-w-0 truncate text-body font-medium text-ink" aria-hidden>
                 {session.title}
               </span>
+              {hasScheduledTask ? (
+                <span
+                  className="shrink-0 text-accent"
+                  data-testid={`sidebar-session-scheduled-${session.id}`}
+                  title={scheduledLabel}
+                  aria-hidden
+                >
+                  <Clock size={12} strokeWidth={1.75} />
+                </span>
+              ) : null}
             </span>
             <span
               className={cn(

@@ -1786,7 +1786,8 @@ export const zhTW = {
       "code": "編碼"
     },
     "status": {
-      "running": "執行中"
+      "running": "執行中",
+      "scheduled": "定時任務"
     },
     "newSpace": "新建…",
     "newTask": "新增任務",

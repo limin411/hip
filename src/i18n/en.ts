@@ -1894,6 +1894,7 @@ export const en = {
       },
       status: {
         running: 'Running',
+        scheduled: 'Scheduled task',
       },
       newSpace: 'New…',
       newTask: 'New task',

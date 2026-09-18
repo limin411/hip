@@ -1781,7 +1781,8 @@ export const ja = {
       "code": "コード"
     },
     "status": {
-      "running": "実行中"
+      "running": "実行中",
+      "scheduled": "定期実行タスク"
     },
     "newSpace": "新規作成…",
     "newTask": "新しいタスク",

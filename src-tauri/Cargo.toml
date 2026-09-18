@@ -1,6 +1,6 @@
 [package]
 name = "hip"
-version = "2.0.2"
+version = "2.0.3"
 description = "Desktop AI workbench (Tauri shell + React UI + Node sidecar)"
 authors = ["ljm"]
 edition = "2021"

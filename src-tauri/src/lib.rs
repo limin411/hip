@@ -1099,6 +1099,8 @@ mod tests {
                 registry_name: None,
                 registry_source_id: None,
                 registry_version: None,
+                plugin_id: Some("pdf-plugin".into()),
+                allow_duplicate: Some(true),
             }],
             skills: vec![super::SkillEntry { id: "pdf-tools".into(), enabled: true }],
             agents: vec![super::AgentEntry {
@@ -1153,6 +1155,11 @@ mod tests {
         assert_eq!(from_toml.mcp_servers.len(), 1);
         assert_eq!(from_toml.mcp_servers[0].id, "srv-1");
         assert_eq!(from_toml.mcp_servers[0].transport, "stdio");
+        // sidecar-side MCP fields must survive a Settings rewrite (set_hip_config is a full rewrite)
+        assert!(toml_str.contains("plugin_id"), "TOML should carry plugin_id");
+        assert!(toml_str.contains("allow_duplicate"), "TOML should carry allow_duplicate");
+        assert_eq!(from_toml.mcp_servers[0].plugin_id.as_deref(), Some("pdf-plugin"));
+        assert_eq!(from_toml.mcp_servers[0].allow_duplicate, Some(true));
         assert_eq!(from_toml.skills.len(), 1);
         assert_eq!(from_toml.skills[0].id, "pdf-tools");
         assert!(from_toml.skills[0].enabled);
@@ -1184,6 +1191,8 @@ mod tests {
         let from_json2: super::HipConfig = serde_json::from_str(&json2).unwrap();
         assert_eq!(from_json2.version, 1);
         assert_eq!(from_json2.mcp_servers[0].id, "srv-1");
+        assert_eq!(from_json2.mcp_servers[0].plugin_id.as_deref(), Some("pdf-plugin"));
+        assert_eq!(from_json2.mcp_servers[0].allow_duplicate, Some(true));
     }
 
     #[test]
@@ -1290,6 +1299,8 @@ mod tests {
                     registry_name: None,
                     registry_source_id: None,
                     registry_version: None,
+                    plugin_id: None,
+                    allow_duplicate: None,
                 },
                 super::McpServerEntry {
                     id: "github".into(),
@@ -1306,6 +1317,8 @@ mod tests {
                     registry_name: None,
                     registry_source_id: None,
                     registry_version: None,
+                    plugin_id: None,
+                    allow_duplicate: None,
                 },
             ],
             skills: vec![
@@ -1422,6 +1435,8 @@ mod tests {
                     registry_name: None,
                     registry_source_id: None,
                     registry_version: None,
+                    plugin_id: None,
+                    allow_duplicate: None,
                 },
                 super::TomlMcpServerEntry {
                     id: "github".into(),
@@ -1442,6 +1457,8 @@ mod tests {
                     registry_name: None,
                     registry_source_id: None,
                     registry_version: None,
+                    plugin_id: None,
+                    allow_duplicate: None,
                 },
             ],
             skills: vec![

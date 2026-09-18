@@ -65,6 +65,12 @@ pub(crate) struct McpServerEntry {
     /// Registry version at install time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) registry_version: Option<String>,
+    /// Plugin that contributed this server. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "plugin_id")]
+    pub(crate) plugin_id: Option<String>,
+    /// Keep this server even when another enabled server shares its capability fingerprint.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "allow_duplicate")]
+    pub(crate) allow_duplicate: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -423,6 +429,12 @@ pub(crate) struct TomlMcpServerEntry {
     pub(crate) registry_source_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "registryVersion")]
     pub(crate) registry_version: Option<String>,
+    /// Plugin that contributed this server. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "pluginId")]
+    pub(crate) plugin_id: Option<String>,
+    /// Keep this server even when another enabled server shares its capability fingerprint.
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "allowDuplicate")]
+    pub(crate) allow_duplicate: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -766,6 +778,8 @@ impl From<McpServerEntry> for TomlMcpServerEntry {
             registry_name: s.registry_name,
             registry_source_id: s.registry_source_id,
             registry_version: s.registry_version,
+            plugin_id: s.plugin_id,
+            allow_duplicate: s.allow_duplicate,
         }
     }
 }
@@ -787,6 +801,8 @@ impl From<TomlMcpServerEntry> for McpServerEntry {
             registry_name: s.registry_name,
             registry_source_id: s.registry_source_id,
             registry_version: s.registry_version,
+            plugin_id: s.plugin_id,
+            allow_duplicate: s.allow_duplicate,
         }
     }
 }

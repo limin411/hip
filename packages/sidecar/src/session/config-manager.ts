@@ -1,3 +1,5 @@
+import { statSync } from 'node:fs'
+import { join } from 'node:path'
 import type { SessionConfig, SkillMeta, AgentConfig, McpServerConfig, ExecutionMode } from '@hip/protocol'
 import {
   canSelectAutopilot,
@@ -13,6 +15,8 @@ export class ConfigManager {
   private cachedPluginAgents: AgentConfig[] | null = null
   /** Last extension conflicts from ExtensionRegistry (for inspect / future UI). */
   private cachedConflicts: import('@hip/protocol').ExtensionConflict[] = []
+  /** Fingerprint of the hip.toml files the caches above were built from. See refreshIfConfigChanged. */
+  private configStamp: string | null = null
 
   constructor(
     private getConfig: () => SessionConfig,
@@ -26,15 +30,50 @@ export class ConfigManager {
     private readonly hookRegistry: HookRegistry,
   ) {}
 
-  get skills(): SkillMeta[] { return this.cachedSkills ?? [] }
-  get mcpConfigs(): McpServerConfig[] { return this.cachedMcpConfigs ?? [] }
-  get pluginAgents(): AgentConfig[] { return this.cachedPluginAgents ?? [] }
+  get skills(): SkillMeta[] { this.refreshIfConfigChanged(); return this.cachedSkills ?? [] }
+  get mcpConfigs(): McpServerConfig[] { this.refreshIfConfigChanged(); return this.cachedMcpConfigs ?? [] }
+  get pluginAgents(): AgentConfig[] { this.refreshIfConfigChanged(); return this.cachedPluginAgents ?? [] }
   get extensionConflicts(): import('@hip/protocol').ExtensionConflict[] {
     return this.cachedConflicts
   }
 
+  /** mtime+size of every hip.toml feeding the caches. Two stats — cheap enough for a getter. */
+  private configStampNow(): string {
+    const cwd = this.getConfig().cwd ?? process.cwd()
+    const files = [process.env.HIP_CONFIG_PATH?.trim(), join(cwd, '.hip', 'hip.toml')]
+    return files
+      .filter((f): f is string => Boolean(f))
+      .map((f) => {
+        try {
+          const s = statSync(f)
+          return `${s.mtimeMs}:${s.size}`
+        } catch {
+          return '-'
+        }
+      })
+      .join('|')
+  }
+
+  /**
+   * Re-read extensions when hip.toml changed underneath this session. Settings rewrites it via
+   * `set_hip_config` and only pushes `mcp:reconnect`, so without this the per-turn
+   * `reconcile(configMgr.mcpConfigs)` would keep using the config the session started with and
+   * drop the server the user just added. No-op until the first loadPluginComponents().
+   */
+  private refreshIfConfigChanged(): void {
+    const stamp = this.configStampNow()
+    if (this.configStamp === null) {
+      this.configStamp = stamp
+      return
+    }
+    if (stamp === this.configStamp) return
+    this.loadPluginComponents()
+  }
+
   /** Load (or reload) per-session plugin components via ExtensionRegistry SSOT. */
   loadPluginComponents(): void {
+    // Stamped before reading: a write landing mid-load only causes one extra reload.
+    this.configStamp = this.configStampNow()
     if (this.isExternalAgent()) {
       this.cachedSkills = []
       this.cachedMcpConfigs = []

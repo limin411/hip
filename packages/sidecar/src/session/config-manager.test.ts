@@ -290,6 +290,30 @@ describe('ConfigManager — MCP config loading', () => {
     expect(mgr.mcpConfigs).toHaveLength(1)
     expect(mgr.mcpConfigs[0]).toMatchObject({ id: 'new-srv', name: 'New' })
   })
+
+  it('picks up a hip.toml rewrite that happened after the load (Settings save → next turn)', () => {
+    const configDir = tmpDir()
+    dirs.push(configDir)
+    const globalToml = join(configDir, 'hip.toml')
+    writeFileSync(globalToml, `version = 1\nmcp_servers = []\n`)
+    process.env.HIP_CONFIG_PATH = globalToml
+
+    const cwdDir = tmpDir()
+    dirs.push(cwdDir)
+
+    const mgr = makeManager(cwdDir)
+    mgr.loadPluginComponents()
+    expect(mgr.mcpConfigs).toHaveLength(0)
+
+    // Settings → MCP writes the file and pushes mcp:reconnect; the per-turn reconcile re-reads
+    // this cache, so it must not keep serving the config the session started with.
+    writeFileSync(
+      globalToml,
+      `version = 1\n\n[[mcp_servers]]\nid = "srv-added"\nname = "Added in Settings"\ntransport = "http"\nenabled = true\nurl = "https://added.test/mcp"\n`,
+    )
+
+    expect(mgr.mcpConfigs.map((s) => s.id)).toEqual(['srv-added'])
+  })
 })
 
 describe('ConfigManager — builtin product skill', () => {
